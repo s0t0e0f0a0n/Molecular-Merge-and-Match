@@ -22,7 +22,7 @@
         const repo = "Molecular-Merge-and-Match";
         const branch = "exercise-files";
         
-        const apiUrl = `https://github.com{username}/${repo}/contents/?ref=${branch}`;
+        const apiUrl = `https://api.github.com/repos/${username}/${repo}/contents/?ref=${branch}`;
 
         fetch(apiUrl)
             .then(res => {
