@@ -1,2 +1,0 @@
-# Prutserij
-Stefan's playground
