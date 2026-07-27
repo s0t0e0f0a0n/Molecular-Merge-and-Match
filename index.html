@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Available Downloads</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; line-height: 1.6; }
+        h1 { border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+        ul { list-style-type: none; padding: 0; }
+        li { padding: 8px 12px; border-bottom: 1px solid #f6f8fa; display: flex; justify-content: space-between; }
+        a { color: #0366d6; text-decoration: none; font-weight: 500; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <h1>Download Directory</h1>
+    <ul id="file-list">Loading files...</ul>
+
+    <script>
+        // Extracts username and repo from current URL automatically
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        const repo = pathParts[0] || '';
+        const username = window.location.hostname.split('.')[0];
+        
+        // Target your specific branch files via public GitHub API
+        const apiUrl = `https://github.com{username}/${repo}/contents/?ref=exercise-files`;
+
+        fetch(apiUrl)
+            .then(res => res.json())
+            .then(data => {
+                const list = document.getElementById('file-list');
+                list.innerHTML = '';
+                
+                // Filter out configuration files and list the zips
+                const files = data.filter(item => item.type === 'file' && item.name !== 'index.html' && !item.name.startsWith('.'));
+                
+                if(files.length === 0) {
+                    list.innerHTML = '<li>No files found in this directory.</li>';
+                    return;
+                }
+
+                files.forEach(file => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<a href="${file.name}">${file.name}</a> <span>(${(file.size / 1024 / 1024).toFixed(2)} MB)</span>`;
+                    list.appendChild(li);
+                });
+            })
+            .catch(err => {
+                document.getElementById('file-list').innerHTML = '<li>Error loading files. Check console or repository privacy settings.</li>';
+            });
+    </script>
+</body>
+</html>
