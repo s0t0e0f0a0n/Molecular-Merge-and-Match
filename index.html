@@ -17,29 +17,41 @@
     <ul id="file-list">Loading files...</ul>
 
     <script>
-        const apiUrl = `https://github.com`;
+        // Directly targets your username, repo, and specific exercise-files branch
+        const username = "s0t0e0f0a0n";
+        const repo = "Molecular-Merge-and-Match";
+        const branch = "exercise-files";
+        
+        const apiUrl = `https://github.com{username}/${repo}/contents/?ref=${branch}`;
 
         fetch(apiUrl)
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`HTTP error! Status: ${res.status}`);
+                }
+                return res.json();
+            })
             .then(data => {
                 const list = document.getElementById('file-list');
                 list.innerHTML = '';
                 
-                // Filter out configuration files and list the zips
+                // Filter out index.html and hidden configuration files
                 const files = data.filter(item => item.type === 'file' && item.name !== 'index.html' && !item.name.startsWith('.'));
                 
-                if(files.length === 0) {
+                if (files.length === 0) {
                     list.innerHTML = '<li>No files found in this directory.</li>';
                     return;
                 }
 
                 files.forEach(file => {
                     const li = document.createElement('li');
-                    li.innerHTML = `<a href="${file.name}">${file.name}</a> <span>(${(file.size / 1024 / 1024).toFixed(2)} MB)</span>`;
+                    // Uses download_url to download directly from the correct branch
+                    li.innerHTML = `<a href="${file.download_url}">${file.name}</a> <span>(${(file.size / 1024 / 1024).toFixed(2)} MB)</span>`;
                     list.appendChild(li);
                 });
             })
             .catch(err => {
+                console.error('GitHub Pages Load Error:', err);
                 document.getElementById('file-list').innerHTML = '<li>Error loading files. Check console or repository privacy settings.</li>';
             });
     </script>
