@@ -17,12 +17,6 @@
     <ul id="file-list">Loading files...</ul>
 
     <script>
-        // Extracts username and repo from current URL automatically
-        const pathParts = window.location.pathname.split('/').filter(Boolean);
-        const repo = pathParts[0] || '';
-        const username = window.location.hostname.split('.')[0];
-        
-        // Target your specific branch files via public GitHub API
         const apiUrl = `https://github.com/s0t0e0f0a0n/Molecular-Merge-and-Match/tree/exercise-files`;
 
         fetch(apiUrl)
