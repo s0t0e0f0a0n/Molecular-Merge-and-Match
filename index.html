@@ -23,7 +23,7 @@
         const username = window.location.hostname.split('.')[0];
         
         // Target your specific branch files via public GitHub API
-        const apiUrl = `https://github.com{username}/${repo}/contents/?ref=exercise-files`;
+        const apiUrl = `https://github.com/s0t0e0f0a0n/Molecular-Merge-and-Match/tree/exercise-files`;
 
         fetch(apiUrl)
             .then(res => res.json())
