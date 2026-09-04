@@ -1,0 +1,13 @@
+[
+  {"name": "Water", "smiles": "O", "keywords": "o ,O , water, h2o, H2O, hydroxyl, hydroxy, oh, OH, alcohol, oxide, oxo, zuurstof, oxygen, o, oh-, hydroxide"},
+  {"name": "Ammonia", "smiles": "N", "keywords": "n ,N , ammonia, nh3, NH3, ammoniak, amine, amino, nh2, NH2, stikstof, nitrogen, n"},
+  {"name": "Methane", "smiles": "C", "keywords": "methane, ch4, CH4, methaan, methyl, ch3, CH3, me, alkyl, alkaan, c"},
+  {"name": "Formaldehyde", "smiles": "C=O", "keywords": "2,o ,O , formaldehyde, methanal, ch2o, CH2O, aldehyde, aldehyde, carbonyl, carbonyl, formyl, cho, CHO, =o, c=o, dubbele binding o, double bond"},
+  {"name": "Ethene", "smiles": "C=C", "keywords": "2, ethene, ethylene, c2h4, C2H4, etheen, alkene, alkeen, double bond, dubbele binding, c=c, vinyl, ethenyl, two"},
+  {"name": "Ethane", "smiles": "CC", "keywords": "ethane, c2h6, C2H6, ethaan, ethyl, c2h5, C2H5, et, alkyl, alkaan, cc"},
+  {"name": "Acetaldehyde", "smiles": "CC=O", "keywords": "2,o ,O , acetaldehyde, ethanal, c2h4o, C2H4O, aldehyde, carbonyl, acetyl, cho, CHO, c=o, dubbele binding o, double bond"},
+  {"name": "Propene", "smiles": "CC=C", "keywords": "2, propene, propylene, c3h6, C3H6, propeen, alkene, alkeen, double bond, dubbele binding, cc=c, propenyl, allyl, two"},
+  {"name": "Propyne", "smiles": "CC#C", "keywords": "3, propyne, methylacetylene, c3h4, C3H4, propyn, alkyne, alkyn, triple bond, drievoudige binding, cc#c, propynyl, three"},
+  {"name": "Benzene", "smiles": "c1ccccc1", "keywords": "benzene, c6h6, C6H6, benzeen, phenyl, ph, aromatic, aromatisch, arene, ring, benzyl, fenyl"},
+  {"name": "Pyridine", "smiles": "n1ccccc1", "keywords": "n ,N , pyridine, c5h5n, C5H5N, aromatic, aromatisch, heterocycle, heterocyclisch, heteroaromatic, heteroaromatisch, n-ring, stikstofring, pyridyl"}
+]

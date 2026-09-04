@@ -1,0 +1,90 @@
+{
+  "name": "molecular-merge-and-match",
+  "version": "1.0.0",
+  "description": "Molecular Bookkeeping for structural analysis",
+  "main": "main.js",
+  "devDependencies": {
+    "electron": "^41.6.1",
+    "electron-builder": "^26.8.1"
+  },
+  "scripts": {
+    "dist": "electron-builder",
+    "postinstall": "electron-builder install-app-deps",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "build": {
+    "appId": "com.ludev.molecularmergeandmatch",
+    "productName": "Molecular Merge and Match",
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "build-assets"
+    },
+    "files": [
+      "package.json",
+      "main.js",
+      "preload.js",
+      "frontend/dist/**/*",
+      "build-assets/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/bin/",
+        "to": "bin/",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "backend/data",
+        "to": "data",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "artifactName": "${name}-Setup-${version}.${ext}",
+      "icon": "build-assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "artifactName": "${name}-Setup-${version}.${ext}",
+      "icon": "build-assets/icon.icns",
+      "category": "public.app-category.education"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "artifactName": "${name}-Setup-${version}.${ext}",
+      "icon": "build-assets/icon.icns",
+      "category": "Education",
+      "description": "An interactive NMR-based structure elucidation tool for university-level organic chemistry students. Students select molecular fragments, match them to peaks in 1H-NMR and 13C-NMR spectra, combine fragments into a complete molecule, and validate their answer against a teacher-defined solution."
+    },
+    "publish": {
+      "provider": "github",
+      "releaseType": "release"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ludev-nl/2026-18-Molecular_Bookkeeping_for_structural_analysis.git"
+  },
+  "keywords": [],
+  "author": "LUDev <ludev@liacs.leidenuniv.nl>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ludev-nl/2026-18-Molecular_Bookkeeping_for_structural_analysis/issues"
+  },
+  "homepage": "https://github.com/ludev-nl/2026-18-Molecular_Bookkeeping_for_structural_analysis#readme",
+  "type": "commonjs"
+}

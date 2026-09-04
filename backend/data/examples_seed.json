@@ -1,0 +1,311 @@
+[
+  {
+    "exercise": {
+      "name": "Example 1",
+      "molecular_formula": "C12H22O11",
+      "exercise_set": "Examples",
+      "tags_csv": "example,chiral",
+      "h1_svg_path": "/examples/ex1_H.svg",
+      "h1_axis_start": 10.1,
+      "h1_axis_end": -0.1,
+      "c13_svg_path": "/examples/ex1_C.svg",
+      "c13_axis_start": 213.0,
+      "c13_axis_end": -2.0,
+      "h1_nmr_text": "1H-NMR (D2O, 500 MHz): 5.37 (1H, d, J = 3.9 Hz), 4.79 (8H, bs), 4.17 (1H, d, J = 8.7 Hz), 4.00 (1H, t, J = 8.6 Hz), 3.85 (1H, ddd, J = 8.4, 6.2, 3.8 Hz), 3.82 - 3.75 (5H, m), 3.71 (1H, dd, J = 10.0, 9.1 Hz), 3.63 (2H, s), 3.51 (1H, dd, J = 10.0, 3.9 Hz), 3.43 (1H, dd, J = 9.8, 9.1 Hz);",
+      "h1_frequency_mhz": 500.0,
+      "h1_solvent": "D2O",
+      "c13_nmr_text": "13C-NMR (D2O, 126 MHz): 103.6, 92.1, 81.3, 76.3, 73.9, 72.5, 72.3, 71.0, 69.2, 62.3, 61.3, 60.1;",
+      "c13_frequency_mhz": 126.0,
+      "c13_solvent": "D2O",
+	  "c13_apt": true,
+      "solution_inchi_hash": "f55c3ff3ff10c1cead53ca1dd27cf9cb91e33f5787251b1e4dd34405d834c4a8",
+      "solution_cas_hash": "f9d2c5db3a58b02126616c5c939890387bf51b1b135c32fdff04cf2fb2d5b699"
+    },
+    "h1_peaks": [
+      {
+        "ppm": 5.37,
+        "multiplicity": "d",
+        "j_values_hz_csv": "3.9",
+        "proton_count": 1,
+        "extra_info": "1H, d, J = 3.9 Hz"
+      },
+      {
+        "ppm": 4.79,
+        "multiplicity": "bs",
+        "j_values_hz_csv": null,
+        "proton_count": 8,
+        "extra_info": "8H, bs"
+      },
+      {
+        "ppm": 4.17,
+        "multiplicity": "d",
+        "j_values_hz_csv": "8.7",
+        "proton_count": 1,
+        "extra_info": "1H, d, J = 8.7 Hz"
+      },
+      {
+        "ppm": 4.0,
+        "multiplicity": "t",
+        "j_values_hz_csv": "8.6",
+        "proton_count": 1,
+        "extra_info": "1H, t, J = 8.6 Hz"
+      },
+      {
+        "ppm": 3.85,
+        "multiplicity": "ddd",
+        "j_values_hz_csv": "8.4,6.2,3.8",
+        "proton_count": 1,
+        "extra_info": "1H, ddd, J = 8.4, 6.2, 3.8 Hz"
+      },
+      {
+        "ppm": 3.785,
+        "multiplicity": "m",
+        "j_values_hz_csv": null,
+        "proton_count": 5,
+        "extra_info": "5H, m"
+      },
+      {
+        "ppm": 3.71,
+        "multiplicity": "dd",
+        "j_values_hz_csv": "10.0,9.1",
+        "proton_count": 1,
+        "extra_info": "1H, dd, J = 10.0, 9.1 Hz"
+      },
+      {
+        "ppm": 3.63,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "proton_count": 2,
+        "extra_info": "2H, s"
+      },
+      {
+        "ppm": 3.51,
+        "multiplicity": "dd",
+        "j_values_hz_csv": "10.0,3.9",
+        "proton_count": 1,
+        "extra_info": "1H, dd, J = 10.0, 3.9 Hz"
+      },
+      {
+        "ppm": 3.43,
+        "multiplicity": "dd",
+        "j_values_hz_csv": "9.8,9.1",
+        "proton_count": 1,
+        "extra_info": "1H, dd, J = 9.8, 9.1 Hz"
+      }
+    ],
+    "c13_peaks": [
+      {
+        "ppm": 103.6,
+        "atom_count": 1,
+        "extra_info": null
+      },
+      {
+        "ppm": 92.1,
+        "atom_count": 1,
+        "extra_info": null
+      },
+      {
+        "ppm": 81.3,
+        "atom_count": 1,
+        "extra_info": null
+      },
+      {
+        "ppm": 76.3,
+        "atom_count": 1,
+        "extra_info": null
+      },
+      {
+        "ppm": 73.9,
+        "atom_count": 1,
+        "extra_info": null
+      },
+      {
+        "ppm": 72.5,
+        "atom_count": 1,
+        "extra_info": null
+      },
+      {
+        "ppm": 72.3,
+        "atom_count": 1,
+        "extra_info": null
+      },
+      {
+        "ppm": 71.0,
+        "atom_count": 1,
+        "extra_info": null
+      },
+      {
+        "ppm": 69.2,
+        "atom_count": 1,
+        "extra_info": null
+      },
+      {
+        "ppm": 62.3,
+        "atom_count": 1,
+        "extra_info": null
+      },
+      {
+        "ppm": 61.3,
+        "atom_count": 1,
+        "extra_info": null
+      },
+      {
+        "ppm": 60.1,
+        "atom_count": 1,
+        "extra_info": null
+      }
+    ],
+    "additional_spectra": [
+      {
+        "label": "C-bbdec",
+        "file_path": "/examples/ex1_C-bbdec.svg"
+      },
+      {
+        "label": "COSY",
+        "file_path": "/examples/ex1_COSY.svg"
+      },
+      {
+        "label": "DEPT-135",
+        "file_path": "/examples/ex1_DEPT-135.svg"
+      },
+      {
+        "label": "GATED",
+        "file_path": "/examples/ex1_GATED.svg"
+      },
+      {
+        "label": "H2BC",
+        "file_path": "/examples/ex1_H2BC.svg"
+      },
+      {
+        "label": "HMBC",
+        "file_path": "/examples/ex1_HMBC.svg"
+      },
+      {
+        "label": "H-presat",
+        "file_path": "/examples/ex1_H-presat.svg"
+      },
+      {
+        "label": "HSQC",
+        "file_path": "/examples/ex1_HSQC.svg"
+      },
+      {
+        "label": "HSQC-TOCSY",
+        "file_path": "/examples/ex1_HSQC-TOCSY.svg"
+      },
+      {
+        "label": "INADEQUATE",
+        "file_path": "/examples/ex1_INADEQUATE.svg"
+      },
+      {
+        "label": "IR",
+        "file_path": "/examples/ex1_IR.svg"
+      },
+      {
+        "label": "meHSQC",
+        "file_path": "/examples/ex1_meHSQC.svg"
+      },
+      {
+        "label": "NOESY",
+        "file_path": "/examples/ex1_NOESY.svg"
+      },
+      {
+        "label": "TOCSY",
+        "file_path": "/examples/ex1_TOCSY.svg"
+      }
+    ]
+  },
+  {
+    "exercise": {
+      "name": "Example 2",
+      "molecular_formula": "C4H8O2",
+      "exercise_set": "Examples",
+      "tags_csv": "example,solvent",
+      "h1_svg_path": "/examples/ex2_H.svg",
+      "h1_axis_start": 10.1,
+      "h1_axis_end": -0.1,
+      "c13_svg_path": "/examples/ex2_C.svg",
+      "c13_axis_start": 213.0,
+      "c13_axis_end": -2.0,
+      "h1_nmr_text": "1H-NMR (CDCl3, 400 MHz): 4.12 (1H, q, J = 7.1 Hz), 2.05 (1H, s), 1.26 (2H, t, J = 7.2 Hz);",
+      "h1_frequency_mhz": 400.0,
+      "h1_solvent": "CDCl3",
+      "c13_nmr_text": "13C-NMR (CDCl3, 101 MHz): 171.0, 60.3, 20.9, 14.1;",
+      "c13_frequency_mhz": 101.0,
+      "c13_solvent": "CDCl3",
+	  "c13_apt": true,
+      "solution_inchi_hash": "e55299b0f2600cdbd8c11031ace2576e9d56afffc87b35443112132ebc54169d",
+      "solution_cas_hash": "6574090d6dbb5b2f45ec6cf3aca7cf02b421eef937a1fd274c6d08a1e26d0edb"
+    },
+    "h1_peaks": [
+      {
+        "ppm": 4.12,
+        "multiplicity": "q",
+        "j_values_hz_csv": "7.1",
+        "proton_count": 1,
+        "extra_info": "1H, q, J = 7.1 Hz"
+      },
+      {
+        "ppm": 2.05,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "proton_count": 1,
+        "extra_info": "1H, s"
+      },
+      {
+        "ppm": 1.26,
+        "multiplicity": "t",
+        "j_values_hz_csv": "7.2",
+        "proton_count": 2,
+        "extra_info": "2H, t, J = 7.2 Hz"
+      }
+    ],
+    "c13_peaks": [
+      {
+        "ppm": 171.0,
+        "atom_count": 1,
+        "extra_info": null
+      },
+      {
+        "ppm": 60.3,
+        "atom_count": 1,
+        "extra_info": null
+      },
+      {
+        "ppm": 20.9,
+        "atom_count": 1,
+        "extra_info": null
+      },
+      {
+        "ppm": 14.1,
+        "atom_count": 1,
+        "extra_info": null
+      }
+    ],
+    "additional_spectra": [
+      {
+        "label": "C-bbdec",
+        "file_path": "/examples/ex2_C-bbdec.svg"
+      },
+      {
+        "label": "COSY",
+        "file_path": "/examples/ex2_COSY.svg"
+      },
+      {
+        "label": "DEPT-135",
+        "file_path": "/examples/ex2_DEPT-135.svg"
+      },
+      {
+        "label": "HMBC",
+        "file_path": "/examples/ex2_HMBC.svg"
+      },
+      {
+        "label": "HSQC",
+        "file_path": "/examples/ex2_HSQC.svg"
+      },
+      {
+        "label": "IR",
+        "file_path": "/examples/ex2_IR.svg"
+      }
+    ]
+  }
+]

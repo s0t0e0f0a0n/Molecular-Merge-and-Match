@@ -1,0 +1,78 @@
+name: CD — Build and Publish Electron Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers on version tags (e.g., v1.0.0)
+  workflow_dispatch: # Allows manual triggering from the GitHub Actions UI
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build Python Backend (Sidecar)
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install pyinstaller
+          pyinstaller --noconsole --collect-all rdkit --collect-all fastapi --collect-all uvicorn --name molecular-backend main_electron.py
+
+      - name: Move Backend Binary to Resources
+        shell: bash
+        run: |
+          mkdir -p resources/bin
+          mv backend/dist/molecular-backend/* resources/bin/
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build Frontend
+        shell: bash
+        env:
+          VITE_BASE_PATH: './'
+        run: |
+          cd frontend
+          npm install
+          mkdir -p public
+          npm run postinstall
+          npm run build
+
+      - name: Install Root Dependencies
+        run: npm install
+
+      - name: Set App Version from Tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          npm version $VERSION --allow-same-version --no-git-tag-version
+
+      - name: Build and Publish with electron-builder
+        env:
+          # This token is automatically provided by GitHub Actions
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        # The -p always flag tells electron-builder to publish the artifacts to GitHub Releases
+        run: npm run dist -- -p always

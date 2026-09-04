@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.idea
+
+# Node
+node_modules/
+dist/
+
+# Frontend public assets (copied by postinstall from node_modules)
+frontend/public/RDKit_minimal.js
+frontend/public/RDKit_minimal.wasm
+frontend/public/jsme/
+frontend/coverage/
+
+# TypeScript build artifacts
+frontend/tsconfig.tsbuildinfo
+
+# Databases
+backend/data/app.db
+backend/data/test.db
+backend/data/uploads/
+
+# OS
+.DS_Store
+
+# Local docs
+docs/local/
+
+# Packaging
+resources/bin/*
+dist-electron/
+backend/dist/
+backend/build/
+backend/molecular-backend.spec
