@@ -216,6 +216,8 @@ export function ExerciseCreationForm({ onCreated }: ExerciseCreationFormProps) {
         end: Number(c13AxisEnd),
       },
       c13_nmr_text: c13NmrText.trim(),
+      c13_alt_text: null,
+      alt_nuc_text: null,
       c13_apt: null,
       molecular_formula: molecularFormula.trim() || null,
       solution_inchi: hashedSolutionInchi,

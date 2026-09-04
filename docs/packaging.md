@@ -27,7 +27,7 @@ Convert the Python code into a standalone binary so that users don't need Python
 Electron needs a static build of the React app.
 
 1.  Navigate to `frontend/`.
-2.  Install dependencies: `npm install`. (do not run `npm audit fix` as it may break the build)
+2.  Install dependencies: `npm install`.
 3.  Make sure `frontend/public` exists, if not, create the folder, then run `npm run postinstall`.
 4.  Run: `npm run build`.
 5.  **Result:** A `frontend/dist/` folder containing `index.html` and assets.
@@ -37,8 +37,8 @@ Electron needs a static build of the React app.
 ## Step 3: Initialize the Electron Shell
 In the **root** of the project (above `backend/` and `frontend/`), set up Electron.
 
-1.  **Install Electron:** `npm install electron electron-builder --save-dev`
-2.  **Initialize npm:** `npm init -y`
+1.  **Initialize npm:** `npm init -y`
+2.  **Install Electron:** `npm install electron electron-builder --save-dev`
 
 ---
 

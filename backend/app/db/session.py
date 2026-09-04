@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import os
 from contextlib import contextmanager
+from collections.abc import Iterator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.core.calculation import calculate_dbe, parse_formula
 from app.core.config import settings
 from app.db.base import Base
 from app.db.models import (
@@ -14,9 +16,69 @@ from app.db.models import (
     ExerciseAdditionalSpectrum,
     ExerciseC13Peak,
     ExerciseH1Peak,
+    ExerciseC13Coupling,
+    SolventsUsed,
+    TagsUsed,
     Fragment,
     PredefinedFragment,
+    UserSettings,
     WorkingSolution,
+)
+
+
+_USER_SETTINGS_PRESETS: tuple[dict[str, object], ...] = (
+    {
+        "name": "Default",
+        "link_inherit_mode": "none",
+        "theme": "Light",
+        "layout_opt": 0,
+        "show_CAS_input": False,
+        "show_solvent": True,
+        "show_exchange": True,
+        "show_missing": False,
+        "show_warnings": True,
+        "show_timer": True,
+        "cheats": "000000000000",
+    },
+    {
+        "name": "Beginner",
+        "link_inherit_mode": "none",
+        "theme": "Light",
+        "layout_opt": 0,
+        "show_CAS_input": True,
+        "show_solvent": True,
+        "show_exchange": True,
+        "show_missing": True,
+        "show_warnings": True,
+        "show_timer": True,
+        "cheats": "110100000000",
+    },
+    {
+        "name": "Exam",
+        "link_inherit_mode": "none",
+        "theme": "Light",
+        "layout_opt": 0,
+        "show_CAS_input": False,
+        "show_solvent": False,
+        "show_exchange": False,
+        "show_missing": False,
+        "show_warnings": False,
+        "show_timer": True,
+        "cheats": "000000000000",
+    },
+    {
+        "name": "User",
+        "link_inherit_mode": "none",
+        "theme": "Light",
+        "layout_opt": 0,
+        "show_CAS_input": False,
+        "show_solvent": True,
+        "show_exchange": True,
+        "show_missing": False,
+        "show_warnings": True,
+        "show_timer": True,
+        "cheats": "000000000000",
+    },
 )
 
 
@@ -71,6 +133,54 @@ def _seed_predefined_fragments() -> None:
     finally:
         db.close()
 
+def _seed_solvents() -> None:
+    """Insert predefined solvents from seed file if table is empty."""
+
+    db = SessionLocal()
+    try:
+        if db.query(SolventsUsed).count() > 0:
+            return
+        seed_path = _get_seed_file_path("solvent_seed.json")
+        if not os.path.exists(seed_path):
+            return
+        with open(seed_path) as f:
+            solvents = json.load(f)
+        for sol in solvents:
+            db.add(SolventsUsed(
+                names=sol["names"],
+                match=sol["match"],
+                display=sol["display"],
+                preference=sol["preference"],
+                count=sol.get("count", 0),
+            ))
+        db.commit()
+    finally:
+        db.close()
+
+def _seed_tags() -> None:
+    """Insert predefined tags from seed file if table is empty."""
+
+    db = SessionLocal()
+    try:
+        if db.query(TagsUsed).count() > 0:
+            return
+        seed_path = _get_seed_file_path("tags_seed.json")
+        if not os.path.exists(seed_path):
+            return
+        with open(seed_path) as f:
+            tags = json.load(f)
+        for tag in tags:
+            db.add(TagsUsed(
+                tag_name=tag["tag_name"],
+                description=tag["description"],
+                is_persistent=tag.get("is_persistent", False),
+                is_hidden=tag.get("is_hidden", False),
+                tag_count=tag.get("tag_count", 0),
+                user_tag=tag.get("user_tag", False),
+            ))
+        db.commit()
+    finally:
+        db.close()
 
 def _seed_exercises() -> None:
     """Insert bundled example exercises if the database is empty."""
@@ -91,10 +201,23 @@ def _seed_exercises() -> None:
 
         for example in examples:
             e = example["exercise"]
+            molecular_formula = e.get("molecular_formula")
+
+            formula_dbe = e.get("dbe")
+            if formula_dbe is None:
+                try:
+                    formula_dbe = (
+                        calculate_dbe(parse_formula(molecular_formula))
+                        if molecular_formula
+                        else 0.0
+                    )
+                except ValueError:
+                    formula_dbe = 0.0
 
             exercise = Exercise(
                 name=e.get("name"),
-                molecular_formula=e.get("molecular_formula"),
+                molecular_formula=molecular_formula,
+                dbe=formula_dbe,
                 tags_csv=e.get("tags_csv"),
                 exercise_set=e.get("exercise_set"),
                 h1_svg_path=e.get("h1_svg_path"),
@@ -107,12 +230,15 @@ def _seed_exercises() -> None:
                 h1_frequency_mhz=e.get("h1_frequency_mhz"),
                 h1_solvent=e.get("h1_solvent"),
                 c13_nmr_text=e.get("c13_nmr_text"),
+                c13_alt_text=e.get("c13_alt_text"),
                 c13_frequency_mhz=e.get("c13_frequency_mhz"),
                 c13_solvent=e.get("c13_solvent"),
                 c13_apt=e.get("c13_apt"),
                 completed=e.get("completed"),
                 solution_inchi_hash=e.get("solution_inchi_hash"),
                 solution_cas_hash=e.get("solution_cas_hash"),
+                h1_data_source=e.get("h1_data_source"),
+                c13_data_source=e.get("c13_data_source"),
             )
 
             db.add(exercise)
@@ -123,7 +249,7 @@ def _seed_exercises() -> None:
             for p in example.get("h1_peaks", []):
                 db.add(ExerciseH1Peak(
                     exercise_id=exercise_id,
-                    ppm=p["ppm"], #why not p.get()?
+                    ppm=p["ppm"],
                     multiplicity=p.get("multiplicity"),
                     j_values_hz_csv=p.get("j_values_hz_csv"),
                     proton_count=p.get("proton_count"),
@@ -135,8 +261,18 @@ def _seed_exercises() -> None:
                     exercise_id=exercise_id,
                     ppm=p["ppm"],
                     atom_tag=p.get("atom_tag"),
-                    atom_count=p.get("atom_count"),
-                    extra_info=p.get("extra_info"),
+                    atom_count=p.get("atom_count") or 1,
+                ))
+
+            for c in example.get("c13_couplings", []):
+                db.add(ExerciseC13Coupling(
+                    exercise_id=exercise_id,
+                    ppm=c["ppm"],
+                    multiplicity=c.get("multiplicity"),
+                    j_values_hz_csv=c.get("j_values_hz_csv"),
+                    extra_info=c.get("extra_info"),
+                    atom_tag=c.get("atom_tag"),
+                    
                 ))
 
             for s in example.get("additional_spectra", []):
@@ -199,6 +335,31 @@ def _seed_preloaded_solutions() -> None:
         db.close()
 
 
+def _seed_user_settings_presets() -> None:
+    """Ensure hardcoded named UserSettings presets exist in the database."""
+
+    db = SessionLocal()
+    try:
+        existing_by_name = {
+            row.name: row
+            for row in db.query(UserSettings).filter(UserSettings.name.isnot(None)).all()
+            if row.name
+        }
+
+        created_any = False
+        for preset in _USER_SETTINGS_PRESETS:
+            preset_name = str(preset["name"])
+            if preset_name in existing_by_name:
+                continue
+            db.add(UserSettings(**preset))
+            created_any = True
+
+        if created_any:
+            db.commit()
+    finally:
+        db.close()
+
+
 
 def _migrate_add_missing_columns() -> None:
     """
@@ -225,12 +386,6 @@ def _migrate_add_missing_columns() -> None:
         if "exercise_set" not in existing_exercise:
             conn.execute(text("ALTER TABLE exercises ADD COLUMN exercise_set TEXT"))
             conn.commit()
-        if "tags_hidden" not in existing_exercise:
-            conn.execute(text("ALTER TABLE exercises ADD COLUMN tags_hidden TEXT"))
-            conn.commit()
-        if "tags_user" not in existing_exercise:
-            conn.execute(text("ALTER TABLE exercises ADD COLUMN tags_user TEXT"))
-            conn.commit()
         if "bookmark" not in existing_exercise:
             conn.execute(text("ALTER TABLE exercises ADD COLUMN bookmark INTEGER"))
             conn.commit()
@@ -248,6 +403,12 @@ def _migrate_add_missing_columns() -> None:
             conn.commit()
         if "alt2_cas_hash" not in existing_exercise:
             conn.execute(text("ALTER TABLE exercises ADD COLUMN alt2_cas_hash TEXT"))
+            conn.commit()
+        if "h1_data_source" not in existing_exercise:
+            conn.execute(text("ALTER TABLE exercises ADD COLUMN h1_data_source STRING(255)"))
+            conn.commit()
+        if "c13_data_source" not in existing_exercise:
+            conn.execute(text("ALTER TABLE exercises ADD COLUMN c13_data_source STRING(255)"))
             conn.commit()
 
         # solution_smiles_hash and cas_answer was removed from the model; drop it so it
@@ -267,6 +428,76 @@ def _migrate_add_missing_columns() -> None:
         if "solution_cas_hash" not in existing_exercise:
             conn.execute(text("ALTER TABLE exercises ADD COLUMN solution_cas_hash TEXT"))
             conn.commit()
+        # Update UserSettings model
+        result_settings = conn.execute(text("PRAGMA table_info(user_settings)"))
+        existing_settings = {row[1] for row in result_settings}
+        if "name" not in existing_settings:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN name TEXT"))
+            conn.commit()
+        if "show_CAS_input" not in existing_settings and "solvent_labels" in existing_settings:
+            conn.execute(text("ALTER TABLE user_settings RENAME COLUMN solvent_labels TO show_CAS_input"))
+            conn.commit()
+        if "show_solvent" not in existing_settings and "solvent_opt" in existing_settings:
+            conn.execute(text("ALTER TABLE user_settings RENAME COLUMN solvent_opt TO show_solvent"))
+            conn.commit()
+        if "show_exchange" not in existing_settings:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN show_exchange BOOLEAN"))
+            conn.commit()
+        if "show_missing" not in existing_settings:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN show_missing BOOLEAN"))
+            conn.commit()
+        if "show_warnings" not in existing_settings:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN show_warnings BOOLEAN"))
+            conn.commit()
+        if "show_creation" not in existing_settings:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN show_creation BOOLEAN"))
+            conn.commit()
+        if "show_timer" not in existing_settings:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN show_timer BOOLEAN"))
+            conn.commit()
+        conn.execute(text("UPDATE user_settings SET name = 'user' WHERE name IS NULL OR TRIM(name) = ''"))
+        conn.commit()
+        conn.execute(text("DELETE FROM user_settings WHERE name = 'user' AND id NOT IN (SELECT MIN(id) FROM user_settings WHERE name = 'user')"))
+        conn.commit()
+
+        # Update SolventsUsed model
+        result_solvents = conn.execute(text("PRAGMA table_info(solvents_used)"))
+        existing_solvents = {row[1] for row in result_solvents}
+        if "preference" not in existing_solvents:
+            conn.execute(text("ALTER TABLE solvents_used ADD COLUMN preference INTEGER NOT NULL DEFAULT 0"))
+            conn.commit()
+        if "count" not in existing_solvents:
+            conn.execute(text("ALTER TABLE solvents_used ADD COLUMN count INTEGER"))
+            conn.commit()
+        if "display" not in existing_solvents:
+            conn.execute(text("ALTER TABLE solvents_used ADD COLUMN display STRING(100)"))
+            conn.commit()
+
+        # Update TagsUsed model
+        result_tags = conn.execute(text("PRAGMA table_info(tags_used)"))
+        existing_tags = {row[1] for row in result_tags}
+        if "description" not in existing_tags:
+            conn.execute(text("ALTER TABLE tags_used ADD COLUMN description TEXT"))
+            conn.commit()
+        if "tag_count" not in existing_tags:
+            conn.execute(text("ALTER TABLE tags_used ADD COLUMN tag_count INTEGER"))
+            conn.commit()
+        if "is_persistent" not in existing_tags:
+            conn.execute(text("ALTER TABLE tags_used ADD COLUMN is_persistent BOOLEAN NOT NULL DEFAULT 0"))
+            conn.commit()
+        if "is_hidden" not in existing_tags:
+            conn.execute(text("ALTER TABLE tags_used ADD COLUMN is_hidden BOOLEAN NOT NULL DEFAULT 0"))
+            conn.commit()
+        if "user_tag" not in existing_tags:
+            conn.execute(text("ALTER TABLE tags_used ADD COLUMN user_tag BOOLEAN"))
+            conn.commit()
+        if "is_hideable" not in existing_tags:
+            conn.execute(text("ALTER TABLE tags_used ADD COLUMN is_hideable BOOLEAN NOT NULL DEFAULT 1"))
+            conn.commit()
+        if "is_cheat" not in existing_tags:
+            conn.execute(text("ALTER TABLE tags_used ADD COLUMN is_cheat BOOLEAN NOT NULL DEFAULT 0"))
+            conn.commit()
+
 
         # Update Statistics model
         result_statistics = conn.execute(text("PRAGMA table_info(statistics)"))
@@ -289,6 +520,25 @@ def _migrate_add_missing_columns() -> None:
             conn.execute(text("ALTER TABLE fragments ADD COLUMN annotation TEXT"))
             conn.commit()
 
+        # Update C13 peaks model for older database versions
+        result_c13_peaks = conn.execute(text("PRAGMA table_info(exercise_c13_peaks)"))
+        existing_c13_peaks = {row[1] for row in result_c13_peaks}
+        if "atom_tag" not in existing_c13_peaks:
+            conn.execute(text("ALTER TABLE exercise_c13_peaks ADD COLUMN atom_tag INTEGER"))
+            conn.commit()
+        if "atom_count" not in existing_c13_peaks:
+            conn.execute(
+                text("ALTER TABLE exercise_c13_peaks ADD COLUMN atom_count INTEGER NOT NULL DEFAULT 1")
+            )
+            conn.commit()
+
+        result_alt_nuclei = conn.execute(text("PRAGMA table_info(exercise_alt_nuclei)"))
+        existing_alt_nuclei = {row[1] for row in result_alt_nuclei}
+        if "atom_count" not in existing_alt_nuclei:
+            conn.execute(
+                text("ALTER TABLE exercise_alt_nuclei ADD COLUMN atom_count INTEGER NOT NULL DEFAULT 1")
+            )
+            conn.commit()
 
 def _purge_soft_deleted_fragments() -> None:
     """Hard-delete any fragment rows still flagged as soft-deleted from a
@@ -298,6 +548,20 @@ def _purge_soft_deleted_fragments() -> None:
     db = SessionLocal()
     try:
         db.query(Fragment).filter(Fragment.deleted_at.isnot(None)).delete(
+            synchronize_session=False
+        )
+        db.commit()
+    finally:
+        db.close()
+
+
+def _purge_soft_deleted_tags() -> None:
+    """Hard-delete any tag rows still flagged as soft-deleted from a
+    previous backend session. Soft-deleted tags should not survive restart."""
+
+    db = SessionLocal()
+    try:
+        db.query(TagsUsed).filter(TagsUsed.deleted_at.isnot(None)).delete(
             synchronize_session=False
         )
         db.commit()
@@ -316,15 +580,19 @@ def init_db() -> None:
 
     Base.metadata.create_all(bind=engine)
     _migrate_add_missing_columns()
+    _seed_user_settings_presets()
     _purge_soft_deleted_fragments()
+    _purge_soft_deleted_tags()
     _seed_predefined_fragments()
+    _seed_solvents()
+    _seed_tags()
     _seed_exercises()
     _seed_preloaded_fragments()
     _seed_preloaded_solutions()
 
 
 @contextmanager
-def get_db() -> Session:
+def get_db() -> Iterator[Session]:
     db = SessionLocal()
     try:
         yield db

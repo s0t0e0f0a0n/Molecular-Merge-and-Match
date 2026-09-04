@@ -1,5 +1,7 @@
 import type { PeakDef } from '../../types/peak';
 
+type PeakListRow = Pick<PeakDef, 'id' | 'ppm' | 'multiplicity'>;
+
 function ppmFmt(x: number) {
   return x.toFixed(x < 10 ? 2 : 1);
 }
@@ -15,7 +17,7 @@ export function PeakList({
   activeFragmentIds,
   fragmentIndexMap,
 }: {
-  peaks: PeakDef[];
+  peaks: PeakListRow[];
   linksByPeak: Map<string, string[]>;
   selectedPeakId: string | null;
   onSelectPeak: (id: string) => void;

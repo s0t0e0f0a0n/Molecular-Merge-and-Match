@@ -67,7 +67,7 @@ export function StereoChoiceDialog({
       role="dialog"
       aria-label="Choose cis or trans configuration"
       style={{
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: 'var(--font-ui)',
         position: 'fixed',
         inset: 0,
         zIndex: 9999,

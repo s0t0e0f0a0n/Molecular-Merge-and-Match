@@ -3,8 +3,6 @@ import sys
 import threading
 import time
 import uvicorn
-
-# Import app to ensure PyInstaller detects and collects the module hooks automatically
 from app.main import app
 
 def watch_parent():
@@ -30,12 +28,13 @@ def watch_parent():
         time.sleep(2)
 
 if __name__ == "__main__":
-    # Start the safety loop before launching the server instance
+    # Start this before uvicorn.run
     threading.Thread(target=watch_parent, daemon=True).start()
 
-    # FIX: Explicitly index sys.argv[1] to extract the port string before integer casting
+    # Use a fixed port or pass one via CLI
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
-
+#  uvicorn.run(app, host="127.0.0.1", port=port, timeout_graceful_shutdown=1)
     # Pass the entry point as a string path configuration block.
     # This prevents PyInstaller from throwing module initialization failures in production.
     uvicorn.run("app.main:app", host="127.0.0.1", port=port, timeout_graceful_shutdown=1)
+

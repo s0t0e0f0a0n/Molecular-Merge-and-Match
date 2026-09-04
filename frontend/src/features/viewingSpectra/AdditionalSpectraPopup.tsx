@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ApiAdditionalSpectrum } from '../../api/exercises'
+import { forceSvgFontFamily, isLikelyIrSpectrum, isSvgPath } from './svgFontOverride'
 
 type ViewMode = 'fit' | 'scroll'
 
@@ -46,12 +47,16 @@ export function AdditionalSpectraPopup({ spectra }: Props) {
   const [activeTab, setActiveTab] = useState(0)
   const [viewMode, setViewMode] = useState<ViewMode>('fit')
   const [zoom, setZoom] = useState(1.2)
+  const [activeSvgContent, setActiveSvgContent] = useState<string>('')
 
-  if (spectra.length === 0) return null
-
+  const hasSpectra = spectra.length > 0
   const sortedSpectra = [...spectra].sort(compareSpectra)
-  const safeTab = Math.min(activeTab, sortedSpectra.length - 1)
-  const active = sortedSpectra[safeTab]
+  const safeTab = hasSpectra ? Math.min(activeTab, sortedSpectra.length - 1) : 0
+  const active = hasSpectra ? sortedSpectra[safeTab] : null
+  const activeFilePath = active?.file_path ?? ''
+  const activeIsSvg = isSvgPath(activeFilePath)
+  const activeIsIr = isLikelyIrSpectrum(active?.label, activeFilePath)
+  const useInlineSvg = activeIsSvg && !activeIsIr
 
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.2, 10))
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.2, 1))
@@ -60,6 +65,42 @@ export function AdditionalSpectraPopup({ spectra }: Props) {
     setActiveTab(0)
     setIsOpen(true)
   }
+
+  useEffect(() => {
+    if (!isOpen || !useInlineSvg || !activeFilePath) {
+      setActiveSvgContent('')
+      return
+    }
+
+    let cancelled = false
+
+    fetch(activeFilePath)
+      .then((res) => res.text())
+      .then((text) => {
+        if (cancelled) return
+
+        const processed = forceSvgFontFamily(text, '--font-spectrum', { forceFill: true })
+          .replace(/<title[\s\S]*?<\/title>/gi, '')
+          .replace(/<desc[\s\S]*?<\/desc>/gi, '')
+          .replace(/<metadata[\s\S]*?<\/metadata>/gi, '')
+          .replace(/\s+title="[^"]*"/gi, '')
+          .replace(/\s+data-name="[^"]*"/gi, '')
+
+        setActiveSvgContent(processed)
+      })
+      .catch((err) => {
+        console.error('Failed to load additional spectrum SVG', err)
+        if (!cancelled) {
+          setActiveSvgContent('')
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeFilePath, isOpen, useInlineSvg])
+
+  if (!hasSpectra || !active) return null
 
   return (
     <>
@@ -82,7 +123,7 @@ export function AdditionalSpectraPopup({ spectra }: Props) {
       {isOpen && createPortal(
         <div
           style={{
-            fontFamily: 'system-ui, sans-serif',
+            fontFamily: 'var(--font-ui)',
             position: 'fixed',
             inset: 0,
             background: 'rgba(0,0,0,0.75)',
@@ -243,19 +284,50 @@ export function AdditionalSpectraPopup({ spectra }: Props) {
                 overflow: viewMode === 'scroll' ? 'auto' : 'hidden',
               }}
             >
-              <img
-                key={active.file_path}
-                src={active.file_path}
-                alt={tabLabel(active, safeTab)}
-                style={{
-                  display: 'block',
-                  width: viewMode === 'fit' ? '100%' : `${zoom * 100}%`,
-                  height: viewMode === 'fit' ? '100%' : 'auto',
-                  padding: 7,
-                  objectFit: viewMode === 'fit' ? 'contain' : undefined,
-                  minWidth: '100%',
-                }}
-              />
+              {useInlineSvg ? (
+                activeSvgContent ? (
+                  <div
+                    key={`${active.file_path}:inline`}
+                    style={{
+                      display: 'block',
+                      width: viewMode === 'fit' ? '100%' : `${zoom * 100}%`,
+                      height: viewMode === 'fit' ? '100%' : 'auto',
+                      minWidth: '100%',
+                      padding: 7,
+                      boxSizing: 'border-box',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: activeSvgContent }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '100%',
+                      height: '100%',
+                      color: '#666',
+                      fontSize: 13,
+                    }}
+                  >
+                    Loading SVG...
+                  </div>
+                )
+              ) : (
+                <img
+                  key={active.file_path}
+                  src={active.file_path}
+                  alt={tabLabel(active, safeTab)}
+                  style={{
+                    display: 'block',
+                    width: viewMode === 'fit' ? '100%' : `${zoom * 100}%`,
+                    height: viewMode === 'fit' ? '100%' : 'auto',
+                    padding: 7,
+                    objectFit: viewMode === 'fit' ? 'contain' : undefined,
+                    minWidth: '100%',
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>,

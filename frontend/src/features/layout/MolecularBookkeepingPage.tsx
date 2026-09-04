@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useWarning } from '../../context/WarningContext';
 import { SpectrumViewer } from '../viewingSpectra/SpectraPrototype';
 import { AdditionalSpectraPopup } from '../viewingSpectra/AdditionalSpectraPopup';
@@ -12,6 +12,7 @@ import { useFragments } from '../../hooks/useFragments';
 import { useWorkingSolution } from '../../hooks/useWorkingSolution';
 import { useLinking } from '../../hooks/useLinking';
 import { useLinkedFragmentWarnings } from '../../hooks/useLinkedFragmentWarnings';
+import { DEFAULT_CHEATS, normalizeCheatBits, useCheating } from '../../hooks/useCheating';
 import { useRDKit } from '../../context/RDKitContext';
 import { parseMolBlock, molGraphToMolBlock } from '../../utils/molParser';
 import { mergeAtAtoms } from '../../utils/mergeFragments';
@@ -26,6 +27,8 @@ import {
   fetchExerciseDbe,
   saveExerciseDbe,
   deleteExercise,
+  type ApiC13Coupling,
+  type ApiC13Peak,
   type ExerciseSummary,
 } from '../../api/exercises';
 import { useExerciseData } from '../../context/ExerciseDataContext';
@@ -39,12 +42,205 @@ import WarningPanel from '../warning/WarningPanel'
 import { FullscreenButton } from '../../components/FullscreenButton';
 import { LoadingExerciseOverlay, PausedExerciseOverlay } from './LoadingExerciseOverlay';
 import { LinkInheritOptionsPopup, type LinkInheritMode } from '../linking/LinkInheritOptionsPopup';
-import { fetchUserSettings, updateUserSettings } from '../../api/settings';
+import { applySettingsPreset, fetchUserSettings, updateUserSettings, type UpdateUserSettingsRequest, type UserSettings } from '../../api/settings';
+import {
+  fetchSolventPreferences,
+  updateSolventPreference,
+  type SolventPreference,
+} from '../../api/solvents';
+import { SettingsPanel } from '../settings/SettingsPanel';
 import {
   ExerciseTimerDisplay,
   PauseExerciseButton,
   useExerciseTimingState,
 } from '../statistics/TimingPanel';
+
+function toRegularC13DisplayPeaks(c13Peaks: ApiC13Peak[]): PeakDef[] {
+  return c13Peaks.map((peak) => ({
+    id: `C${peak.id}`,
+    spectrum: '13C',
+    ppm: peak.ppm,
+  }));
+}
+
+function sortPeaksByPpmDescending(peaks: PeakDef[]): PeakDef[] {
+  return [...peaks].sort((a, b) => {
+    if (b.ppm !== a.ppm) return b.ppm - a.ppm;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+function toAltC13DisplayPeaks(
+  c13Peaks: ApiC13Peak[],
+  c13Couplings: ApiC13Coupling[],
+  includeJValuesInMultiplicity: boolean,
+): PeakDef[] {
+  const formatAltMultiplicity = (coupling: ApiC13Coupling | undefined): string | null => {
+    const multiplicity = coupling?.multiplicity ?? null;
+    if (!multiplicity) return null;
+    if (!includeJValuesInMultiplicity) return multiplicity;
+
+    const rawJValues = coupling?.j_values_hz_csv;
+    if (!rawJValues) return multiplicity;
+
+    const values = rawJValues
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    if (values.length === 0) return multiplicity;
+    return `${multiplicity}, J = ${values.join(', ')} Hz`;
+  };
+
+  const couplingsByTag = new Map<number, ApiC13Coupling>();
+  const untaggedCouplings: ApiC13Coupling[] = [];
+
+  for (const coupling of c13Couplings) {
+    if (typeof coupling.atom_tag === 'number') {
+      if (!couplingsByTag.has(coupling.atom_tag)) {
+        couplingsByTag.set(coupling.atom_tag, coupling);
+      }
+      continue;
+    }
+    untaggedCouplings.push(coupling);
+  }
+
+  const groupedByTag = new Map<number, ApiC13Peak[]>();
+  const orderedTags: number[] = [];
+  const untaggedRegularPeaks: ApiC13Peak[] = [];
+
+  for (const peak of c13Peaks) {
+    if (typeof peak.atom_tag === 'number') {
+      if (!groupedByTag.has(peak.atom_tag)) {
+        groupedByTag.set(peak.atom_tag, []);
+        orderedTags.push(peak.atom_tag);
+      }
+      groupedByTag.get(peak.atom_tag)?.push(peak);
+      continue;
+    }
+    untaggedRegularPeaks.push(peak);
+  }
+
+  const displayPeaks: PeakDef[] = [];
+
+  for (const atomTag of orderedTags) {
+    const regularGroup = groupedByTag.get(atomTag);
+    if (!regularGroup || regularGroup.length === 0) {
+      continue;
+    }
+
+    const representative = regularGroup[0];
+    const alt = couplingsByTag.get(atomTag);
+
+    displayPeaks.push({
+      id: `C${representative.id}`,
+      spectrum: '13C',
+      ppm: alt?.ppm ?? representative.ppm,
+      multiplicity: formatAltMultiplicity(alt),
+    });
+  }
+
+  // Keep untagged peaks and replace ppm/multiplicity from alt couplings when available.
+  for (let i = 0; i < untaggedRegularPeaks.length; i += 1) {
+    const representative = untaggedRegularPeaks[i];
+    const alt = untaggedCouplings[i];
+    displayPeaks.push({
+      id: `C${representative.id}`,
+      spectrum: '13C',
+      ppm: alt?.ppm ?? representative.ppm,
+      multiplicity: formatAltMultiplicity(alt),
+    });
+  }
+
+  return displayPeaks;
+}
+
+function formatH1Multiplicity(
+  multiplicity: string | null,
+  jValuesHzCsv: string | null,
+  protonCount: number | null,
+  includeJValues: boolean,
+  includeAtomCount: boolean,
+): string | null {
+  const formattedMultiplicity = (() => {
+    if (!multiplicity) return null;
+    if (!includeJValues) return multiplicity;
+    if (!jValuesHzCsv) return multiplicity;
+
+    const values = jValuesHzCsv
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    if (values.length === 0) return multiplicity;
+    return `${multiplicity}, J = ${values.join(', ')} Hz`;
+  })();
+
+  const countLabel = includeAtomCount && protonCount != null ? `${protonCount}H` : null;
+  const parts = [countLabel, formattedMultiplicity].filter(
+    (value): value is string => typeof value === 'string' && value.length > 0,
+  );
+
+  if (parts.length === 0) return null;
+  return parts.join(', ');
+}
+
+const SUPERSCRIPT_DIGITS: Record<string, string> = {
+  '0': '⁰',
+  '1': '¹',
+  '2': '²',
+  '3': '³',
+  '4': '⁴',
+  '5': '⁵',
+  '6': '⁶',
+  '7': '⁷',
+  '8': '⁸',
+  '9': '⁹',
+};
+
+function renderSuperscriptNucleus(nucleus: string): string {
+  return nucleus.replace(/\d/g, (digit) => SUPERSCRIPT_DIGITS[digit] ?? digit);
+}
+
+function formatAltNucleusDisplayLabel(nucleus: string): string {
+  return renderSuperscriptNucleus(nucleus);
+}
+
+function formatAltNucleusMultiplicity(
+  atomCount: number | null,
+  multiplicity: string | null,
+  jValuesHzCsv: string | null,
+): string | null {
+  const parts: string[] = [];
+
+  if (atomCount != null) {
+    parts.push(String(atomCount));
+  }
+
+  if (multiplicity) {
+    parts.push(multiplicity);
+  }
+
+  if (jValuesHzCsv) {
+    const values = jValuesHzCsv
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    if (values.length > 0) {
+      parts.push(`J = ${values.join(', ')} Hz`);
+    }
+  }
+
+  if (parts.length === 0) return null;
+  return parts.join(', ');
+}
+
+type AltNucleusTable = {
+  key: string;
+  title: ReactNode;
+  peaks: Array<{ id: string; ppm: number; multiplicity: string | null }>;
+};
 
 
 export function MolecularBookkeepingPage() {
@@ -74,6 +270,22 @@ export function MolecularBookkeepingPage() {
   const [casAnswerInput, setCasAnswerInput] = useState('');
   const [casAnswerIsCorrect, setCasAnswerIsCorrect] = useState<boolean | null>(null);
   const [validatingCasAnswer, setValidatingCasAnswer] = useState(false);
+  const [cheatBits, setCheatBits] = useState(DEFAULT_CHEATS);
+  const [settingsHover, setSettingsHover] = useState(false);
+  const [showCASValidation, setShowCASValidation] = useState(true);
+  const [showTimer, setShowTimer] = useState(true);
+  const [showWarnings, setShowWarnings] = useState(true);
+  const [showSolventText, setShowSolventText] = useState(true);
+  const [showExchangeText, setShowExchangeText] = useState(true);
+  const [showMissingText, setShowMissingText] = useState(true);
+  const [showCreation, setShowCreation] = useState(true);
+  const [selectedTheme, setSelectedTheme] = useState('Light');
+  const [selectedPreset, setSelectedPreset] = useState('User');
+  const [availablePresets, setAvailablePresets] = useState<string[]>(['Default', 'Beginner', 'Exam', 'User']);
+  const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [solvents, setSolvents] = useState<SolventPreference[]>([]);
+  const [solventsLoading, setSolventsLoading] = useState(false);
+  const cheating = useCheating(cheatBits);
 
   const {
     exercisePaused,
@@ -342,6 +554,12 @@ useEffect(() => {
     }
   }, [creationFormOpen, cancelExerciseMenuClose]);
 
+  useEffect(() => {
+    if (!showCreation && creationFormOpen) {
+      setCreationFormOpen(false);
+    }
+  }, [showCreation, creationFormOpen]);
+
   const exerciseSetOptions = useMemo(() => {
     const setNames = new Set<string>();
     for (const ex of exerciseSummaries) {
@@ -441,6 +659,30 @@ useEffect(() => {
     });
   }, [exercisesBySet]);
 
+  const loadSolventPreferences = useCallback(async () => {
+    setSolventsLoading(true);
+    try {
+      const rows = await fetchSolventPreferences();
+      setSolvents(rows);
+    } catch (err) {
+      console.error('failed to load solvent preferences', err);
+      setSolvents([]);
+    } finally {
+      setSolventsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSolventPreferences();
+  }, [loadSolventPreferences]);
+
+  const handleExercisesMutated = useCallback(async () => {
+    await Promise.all([
+      loadExerciseSummaries(),
+      loadSolventPreferences(),
+    ]);
+  }, [loadExerciseSummaries, loadSolventPreferences]);
+
   const handleDeleteSelected = useCallback(async () => {
     const ok = window.confirm(
       `Delete ${selectedForDeletion.size} item${selectedForDeletion.size !== 1 ? 's' : ''}? This cannot be undone.`
@@ -467,6 +709,7 @@ useEffect(() => {
     try {
       const updatedSummaries = await fetchExerciseSummaries();
       setExerciseSummaries(updatedSummaries);
+      await loadSolventPreferences();
       
       if (selectedExerciseId && exerciseIds.includes(selectedExerciseId)) {
         const nextExercise = updatedSummaries.find(s => s.id !== selectedExerciseId);
@@ -484,30 +727,131 @@ useEffect(() => {
       const message = `Failed to delete: ${failed.join(', ')}`;
       alert(message);
     }
-  }, [selectedForDeletion, selectedExerciseId, selectExerciseById, clearSelectedExercise]);
+  }, [selectedForDeletion, selectedExerciseId, selectExerciseById, clearSelectedExercise, loadSolventPreferences]);
 
   const currentPeaks = useMemo<PeakDef[]>(() => {
     if (!selectedExercise) {
     return [];
   }
+
+  const useAltC13Display =
+    cheating.useAltC13Display
+    && Boolean(selectedExercise.c13_alt_text?.trim());
+  const showAltC13JValues = cheating.showAltC13JValues;
+  const showH1JValues = cheating.showH1JValues;
+  const showAtomCount = cheating.showAtomCount;
   
   const h1Peaks: PeakDef[] = selectedExercise.h1_peaks.map((peak) => ({
       //This defines how the 1H table entries are stored
     id: `H${peak.id}`,
     spectrum: '1H',
     ppm: peak.ppm,
-    multiplicity: peak.multiplicity,
+    multiplicity: formatH1Multiplicity(
+      peak.multiplicity,
+      peak.j_values_hz_csv,
+      peak.proton_count,
+      showH1JValues,
+      showAtomCount,
+    ),
   }));
 
-  const c13Peaks: PeakDef[] = selectedExercise.c13_peaks.map((peak) => ({
-      //This defines how the 13C table entries are stored
-    id: `C${peak.id}`,
-    spectrum: '13C',
-    ppm: peak.ppm,
-  }));
+  const c13Peaks: PeakDef[] = useAltC13Display
+    ? toAltC13DisplayPeaks(
+      selectedExercise.c13_peaks,
+      selectedExercise.c13_couplings,
+      showAltC13JValues,
+    )
+    : toRegularC13DisplayPeaks(selectedExercise.c13_peaks);
 
-  return [...h1Peaks, ...c13Peaks];
- }, [selectedExercise]);
+  const atomCountByC13PeakId = new Map<string, number>(
+    selectedExercise.c13_peaks.map((peak) => [`C${peak.id}`, peak.atom_count]),
+  );
+
+  const c13PeaksWithCount: PeakDef[] = c13Peaks.map((peak) => {
+    if (!showAtomCount) return peak;
+
+    const atomCount = atomCountByC13PeakId.get(peak.id);
+    const countLabel = atomCount != null ? `${atomCount}C` : null;
+    const multiplicityText = peak.multiplicity ?? null;
+    const parts = [countLabel, multiplicityText].filter(
+      (value): value is string => typeof value === 'string' && value.length > 0,
+    );
+
+    return {
+      ...peak,
+      multiplicity: parts.length > 0 ? parts.join(', ') : null,
+    };
+  });
+
+  const altNucleusPeaks: PeakDef[] = sortPeaksByPpmDescending(
+    (selectedExercise.alt_nuclei ?? []).map((peak) => ({
+      id: `N${peak.id}`,
+      spectrum: 'alt' as const,
+      ppm: peak.ppm,
+      multiplicity: null,
+      displayLabel: formatAltNucleusDisplayLabel(peak.nucleus),
+    })),
+  );
+
+  return [
+    ...sortPeaksByPpmDescending(h1Peaks),
+    ...sortPeaksByPpmDescending(c13PeaksWithCount),
+    ...altNucleusPeaks,
+  ];
+ }, [
+  selectedExercise,
+  cheating.useAltC13Display,
+  cheating.showAltC13JValues,
+  cheating.showH1JValues,
+  cheating.showAtomCount,
+]);
+
+  const c13SpectrumPeaks = useMemo<{ id: string; ppm: number }[]>(() => {
+    if (!selectedExercise) return [];
+
+    return sortPeaksByPpmDescending(
+      selectedExercise.c13_peaks.map((peak) => ({
+        id: `C${peak.id}`,
+        spectrum: '13C' as const,
+        ppm: peak.ppm,
+      })),
+    ).map((peak) => ({ id: peak.id, ppm: peak.ppm }));
+  }, [selectedExercise]);
+
+  const c13SpectrumToDisplayPeakId = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!selectedExercise) return map;
+
+    const useAltC13Display =
+      cheating.useAltC13Display
+      && Boolean(selectedExercise.c13_alt_text?.trim());
+
+    if (!useAltC13Display) {
+      for (const peak of selectedExercise.c13_peaks) {
+        const id = `C${peak.id}`;
+        map.set(id, id);
+      }
+      return map;
+    }
+
+    const representativeByTag = new Map<number, string>();
+    for (const peak of selectedExercise.c13_peaks) {
+      if (typeof peak.atom_tag === 'number' && !representativeByTag.has(peak.atom_tag)) {
+        representativeByTag.set(peak.atom_tag, `C${peak.id}`);
+      }
+    }
+
+    for (const peak of selectedExercise.c13_peaks) {
+      const sourceId = `C${peak.id}`;
+      if (typeof peak.atom_tag === 'number') {
+        map.set(sourceId, representativeByTag.get(peak.atom_tag) ?? sourceId);
+      } else {
+        map.set(sourceId, sourceId);
+      }
+    }
+
+    return map;
+  }, [selectedExercise, cheating.useAltC13Display]);
 
   const linking = useLinking(currentPeaks);
   
@@ -515,30 +859,229 @@ useEffect(() => {
   const [linkInheritMode, setLinkInheritMode] = useState<LinkInheritMode>('none'); // Default link inherit option
   const [loadingLinkSettings, setLoadingLinkSettings] = useState(true);
 
+  const applyIncomingSettings = useCallback((settings: UserSettings) => {
+    const mode = settings.link_inherit_mode;
+    setLinkInheritMode(
+      mode === 'none' || mode === 'transfer' || mode === 'copy' ? mode : 'none',
+    );
+    setCheatBits(normalizeCheatBits(settings.cheats));
+    setShowCASValidation(settings.show_CAS ?? true);
+    setShowTimer(settings.show_timer ?? true);
+    setShowWarnings(settings.show_warnings ?? true);
+    setShowSolventText(settings.show_solvent ?? true);
+    setShowExchangeText(settings.show_exchange ?? true);
+    setShowMissingText(settings.show_missing ?? true);
+    setShowCreation(settings.show_creation ?? true);
+    setSelectedTheme(settings.theme ?? 'Light');
+
+    if (settings.active_preset) {
+      setSelectedPreset(settings.active_preset);
+    }
+
+    const presetOptions = (settings.available_presets ?? []).filter(Boolean);
+    if (presetOptions.length > 0) {
+      setAvailablePresets(presetOptions);
+    }
+  }, []);
+
+  const persistUserSettings = useCallback(
+    async (overrides: UpdateUserSettingsRequest) => {
+      // Only send keys that were explicitly overridden so the backend
+      // receives a minimal payload (tests expect single-key updates).
+      const payload: UpdateUserSettingsRequest = {};
+      if (overrides.link_inherit_mode !== undefined) payload.link_inherit_mode = overrides.link_inherit_mode;
+      if (overrides.theme !== undefined) payload.theme = overrides.theme;
+      if (overrides.cheats !== undefined) payload.cheats = overrides.cheats;
+      if (overrides.show_CAS !== undefined) payload.show_CAS = overrides.show_CAS;
+      if (overrides.show_timer !== undefined) payload.show_timer = overrides.show_timer;
+      if (overrides.show_warnings !== undefined) payload.show_warnings = overrides.show_warnings;
+      if (overrides.show_solvent !== undefined) payload.show_solvent = overrides.show_solvent;
+      if (overrides.show_exchange !== undefined) payload.show_exchange = overrides.show_exchange;
+      if (overrides.show_missing !== undefined) payload.show_missing = overrides.show_missing;
+      if (overrides.show_creation !== undefined) payload.show_creation = overrides.show_creation;
+
+      try {
+        const saved = await updateUserSettings(payload);
+        applyIncomingSettings(saved);
+      } catch (err) {
+        console.error('failed to save settings', err);
+      }
+    },
+    [
+      linkInheritMode,
+      selectedTheme,
+      cheatBits,
+      showCASValidation,
+      showTimer,
+      showWarnings,
+      showSolventText,
+      showExchangeText,
+      showMissingText,
+      showCreation,
+      applyIncomingSettings,
+    ],
+  );
+
   useEffect(() => {
-  fetchUserSettings()
-    .then((settings) => {
-      setLinkInheritMode(settings.link_inherit_mode as LinkInheritMode);
-    })
-    .catch((err) => {
-      console.error('failed to load settings', err);
-    })
-    .finally(() => {
-      setLoadingLinkSettings(false);
-    });
-}, []);
+    fetchUserSettings()
+      .then((settings) => {
+        applyIncomingSettings(settings);
+      })
+      .catch((err) => {
+        console.error('failed to load settings', err);
+        setCheatBits(DEFAULT_CHEATS);
+        setShowCASValidation(true);
+        setShowTimer(true);
+        setShowWarnings(true);
+        setShowSolventText(true);
+        setShowExchangeText(true);
+        setShowMissingText(true);
+        setShowCreation(true);
+        setSelectedTheme('Light');
+        setSelectedPreset('User');
+      })
+      .finally(() => {
+        setLoadingLinkSettings(false);
+      });
+  }, [applyIncomingSettings]);
+
+  const handleSolventPreferenceChange = useCallback(
+    async (solventId: number, preference: number) => {
+      const prev = solvents;
+      setSolvents((current) => current.map((item) => (
+        item.id === solventId ? { ...item, preference, selected_name: item.options[preference] ?? item.selected_name } : item
+      )));
+
+      try {
+        const updated = await updateSolventPreference(solventId, preference);
+        setSolvents((current) => current
+          .map((item) => {
+            if (item.id !== solventId) return item;
+            // Merge only the fields that are expected to change locally (do not
+            // overwrite `match` or `display` which the user may edit manually).
+            return {
+              ...item,
+              preference: updated.preference,
+              selected_name: updated.selected_name,
+              count: updated.count,
+            };
+          })
+          .sort((a, b) => (b.count - a.count) || (a.id - b.id)));
+
+        if (selectedExerciseId !== null) {
+          void selectExerciseById(selectedExerciseId);
+        }
+      } catch (err) {
+        console.error('failed to update solvent preference', err);
+        setSolvents(prev);
+      }
+    },
+    [solvents, selectedExerciseId, selectExerciseById],
+  );
 
 const handleChangeLinkInheritMode = useCallback(
   async (mode: LinkInheritMode) => {
     setLinkInheritMode(mode);
+    setSelectedPreset('User');
+    void persistUserSettings({ link_inherit_mode: mode });
+  },
+  [persistUserSettings],
+);
+
+const handleApplyPreset = useCallback(
+  async (presetName: string) => {
+    setSelectedPreset(presetName);
 
     try {
-      await updateUserSettings(mode);
+      const applied = await applySettingsPreset(presetName);
+      applyIncomingSettings(applied);
     } catch (err) {
-      console.error('failed to save settings', err);
+      console.error('failed to apply settings preset', err);
     }
   },
-  [],
+  [applyIncomingSettings],
+);
+
+const handleThemeChange = useCallback(
+  (theme: string) => {
+    setSelectedTheme(theme);
+    setSelectedPreset('User');
+    void persistUserSettings({ theme });
+  },
+  [persistUserSettings],
+);
+
+const handleShowCASValidationChange = useCallback(
+  (value: boolean) => {
+    setShowCASValidation(value);
+    setSelectedPreset('User');
+    void persistUserSettings({ show_CAS: value });
+  },
+  [persistUserSettings],
+);
+
+const handleShowTimerChange = useCallback(
+  (value: boolean) => {
+    setShowTimer(value);
+    setSelectedPreset('User');
+    void persistUserSettings({ show_timer: value });
+  },
+  [persistUserSettings],
+);
+
+const handleShowWarningsChange = useCallback(
+  (value: boolean) => {
+    setShowWarnings(value);
+    setSelectedPreset('User');
+    void persistUserSettings({ show_warnings: value });
+  },
+  [persistUserSettings],
+);
+
+const handleShowSolventTextChange = useCallback(
+  (value: boolean) => {
+    setShowSolventText(value);
+    setSelectedPreset('User');
+    void persistUserSettings({ show_solvent: value });
+  },
+  [persistUserSettings],
+);
+
+const handleShowExchangeTextChange = useCallback(
+  (value: boolean) => {
+    setShowExchangeText(value);
+    setSelectedPreset('User');
+    void persistUserSettings({ show_exchange: value });
+  },
+  [persistUserSettings],
+);
+
+const handleShowMissingTextChange = useCallback(
+  (value: boolean) => {
+    setShowMissingText(value);
+    setSelectedPreset('User');
+    void persistUserSettings({ show_missing: value });
+  },
+  [persistUserSettings],
+);
+
+const handleShowCreationChange = useCallback(
+  (value: boolean) => {
+    setShowCreation(value);
+    setSelectedPreset('User');
+    void persistUserSettings({ show_creation: value });
+  },
+  [persistUserSettings],
+);
+
+const handleCheatBitsChange = useCallback(
+  (bits: string) => {
+    const normalized = normalizeCheatBits(bits);
+    setCheatBits(normalized);
+    setSelectedPreset('User');
+    void persistUserSettings({ cheats: normalized });
+  },
+  [persistUserSettings],
 );
 
 const hAxisRange: [number, number] | null =
@@ -626,6 +1169,14 @@ const cAxisRange: [number, number] | null =
     }
   }, [selectedExerciseId, parsedFormulaDbeDraft]);
 
+  const showCorrectDbeCheat = cheating.showCorrectDbe;
+  const showAltNucleiTablesCheat = cheating.showAltNucleiTables;
+  const exerciseDbeValue = selectedExercise?.dbe ?? null;
+  const effectiveFormulaDbe = showCorrectDbeCheat ? exerciseDbeValue : savedFormulaDbe;
+  const displayedFormulaDbe = showCorrectDbeCheat
+    ? (exerciseDbeValue === null ? '' : String(exerciseDbeValue))
+    : formulaDbeDraft;
+
   // This sends the linking data and the fragments to the warning hook
   // In copy mode the old fragments and the merged fragment all keep links.
   // That makes the warning checks count the same peaks/fragments twice,
@@ -645,7 +1196,7 @@ const cAxisRange: [number, number] | null =
     warningLinksByPeak,
     fragments,
     selectedExercise?.molecular_formula ?? undefined,
-    savedFormulaDbe,
+    effectiveFormulaDbe,
     selectedExerciseId,
   );
 
@@ -688,6 +1239,54 @@ const cAxisRange: [number, number] | null =
       : fragments.map((f) => String(f.id));
     return new Map(order.map((id, i) => [id, i + 1]));
   }, [fragmentDisplayOrder, fragments]);
+
+  const altNucleusTables = useMemo<AltNucleusTable[]>(() => {
+    if (!showAltNucleiTablesCheat || !selectedExercise) {
+      return [];
+    }
+
+    const rows = Array.isArray(selectedExercise.alt_nuclei)
+      ? selectedExercise.alt_nuclei
+      : [];
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const grouped = new Map<string, { nucleus: string; rows: typeof rows }>();
+
+    for (const row of rows) {
+      const nucleus = row.nucleus?.trim() || '?';
+      const key = nucleus;
+      const existing = grouped.get(key);
+
+      if (existing) {
+        existing.rows.push(row);
+      } else {
+        grouped.set(key, { nucleus, rows: [row] });
+      }
+    }
+
+    return Array.from(grouped.entries()).map(([key, group]) => {
+      const peaks = [...group.rows]
+        .sort((a, b) => b.ppm - a.ppm)
+        .map((row) => ({
+          id: `N${row.id}`,
+          ppm: row.ppm,
+          multiplicity: formatAltNucleusMultiplicity(
+            row.atom_count,
+            row.multiplicity,
+            row.j_values_hz_csv,
+          ),
+        }));
+
+      return {
+        key,
+        title: `${renderSuperscriptNucleus(group.nucleus)} peaks (ppm)`,
+        peaks,
+      };
+    });
+  }, [selectedExercise, showAltNucleiTablesCheat]);
 
   const handleDeleteFragment = useCallback(
     async (id: number) => {
@@ -1151,6 +1750,50 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
             title="Molecular Merge and Match"
             style={{ width: 36, height: 36, verticalAlign: 'middle' }}
           />
+          <button
+            type="button"
+            onClick={() => setSettingsPanelOpen(true)}
+            title="Open settings"
+            aria-label="Open settings"
+            onMouseEnter={() => setSettingsHover(true)}
+            onMouseLeave={() => setSettingsHover(false)}
+            style={{
+              width: 36,
+              height: 36,
+              padding: 1,
+              border: 'none',
+              background: 'white',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <img
+              src={`${import.meta.env.BASE_URL}gears_1.svg`}
+              alt="Settings"
+              style={{
+                position: 'absolute',
+                width: 48,
+                height: 48,
+                transition: 'all 1s ease-in-out',
+                opacity: settingsHover ? 0 : 1,
+              }}
+            />
+            <img
+              src={`${import.meta.env.BASE_URL}gears_2.svg`}
+              alt="Settings hover"
+              style={{
+                position: 'absolute',
+                width: 48,
+                height: 48,
+                transition: 'all 1s ease-in-out',
+                opacity: settingsHover ? 1 : 0,
+              }}
+            />
+          </button>
           {selectedExercise ? (
             <div
               aria-label="Current exercise"
@@ -1167,7 +1810,9 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
             </div>
           ) : (
             <span style={{ fontSize: 13, opacity: 0.6 }}>
-              {loadingExerciseSummaries
+              {loadingSelectedExercise
+                ? 'Loading exercise...'
+                : loadingExerciseSummaries
                 ? 'Loading exercises...'
                 : exerciseSummaries.length === 0
                   ? 'No exercises found'
@@ -1175,11 +1820,25 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
             </span>
           )}
           <AdditionalSpectraPopup spectra={selectedExercise?.additional_spectra ?? []} />
+          {cheating.isEnabled(1) && (
+            <span
+              title="Cheats are enabled for this exercise."
+              style={{ cursor: 'help', display: 'inline-flex' }}
+            >
+              <img
+                src={`${import.meta.env.BASE_URL}use_cheats.svg`}
+                alt="Cheats enabled"
+                style={{ width: 32, height: 32 }}
+              />
+            </span>
+          )}
         </div>
 
         {/* Center: WarningPanel (takes remaining space, centered) */}
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-          <WarningPanel />
+          {showWarnings && selectedExercise && !loadingSelectedExercise && (
+            <WarningPanel />
+          )}
         </div>
 
         {/* Right: student answer tools + editor + exercise menu + fullscreen */}
@@ -1189,68 +1848,38 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
           <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
             DBE
             <input
-              value={formulaDbeDraft} placeholder='?'
-              onChange={(e) => setFormulaDbeDraft(e.target.value)}
-              onBlur={() => void handleSaveDbe()}
-              onKeyDown={(e) => {if (e.key === 'Enter') e.currentTarget.blur();}}
-              title="Enter the calculated double bond equivalent here."
+              value={displayedFormulaDbe} placeholder='?'
+              onChange={(e) => {
+                if (!showCorrectDbeCheat) {
+                  setFormulaDbeDraft(e.target.value);
+                }
+              }}
+              onBlur={() => {
+                if (!showCorrectDbeCheat) {
+                  void handleSaveDbe();
+                }
+              }}
+              onKeyDown={(e) => {
+                if (!showCorrectDbeCheat && e.key === 'Enter') e.currentTarget.blur();
+              }}
+              disabled={showCorrectDbeCheat}
+              title={showCorrectDbeCheat
+                ? 'Cheat mode: showing the exercise DBE value from the exercises table.'
+                : 'Enter the calculated double bond equivalent here.'}
               style={{
                 width: 42,
                 padding: '4px 6px',
                 borderRadius: 6,
-                border: '1px solid #ccc',
+                border: '1px solid',
+                borderColor: showCorrectDbeCheat ? '#FF9800' : '#ccc',
                 fontSize: 12,
                 textAlign: 'center',
-                background: 'white',
+                fontWeight: showCorrectDbeCheat ? 700 : 400,
+                background: showCorrectDbeCheat ? '#FFF3E0' : 'white',
               }}
             />
           </label>
 
-          {/* CAS answer validation */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input
-              aria-label="CAS number answer"
-              value={casAnswerInput}
-              onChange={(event) => setCasAnswerInput(event.target.value)}
-              placeholder="CAS number"
-              style={{
-                width: 120,
-                border: '1px solid #ccc',
-                borderRadius: 6,
-                padding: '4px 8px',
-                boxSizing: 'border-box',
-                fontSize: 12,
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => void handleValidateCasAnswer()}
-              disabled={validatingCasAnswer || selectedExerciseId === null}
-              style={{
-                padding: '4px 8px',
-                borderRadius: 6,
-                border: '1px solid #ccc',
-                background: validatingCasAnswer ? '#f2f2f2' : 'white',
-                cursor: validatingCasAnswer ? 'default' : 'pointer',
-                fontSize: 12,
-                fontWeight: 600,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {validatingCasAnswer ? 'Validating...' : 'Validate CAS'}
-            </button>
-            <span
-              style={{
-                minWidth: 170,
-                fontSize: 11,
-                color: casAnswerIsCorrect ? '#0f5f0f' : '#b30000',
-                whiteSpace: 'nowrap',
-                visibility: casAnswerIsCorrect === null ? 'hidden' : 'visible',
-              }}
-            >
-              {casAnswerIsCorrect ? 'CAS answer is correct.' : 'CAS answer is incorrect.'}
-            </span>
-          </div>
 
           {/* Molecule editor */}
           <MoleculeEditorPopup
@@ -1332,7 +1961,9 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
               {'\u21BA'}
             </button>
 
-            <ExerciseTimerDisplay formattedDisplayedTimer={formattedDisplayedTimer} />
+            {showTimer && (
+              <ExerciseTimerDisplay formattedDisplayedTimer={formattedDisplayedTimer} />
+            )}
 
             <div
               onMouseEnter={cancelExerciseMenuClose}
@@ -1673,47 +2304,50 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
 
                   <div style={{ display: creationFormOpen ? 'none' : 'block' }}>
                     <ExerciseZipImport
-                    onImported={loadExerciseSummaries}
+                    onImported={handleExercisesMutated}
                     onImportingChange={(isImporting) => { zipImportingRef.current = isImporting; }}
                     />
                   </div>
 
+                  {showCreation ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setCreationFormOpen((open) => !open)}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '8px 10px',
+                          borderRadius: 8,
+                          border: '1px solid #ccc',
+                          background: '#f9f9f9',
+                          color: '#111',
+                          cursor: 'pointer',
+                          fontSize: 13,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {creationFormOpen
+                          ? 'Hide exercise creation form'
+                          : 'Create new exercise'}
+                      </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setCreationFormOpen((open) => !open)}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '8px 10px',
-                      borderRadius: 8,
-                      border: '1px solid #ccc',
-                      background: '#f9f9f9',
-                      color: '#111',
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {creationFormOpen
-                      ? 'Hide exercise creation form'
-                      : 'Create new exercise'}
-                  </button>
-
-                {creationFormOpen ? (
-                  <div
-                    style={{
-                      maxHeight: '70vh',
-                      overflow: 'auto',
-                      border: '1px solid #eee',
-                      borderRadius: 8,
-                      padding: 8,
-                      background: '#fcfcfc',
-                    }}
-                  >
-                    <ExerciseCreationForm onCreated={loadExerciseSummaries} />
-                  </div>
-                ) : null}
+                      {creationFormOpen ? (
+                        <div
+                          style={{
+                            maxHeight: '70vh',
+                            overflow: 'auto',
+                            border: '1px solid #eee',
+                            borderRadius: 8,
+                            padding: 8,
+                            background: '#fcfcfc',
+                          }}
+                        >
+                          <ExerciseCreationForm onCreated={handleExercisesMutated} />
+                        </div>
+                      ) : null}
+                    </>
+                  ) : null}
               </div>
             </div>
           </div>
@@ -1793,6 +2427,11 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
               src={selectedExercise?.h1_svg_url ?? ''}
               height="100%"
               type="H"
+              showCheatSegmentsOverlay={cheating.showSpectrumSegmentsOverlay}
+              showSpectrumDataSource={cheating.showSpectrumDataSources}
+              dataSource={selectedExercise?.h1_data_source ?? null}
+              showSolventText={showSolventText}
+              showExchangeText={showExchangeText}
               solvent={selectedExercise?.h1_solvent ?? null}
               frequencyMhz={selectedExercise?.h1_frequency_mhz ?? null}
               peaks={currentPeaks
@@ -1813,16 +2452,29 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
               src={selectedExercise?.c13_svg_url ?? ''}
               height="100%"
               type="C"
+              showCheatSegmentsOverlay={cheating.showSpectrumSegmentsOverlay}
+              showSpectrumDataSource={cheating.showSpectrumDataSources}
+              dataSource={selectedExercise?.c13_data_source ?? null}
+              showSolventText={showSolventText}
+              showExchangeText={showExchangeText}
               solvent={selectedExercise?.c13_solvent ?? null}
               frequencyMhz={selectedExercise?.c13_frequency_mhz ?? null}
               apt={selectedExercise?.c13_apt ?? false}
-              peaks={currentPeaks
-                .filter(p => p.spectrum === '13C')
-                .map(p => ({ id: p.id, ppm: p.ppm }))}
+              peaks={c13SpectrumPeaks}
               axisRange={cAxisRange}
-              onHoverPeak={linking.setHoverPeakId}
-              onSelectPeak={linking.selectPeak}
-              isHighlighted={linking.peakIsHighlighted}
+              onHoverPeak={(peakId) => {
+                if (peakId === null) {
+                  linking.setHoverPeakId(null);
+                  return;
+                }
+                linking.setHoverPeakId(c13SpectrumToDisplayPeakId.get(peakId) ?? peakId);
+              }}
+              onSelectPeak={(peakId) => {
+                linking.selectPeak(c13SpectrumToDisplayPeakId.get(peakId) ?? peakId);
+              }}
+              isHighlighted={(peakId) => {
+                return linking.peakIsHighlighted(c13SpectrumToDisplayPeakId.get(peakId) ?? peakId);
+              }}
             />
           </div>
         )}
@@ -1851,6 +2503,23 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
             activeFragmentIds={activeFragmentIds}
             fragmentIndexMap={fragmentIndexMap}
           />
+
+          {altNucleusTables.map((table) => (
+            <div key={table.key} style={{ marginTop: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>{table.title}</div>
+              <PeakList
+                peaks={table.peaks}
+                linksByPeak={linking.linksByPeak}
+                selectedPeakId={linking.selectedPeakId}
+                onSelectPeak={linking.selectPeak}
+                onHoverPeak={linking.setHoverPeakId}
+                isHighlighted={linking.peakIsHighlighted}
+                dimNonHighlighted={linking.hasFocus}
+                fragmentIndexMap={fragmentIndexMap}
+                activeFragmentIds={activeFragmentIds}
+              />
+            </div>
+          ))}
         </div>
 
         {/* 13C peak list (beside 13C spectrum) */}
@@ -1863,6 +2532,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
             padding: 10,
             minHeight: 0,
             overflow: 'auto',
+            overflowX: 'hidden',
           }}
         >
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>¹³C peaks (ppm)</div>
@@ -1896,8 +2566,62 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
             mergeState={mergeState}
             onSolutionAtomClick={handleSolutionAtomClick}
             onSendToFragments={handleSendToFragments}
-            formulaDbe={savedFormulaDbe}
+            formulaDbe={effectiveFormulaDbe}
+            showMissingText={showMissingText}
           />
+
+          {/* CAS answer validation */}
+          {showCASValidation && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 5 }}>
+              <span
+                style={{
+                  width: 200,
+                  fontSize: 12,
+                  color: casAnswerIsCorrect ? '#0f5f0f' : '#b30000',
+                  whiteSpace: 'nowrap',
+                  visibility: casAnswerIsCorrect === null ? 'hidden' : 'visible',
+                  alignItems: 'center',
+                  textAlign: 'center',
+                }}
+              >
+                {casAnswerIsCorrect ? 'CAS answer is correct.' : 'CAS answer is incorrect.'}
+              </span>
+
+              <span style={{ justifyContent: 'center', whiteSpace: 'nowrap', alignItems: 'center', fontSize: 12 }}>Manual validation:</span>
+              <input
+                aria-label="CAS number answer"
+                value={casAnswerInput}
+                onChange={(event) => setCasAnswerInput(event.target.value)}
+                placeholder="CAS number"
+                style={{
+                  width: 120,
+                  border: '1px solid #ccc',
+                  borderRadius: 6,
+                  padding: '4px 8px',
+                  boxSizing: 'border-box',
+                  fontSize: 12,
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => void handleValidateCasAnswer()}
+                disabled={validatingCasAnswer || selectedExerciseId === null}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: 6,
+                  border: '1px solid #ccc',
+                  background: validatingCasAnswer ? '#f2f2f2' : 'white',
+                  cursor: validatingCasAnswer ? 'default' : 'pointer',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {validatingCasAnswer ? 'Validating...' : 'Validate CAS'}
+              </button>
+              
+            </div>
+          )}
 
           {/* fragment space */}
         <div
@@ -1970,7 +2694,40 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         
 
       </div>
+      {/* Settingspanel dialog */}
 
+      <SettingsPanel
+        isOpen={settingsPanelOpen}
+        onClose={() => setSettingsPanelOpen(false)}
+        linkInheritMode={linkInheritMode}
+        onLinkInheritModeChange={handleChangeLinkInheritMode}
+        selectedTheme={selectedTheme}
+        availableThemes={['Light']}
+        onThemeChange={handleThemeChange}
+        selectedPreset={selectedPreset}
+        availablePresets={availablePresets}
+        onPresetChange={handleApplyPreset}
+        showTimer={showTimer}
+        onShowTimerChange={handleShowTimerChange}
+        showCASValidation={showCASValidation}
+        onShowCASValidationChange={handleShowCASValidationChange}
+        showWarnings={showWarnings}
+        onShowWarningsChange={handleShowWarningsChange}
+        showSolventText={showSolventText}
+        onShowSolventTextChange={handleShowSolventTextChange}
+        showExchangeText={showExchangeText}
+        onShowExchangeTextChange={handleShowExchangeTextChange}
+        showMissingText={showMissingText}
+        onShowMissingTextChange={handleShowMissingTextChange}
+        showCreation={showCreation}
+        onShowCreationChange={handleShowCreationChange}
+        cheatBits={cheatBits}
+        onCheatBitsChange={handleCheatBitsChange}
+        solvents={solvents}
+        solventsLoading={solventsLoading}
+        onSolventPreferenceChange={handleSolventPreferenceChange}
+        onTagsUpdated={loadExerciseSummaries}
+      />
       {/* Cis/trans stereo choice dialog */}
       {stereoDialogState && (
         <StereoChoiceDialog

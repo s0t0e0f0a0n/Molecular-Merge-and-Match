@@ -76,19 +76,63 @@ export const FullscreenButton = () => {
     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <button
         type="button"
+		title="Toggle Fullscreen"
         onClick={handleToggle}
         style={{
-          padding: '6px 12px',
-          borderRadius: 999,
+          width: 28,
+          height: 28,
+          padding: 0,
+          borderRadius: 6,
           border: '1px solid #ccc',
           background: 'white',
           color: '#111',
           cursor: 'pointer',
-          fontSize: 13,
-          whiteSpace: 'nowrap',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          lineHeight: 0,
         }}
       >
-        {isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+	{/* inline SVG's */}
+	{/*  there is a 2x2 block in the center without fill, as well as an edge of 3 px which is empty   */}
+	{/*  hence diagonals run from 3,21 to 21,3 skipping at 10,14, resume at 14,10    */}
+        {isFullscreen ? (
+			<svg
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				xmlns="http://www.w3.org/2000/svg"
+				aria-hidden="true"
+				style={{ display: 'block' }}
+			>
+				<path 
+					d="M21 3 L14 10 M14 4 V10 H20 M3 21 L10 14 M4 14 H10 V20" 
+					stroke="currentColor" 
+					strokeWidth="2" 
+					strokeLinecap="round" 
+					strokeLinejoin="round" 
+				/>
+			</svg>
+        ) : (
+			<svg
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				xmlns="http://www.w3.org/2000/svg"
+				aria-hidden="true"
+				style={{ display: 'block' }}
+			>
+				<path 
+					d="M14 10 L21 3 M15 3 H21 V9 M10 14 L3 21 M9 21 H3 V15" 
+					stroke="currentColor" 
+					strokeWidth="2" 
+					strokeLinecap="round" 
+					strokeLinejoin="round" 
+				/>
+			</svg>
+        )}
       </button>
     </div>
   );

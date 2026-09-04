@@ -37,8 +37,9 @@ function setupUserData() {
 
     // Maps to the root of process.resourcesPath cleanly on all platforms
     const possibleSourcePaths = [
-        path.join(process.resourcesPath, 'data'),
-        path.join(process.resourcesPath, 'app.asar.unpacked', 'backend', 'data')
+        path.join(process.resourcesPath, 'data'), // Windows/Linux
+        path.join(process.resourcesPath, 'resources', 'data'), // macOS (inside .app bundle)
+    //  path.join(process.resourcesPath, 'app.asar.unpacked', 'backend', 'data')  /*this might be needed instead*/
     ];
 
     const sourceDataDir = possibleSourcePaths.find(p => fs.existsSync(p));
@@ -56,8 +57,8 @@ function setupUserData() {
         try {
             const copyFolderSync = (src, dest) => {
                 if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-                try { fs.chmodSync(dest, 511); } catch (e) {} // 511 matches 0o755 directory protection standard
-
+                try { fs.chmodSync(dest, 511); } catch (e) {} // Ensure dir is writable //SvdV : might need to make this "511" for compatability
+                
                 for (const file of fs.readdirSync(src)) {
                     const srcPath = path.join(src, file);
                     const destPath = path.join(dest, file);
@@ -65,7 +66,7 @@ function setupUserData() {
                         copyFolderSync(srcPath, destPath);
                     } else {
                         fs.copyFileSync(srcPath, destPath);
-                        try { fs.chmodSync(destPath, 438); } catch (e) {} // 438 matches 0o666 file permissions standard
+                        try { fs.chmodSync(destPath, 438); } catch (e) {} //SvdV : might need to make this "438" for compatability
                     }
                 }
             };
@@ -78,19 +79,21 @@ function setupUserData() {
         console.log("Creating empty data directory in userData:", targetDataDir);
         fs.mkdirSync(targetDataDir, { recursive: true });
     } else if (sourceDataDir) {
-        // Keeps user seed data updated safely
+        // The data folder exists, but we must keep seed files up to date, without overwriting the user's custom app.db.
         const seedFiles = [
             'examples_seed.json',
-            'exercises_seed.json',
-            'exercise_h1_peaks_seed.json',
-            'exercise_c13_peaks_seed.json',
+            'exercises_seed.json', //doesn't exist anymore?
+            'exercise_h1_peaks_seed.json', //doesn't exist anymore?
+            'exercise_c13_peaks_seed.json', //doesn't exist anymore?
             'predefined_fragments_seed.json',
             'preloaded_fragments_seed.json',
-            'preloaded_solutions_seed.json'
+            'preloaded_solutions_seed.json',
+            'solvent_seed.json',
+            'tags_seed.json'
         ];
         for (const file of seedFiles) {
             const srcPath = path.join(sourceDataDir, file);
-            const destPath = path.join(targetDataDir, file);
+            const destPath = path.join(targetDataDir, file); //Added a warning
             if (fs.existsSync(srcPath)) {
                 try {
                     fs.copyFileSync(srcPath, destPath);
@@ -105,45 +108,34 @@ function setupUserData() {
 function startBackend() {
     const exeName = process.platform === 'win32' ? 'molecular-backend.exe' : 'molecular-backend';
 
-    // This safely targets the binary hidden inside its own native folder block
-    const backendPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'bin', 'molecular-backend', exeName)
-    : path.join(__dirname, 'resources', 'bin', 'molecular-backend', exeName);
+    const backendPath = app.isPackaged 
+        ? path.join(process.resourcesPath, 'bin', 'molecular-backend', exeName) 
+        : path.join(__dirname, 'resources', 'bin', 'molecular-backend', exeName);
 
     console.log(`Starting backend at: ${backendPath} on port ${backendPort}`);
 
     try {
         if (process.platform !== 'win32' && fs.existsSync(backendPath)) {
-            try {
-                // FIX: Swap out octal format for decimal integer equivalent (511) to stabilize CommonJS environments
-                fs.chmodSync(backendPath, 511);
+            try { fs.chmodSync(backendPath, 511); //Also here might need "511"
                 console.log("Successfully set 755 execution permissions on backend binary.");
-            } catch (e) {
+
+            }
+            catch (e) {
                 console.warn("Failed to set execute permissions:", e);
             }
         } else if (!fs.existsSync(backendPath)) {
             console.error(`CRITICAL: Backend binary completely missing at: ${backendPath}`);
         }
-        // SAFE PLATFORM-SPECIFIC PATCH
-        // Leaves your working Windows and Linux Flatpak paths exactly as they were,
-        // but gives macOS the internal bundle directory it needs to load dynamic libraries.
-        // FIX: Bound cwd dynamically to the exact directory holding the binary and the '_internal' folder.
-        // This stops PyInstaller binaries from immediately crashing on macOS and container sandboxes.
 
         const backendCwd = app.isPackaged
-        ? (process.platform === 'darwin' 
-            ? path.join(process.resourcesPath, 'bin', 'molecular-backend') 
-            : app.getPath('userData'))
-        : path.join(__dirname, 'backend');
-
-
-
-        console.log(`Setting backend CWD context to: ${backendCwd}`);
+            ? app.getPath('userData')
+            : path.join(__dirname, 'backend');
+            console.log(`Setting backend CWD context to: ${backendCwd}`);
 
         backendProcess = spawn(backendPath, [backendPort.toString()], {
             detached: true,
             stdio: 'pipe',
-            cwd: backendCwd, // Crucial execution assignment
+            cwd: backendCwd,
             env: {
                 ...process.env,
                 APP_DATA_DIR: app.isPackaged ? path.join(app.getPath('userData'), 'data') : path.join(__dirname, 'backend', 'data')
@@ -166,11 +158,10 @@ function startBackend() {
     }
 }
 
-// FIX 1: Explicitly utilize net.fetch instead of global fetch to safely bypass OS sandbox proxy traps
 async function fetchWithRetry(url, options, retries = 30) {
     for (let i = 0; i < retries; i++) {
         try {
-            return await net.fetch(url, options);
+            return await net.fetch(url, options); //SvdV added 'net.' supposedly is safer for sandboxed (flatpak, macOS)
         } catch (err) {
             if (i === retries - 1) throw err;
             console.log(`[Proxy] Backend not ready, retrying in 1s... (${i + 1}/${retries})`);
@@ -219,12 +210,12 @@ function createWindow() {
         minWidth: 1280,
         minHeight: 660,
         icon: path.join(__dirname, 'build-assets', 'icon.png'),
-                                  webPreferences: {
-                                      preload: path.join(__dirname, 'preload.js'),
-                                  contextIsolation: true,
-                                  nodeIntegration: false,
-                                  sandbox: true
-                                  }
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true
+        }
     });
 
     win.once('ready-to-show', () => {
@@ -240,7 +231,8 @@ function createWindow() {
     win.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
         console.error(`Failed to load: ${errorCode} - ${errorDescription}`);
     });
-
+    
+    // Load the React build
     const indexPath = path.join(__dirname, 'frontend', 'dist', 'index.html');
     console.log("Loading from:", indexPath);
     win.loadFile(indexPath);
@@ -258,32 +250,20 @@ app.whenReady().then(async () => {
     createWindow();
 });
 
-// FIX 2: Quit entirely on all platforms to shut down the Python loopback engine cleanly
 app.on('window-all-closed', () => {
-    app.quit();
+  if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('will-quit', () => {
-    if (backendProcess) {
-        console.log("Killing backend process tree safely...");
-        if (process.platform === 'win32') {
-            try {
-                const { exec } = require('child_process');
-                exec(`taskkill /pid ${backendProcess.pid} /T /F`);
-            } catch (e) {
-                console.error("Failed to kill Windows task tree:", e);
-            }
-        } else if (process.platform === 'darwin' || process.platform === 'linux') {
-            // FIX 3: Encapsulate process group kill in a explicit try block to catch unhandled error states smoothly
-            try {
-                process.kill(-backendProcess.pid, 'SIGTERM');
-            } catch (e) {
-                try { backendProcess.kill('SIGTERM'); } catch (err) {}
-            }
-        } else {
-            try { backendProcess.kill('SIGTERM'); } catch (err) {}
-        }
+  if (backendProcess) {
+    console.log("Killing backend process...");
+    if (process.platform === 'win32') {
+      const { exec } = require('child_process');
+      exec(`taskkill /pid ${backendProcess.pid} /T /F`);
+    } else {
+      backendProcess.kill('SIGTERM');
     }
+  }
 });
 
 process.on('SIGINT', () => {

@@ -6,14 +6,12 @@ export const mockSummaries: ExerciseSummary[] = [
     name: 'Exercise 1',
     exercise_set: 'Base set',
     tags: ['OSS', 'C4', 'base set', 'solvent'],
-    completed: true,
   },
   {
     id: 2,
     name: 'Exercise 2',
     exercise_set: 'Base set',
     tags: ['OSS', 'C3', 'base set', 'solvent', 'symmetry', 'exchange'],
-    completed: false,
   },
 ];
 

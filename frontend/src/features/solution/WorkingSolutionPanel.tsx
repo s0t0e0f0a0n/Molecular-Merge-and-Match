@@ -27,7 +27,7 @@ export function formulaToCounts(formula: string): Map<string, number> {
 
   return counts;
 }
-// waar kan ik deuterium aanpassen?
+
 export function formatMissingAtoms(targetFormula: string | undefined, currentFormula: string): string {
   if (!targetFormula) return 'Target formula is not available yet.';
 
@@ -132,6 +132,7 @@ export interface WorkingSolutionPanelProps {
   onSolutionAtomClick: (pointIndex: number) => void;
   onSendToFragments: () => void;
   formulaDbe?: number | null;
+  showMissingText?: boolean;
 }
 
 export function WorkingSolutionPanel({
@@ -142,6 +143,7 @@ export function WorkingSolutionPanel({
   onSolutionAtomClick,
   onSendToFragments,
   formulaDbe,
+  showMissingText = true,
 }: WorkingSolutionPanelProps) {
   const { setWarningResult } = useWarning();
   const warningRequestIdRef = useRef(0);
@@ -493,7 +495,7 @@ useEffect(() => {
             background: '#f9f9f9',
             borderRadius: 8,
             fontSize: 12,
-            color: '#999',
+            color: '#999', 
             flexShrink: 0,
           }}
         >
@@ -502,7 +504,7 @@ useEffect(() => {
       )}
 
       {/* Info panel */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 360 }}>
           <div style={{ fontWeight: 700, fontSize: 14 }}>Working Solution</div>
 
         {isPicking && (
@@ -531,16 +533,18 @@ useEffect(() => {
         )}
 
         {/* The atom countdown text */}
-        <div
-          style={{
-            fontSize: 12,
-            opacity: 0.8,
-            marginTop: 4,
-            whiteSpace: 'pre-line',
-          }}
-        >
-          {missingAtomsText}
-        </div>
+        {showMissingText && (
+          <div
+            style={{
+              fontSize: 12,
+              opacity: 0.8,
+              marginTop: 4,
+              whiteSpace: 'pre-line',
+            }}
+          >
+            {missingAtomsText}
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
           <button
@@ -583,7 +587,7 @@ useEffect(() => {
               padding: '4px 12px',
               borderRadius: 8,
               border: '1px solid #4CAF50',
-              background: validating ? '#f2f2f2' : '#E8F5E9',
+              background: validating ? '#f2f2f2' : '#e8ebf5',
               color: '#1B5E20',
               cursor: validating ? 'default' : 'pointer',
               fontSize: 12,

@@ -18,7 +18,17 @@ export type ApiH1Peak = {
 export type ApiC13Peak = {
   id: number;
   ppm: number;
+  atom_tag: number | null;
   atom_count: number;
+  extra_info: string | null;
+};
+
+export type ApiC13Coupling = {
+  id: number;
+  ppm: number;
+  multiplicity: string | null;
+  j_values_hz_csv: string | null;
+  atom_tag: number | null;
   extra_info: string | null;
 };
 
@@ -29,10 +39,21 @@ export type ApiAdditionalSpectrum = {
   priority: number;
 };
 
+export type ApiAltNucleusPeak = {
+  id: number;
+  nucleus: string;
+  ppm: number;
+  atom_count: number;
+  multiplicity: string | null;
+  j_values_hz_csv: string | null;
+  extra_info: string | null;
+};
+
 export type ExerciseDetail = {
   id: number;
   name: string | null;
   molecular_formula: string | null;
+  dbe?: number | null;
   exercise_set: string | null;
   tags: string[];
   completed?: boolean | null;
@@ -44,6 +65,7 @@ export type ExerciseDetail = {
   h1_nmr_text: string;
   h1_frequency_mhz: number | null;
   h1_solvent: string | null;
+  h1_data_source: string | null;
   h1_peaks: ApiH1Peak[];
 
   c13_svg_path: string;
@@ -51,16 +73,21 @@ export type ExerciseDetail = {
   c13_axis_start: number;
   c13_axis_end: number;
   c13_nmr_text: string;
+  c13_alt_text: string | null;
   c13_frequency_mhz: number | null;
   c13_solvent: string | null;
+  c13_data_source: string | null;
   /**
    * APT flag for 13C. When true the spectrum title shows an "APT" badge. 
    * Optional because the backend column does not exist yet.
    */
   c13_apt?: boolean | null;
   c13_peaks: ApiC13Peak[];
+  c13_couplings: ApiC13Coupling[];
+  alt_nuclei: ApiAltNucleusPeak[];
 
   additional_spectra: ApiAdditionalSpectrum[];
+  statistics?: ExerciseStatistics | null;
 };
 
 export type CasAnswerValidationResponse = {
@@ -122,6 +149,9 @@ export async function fetchExerciseDetail(
 
   data.h1_svg_url = formatAssetUrl(data.h1_svg_path);
   data.c13_svg_url = formatAssetUrl(data.c13_svg_path);
+  data.c13_alt_text = data.c13_alt_text ?? null;
+  data.c13_couplings = Array.isArray(data.c13_couplings) ? data.c13_couplings : [];
+  data.alt_nuclei = Array.isArray(data.alt_nuclei) ? data.alt_nuclei : [];
   
   if (data.additional_spectra) {
     data.additional_spectra = data.additional_spectra.map(spec => ({

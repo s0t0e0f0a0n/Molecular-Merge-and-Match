@@ -40,8 +40,9 @@ jobs:
       - name: Move Backend Binary to Resources
         shell: bash
         run: |
+          rm -rf resources/bin/molecular-backend
           mkdir -p resources/bin
-          mv backend/dist/molecular-backend/* resources/bin/
+          cp -a backend/dist/molecular-backend resources/bin/
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -72,7 +73,8 @@ jobs:
       - name: Build and Publish with electron-builder
         env:
           # This token is automatically provided by GitHub Actions
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+ #SvdV         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
         # The -p always flag tells electron-builder to publish the artifacts to GitHub Releases
-        run: npm run dist -- -p always
+ #SvdV       run: npm run dist -- -p always
+ 		run: npm run dist -- --publish never

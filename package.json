@@ -1,18 +1,17 @@
 {
   "name": "molecular-merge-and-match",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "Molecular Bookkeeping for Structural Analysis",
   "main": "main.js",
   "devDependencies": {
-    "electron": "^41.10.3",
-    "electron-builder": "^26.15.3"
+    "electron": "^41.6.1",
+    "electron-builder": "^26.8.1"
   },
   "scripts": {
     "clean:win": "if exist dist-electron rmdir /s /q dist-electron && if exist frontend\\dist rmdir /s /q frontend\\dist",
     "clean:unix": "rm -rf dist-electron frontend/dist",
     "clean": "npm run clean:win 2>nul || npm run clean:unix",
-    "dist": "electron-builder",
-    "dist:mac": "electron-builder --mac --publish never",
+    "dist": "electron-builder --publish never",
     "postinstall": "electron-builder install-app-deps",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -62,22 +61,14 @@
       ],
       "artifactName": "${name}-Setup-${version}.${ext}",
       "icon": "build-assets/icon.icns",
-      "category": "public.app-category.education",
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "entitlements": "build-assets/entitlements.mac.plist",
-      "entitlementsInherit": "build-assets/entitlements.mac.plist",
-      "extendInfo": {
-        "NSCameraUsageDescription": "Not used",
-        "NSMicrophoneUsageDescription": "Not used"
-      }
+      "category": "public.app-category.education"
     },
     "linux": {
       "target": [
+        "AppImage",
         "deb",
-        "flatpak",
         "rpm",
-        "AppImage"
+        "flatpak"
       ],
       "executableName": "molecularmergeandmatch",
       "artifactName": "${name}-Setup-${version}.${ext}",

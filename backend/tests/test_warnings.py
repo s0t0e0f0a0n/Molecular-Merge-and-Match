@@ -114,6 +114,22 @@ def test_warning_with_multiletter_element_and_hydrate():
 
     assert exceeds_formula(fragment_counts, formula_counts) is True
 
+
+def test_parse_formula_ignores_everything_after_dot_separators():
+    expected = {"N": 1, "H": 3}
+
+    assert parse_formula("NH3.HCl") == expected
+    assert parse_formula("NH3·HCl") == expected
+    assert parse_formula("NH3●HCl") == expected
+    assert parse_formula("NH3•HCl") == expected
+
+
+def test_parse_formula_nested_parentheses_match_flat_formula():
+    nested = parse_formula("(CH3)2CO")
+    flat = parse_formula("C3H6O")
+
+    assert nested == flat
+
 def test_warning_true_when_fragment_dbe_exceeds_formula_dbe():
     formula_counts = parse_formula("C2H4Br2")
     fragment_counts = count_atoms_in_fragments(["C=C"])

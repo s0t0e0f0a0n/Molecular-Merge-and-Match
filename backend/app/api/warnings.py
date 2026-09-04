@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import re
 from collections import Counter
 from typing import Literal, Union
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from rdkit import Chem
+
+from app.core.calculation import calculate_dbe, parse_formula
 
 router = APIRouter(prefix="/warnings", tags=["warnings"])
 
@@ -48,123 +49,6 @@ def count_atoms_in_fragments(fragments: list[str]) -> dict[str, int]:
     for smiles in fragments:
         total += Counter(count_atoms_in_smiles(smiles))
     return dict(total)
-
-
-def calculate_dbe(atom_counts: dict[str, int]) -> float:
-    c = sum(atom_counts.get(symbol, 0) for symbol in ["C", "Si", "Sn"])
-    h = atom_counts.get("H", 0)
-    n = sum(atom_counts.get(symbol, 0) for symbol in ["N", "P", "B"])
-    x = sum(atom_counts.get(symbol, 0) for symbol in ["F", "Cl", "Br", "I", "D", "[2]H", "[2H]"])
-
-    dbe = c + 1 - (h + x - n) / 2
-    return dbe
-
-def parse_formula(formula: str) -> dict[str, int]:
-    """
-    Convert a molecular formula string into atom counts.
-
-    Examples:
-    "C6H12O6+"        -> {'C': 6, 'H': 12, 'O': 6}
-    "C6H12O6·H2O"     -> {'C': 6, 'H': 14, 'O': 7}
-    "Fe2(SO4)3"       -> {'Fe': 2, 'S': 3, 'O': 12}
-    "CH3COOH"         -> {'C': 2, 'H': 4, 'O': 2}
-    """
-
-    # Remove spaces
-    formula = formula.strip().replace(" ", "")
-    # replace the deuterium isotope notation, with "D"still gives frontend error symbol.
-    # replace with "H" avoids this
-    formula = formula.replace("[2]H", "H")
-    # Remove charge at the end, like +, -, 2+, 3-
-    formula = re.sub(r'(\d*[+-])$', '', formula)
-
-    # Split hydrates (e.g. "C6H12O6·H2O" or "C6H12O6.H2O")
-    parts = re.split(r'[·.]', formula)
-
-    total_counts = Counter()
-
-    # Parse each part separately and add them together
-    for part in parts:
-        total_counts += Counter(_parse_formula_part(part))
-
-    return dict(total_counts)
-
-
-def _parse_formula_part(part: str) -> dict[str, int]:
-    """
-    Parse one part of a formula (no hydrates).
-    Handles parentheses and element counts.
-    """
-
-    # Stack is used to handle nested parentheses
-    stack = [Counter()]
-    i = 0
-
-    while i < len(part):
-        char = part[i]
-
-        if char == '(':
-            # Start a new group
-            stack.append(Counter())
-            i += 1
-
-        elif char == ')':
-            # End of a group
-            i += 1
-
-            # Read multiplier after ')'
-            multiplier, i = _read_number(part, i)
-
-            # Pop the group and multiply it
-            group_counts = stack.pop()
-
-            for element, count in group_counts.items():
-                stack[-1][element] += count * multiplier
-
-        elif char.isupper():
-            # Start of an element symbol (e.g. C, Fe, Na)
-            element = char
-            i += 1
-
-            # Check if it has a lowercase letter (e.g. Cl, Na)
-            if i < len(part) and part[i].islower():
-                element += part[i]
-                i += 1
-
-            # Read the number after the element (if any)
-            count, i = _read_number(part, i)
-
-            # Add to current level
-            stack[-1][element] += count
-
-        else:
-            # Unexpected character
-            raise ValueError(f"Unexpected character in formula: {char}")
-
-    # If stack is not back to 1, parentheses were not closed
-    if len(stack) != 1:
-        raise ValueError(f"Unclosed parenthesis in formula: {part}")
-
-    return dict(stack[0])
-
-
-def _read_number(text: str, i: int) -> tuple[int, int]:
-    """
-    Read a number starting at position i.
-    If no number is found, return 1.
-    """
-
-    start = i
-
-    # Read all digits
-    while i < len(text) and text[i].isdigit():
-        i += 1
-
-    # If no digits, default count is 1
-    if start == i:
-        return 1, i
-
-    return int(text[start:i]), i
 
 def exceeds_formula(fragment_counts: dict[str, int], formula_counts: dict[str, int], hydrogen_in_warning: bool = False,) -> bool:
     """

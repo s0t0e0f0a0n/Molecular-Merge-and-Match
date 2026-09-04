@@ -196,7 +196,6 @@ Built for the Software Engineering course at Leiden University (2026).
 │   └── vite.config.ts               # Build config + dev proxy + Node polyfills for Ketcher
 │
 ├── .gitignore
-├── CHANGELOG.md                     # Release notes
 ├── docker-compose.yml               # One-command full-stack startup
 ├── LICENSE           				 # MIT License
 ├── main.js                          # Main entry point of Electron

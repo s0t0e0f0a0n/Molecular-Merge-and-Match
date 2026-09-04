@@ -24,10 +24,8 @@ class Exercise(Base):
 
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     molecular_formula: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    dbe: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    dbe: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     tags_csv: Mapped[str | None] = mapped_column(Text, nullable=True)
-    tags_hidden: Mapped[str | None] = mapped_column(Text, nullable=True)
-    tags_user: Mapped[str | None] = mapped_column(Text, nullable=True)
     bookmark: Mapped[int | None] = mapped_column(Integer, nullable=True)
     exercise_set: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
@@ -42,12 +40,14 @@ class Exercise(Base):
     h1_nmr_text: Mapped[str] = mapped_column(Text, nullable=False)
     h1_frequency_mhz: Mapped[float | None] = mapped_column(Float, nullable=True)
     h1_solvent: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    h1_data_source: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     c13_nmr_text: Mapped[str] = mapped_column(Text, nullable=False)
     c13_frequency_mhz: Mapped[float | None] = mapped_column(Float, nullable=True)
     c13_solvent: Mapped[str | None] = mapped_column(String(100), nullable=True)
     c13_apt: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)
     c13_alt_text: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    c13_data_source: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     alt_nuc_text: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
 
@@ -133,7 +133,6 @@ class ExerciseC13Peak(Base):
     ppm: Mapped[float] = mapped_column(Float, nullable=False)
     atom_tag: Mapped[int] = mapped_column(Integer, nullable=True)
     atom_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    extra_info: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     exercise: Mapped["Exercise"] = relationship(back_populates="c13_peaks")
 
@@ -165,6 +164,7 @@ class ExerciseAdditionalNuclei(Base):
     )
     nucleus: Mapped[str] = mapped_column(String(5), nullable=False)
     frequency_mhz: Mapped[float | None] = mapped_column(Float, nullable=True)
+    atom_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     ppm: Mapped[float] = mapped_column(Float, nullable=False)
     multiplicity: Mapped[str | None] = mapped_column(String(50), nullable=True)
     j_values_hz_csv: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -209,14 +209,28 @@ class TagsUsed(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     tag_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_persistent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_hideable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_cheat: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     tag_count: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
     user_tag: Mapped[bool] = mapped_column(Boolean, nullable=True, default=False)
     # Soft-delete: NULL = active, timestamp = soft-deleted. Similar to Fragment. Want to re-use the same name in current session
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True, default=None
     )
+
+class SolventsUsed(Base):
+    __tablename__ = "solvents_used"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    names: Mapped[str] = mapped_column(String(255), nullable=False)
+    match: Mapped[str] = mapped_column(String(50), nullable=False, default="solvent")
+    display: Mapped[str] = mapped_column(String(100), nullable=False, default="solvent")
+    preference: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    count: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    
 
 class PredefinedFragment(Base):
     """Predefined fragment library - shared list among exercises"""
@@ -280,7 +294,7 @@ class Statistics(Base):
 class UserSettings(Base):
     __tablename__ = "user_settings"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-
+    name: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # Global setting, not linked to one exercise.
     # Decides what happens to links after merging two fragments.
     link_inherit_mode: Mapped[str] = mapped_column(
@@ -288,16 +302,19 @@ class UserSettings(Base):
         nullable=False,
         default="none",
     )
-    theme: Mapped[str] = mapped_column(String(20), nullable=False, default="light")
+    theme: Mapped[str] = mapped_column(String(20), nullable=False, default="Light")
     layout_opt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    solvent_opt: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    solvent_labels: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    show_CAS_input: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    show_solvent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     show_exchange: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    cheats: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    show_missing: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    show_warnings: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    show_creation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    show_timer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    cheats: Mapped[str] = mapped_column(String(15), nullable=False, default=0)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
     )
-# een nieuwe tabel met help-indecis kan werken

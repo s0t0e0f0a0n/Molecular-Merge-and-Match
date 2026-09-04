@@ -39,6 +39,32 @@ def _ensure_statistics_row(db, exercise_id: int | str) -> tuple[Statistics, bool
     return row, True
 
 
+def _find_statistics_row(db, exercise_id: str) -> Statistics | None:
+    """Try to find a statistics row for the given id, accepting both
+    bare numeric ids ("8") and prefixed keys ("exercise-8")."""
+    key = str(exercise_id)
+    row = db.query(Statistics).filter(Statistics.exercise_id == key).first()
+    if row is not None:
+        return row
+
+    # If key is numeric, try the prefixed form
+    if key.isdigit():
+        alt = f"exercise-{key}"
+        row = db.query(Statistics).filter(Statistics.exercise_id == alt).first()
+        if row is not None:
+            return row
+
+    # If key starts with exercise- try the bare numeric suffix
+    if key.startswith("exercise-"):
+        suffix = key[len("exercise-"):]
+        if suffix:
+            row = db.query(Statistics).filter(Statistics.exercise_id == suffix).first()
+            if row is not None:
+                return row
+
+    return None
+
+
 def _exercise_is_incomplete(db, exercise_id: int | str) -> bool:
     try:
         exercise = db.query(Exercise).filter(Exercise.id == int(exercise_id)).first()
@@ -157,13 +183,13 @@ def increment_incorrect_count(exercise_id: int | str) -> None:
 @router.get("/", response_model=StatisticsOut)
 def get_statistics(exercise_id: str = Query(...)) -> StatisticsOut:
     with get_db() as db:
-        row = (
-            db.query(Statistics)
-            .filter(Statistics.exercise_id == exercise_id)
-            .first()
-        )
+        row = _find_statistics_row(db, exercise_id)
         if row is None:
-            raise HTTPException(status_code=404, detail="Statistics not found.")
+            # If no statistics row exists yet, create one to maintain previous behavior
+            # where selecting an exercise resulted in an available statistics row.
+            row, _ = _ensure_statistics_row(db, exercise_id)
+            db.commit()
+            db.refresh(row)
         return StatisticsOut.model_validate(row)
 
 

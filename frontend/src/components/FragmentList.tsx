@@ -215,7 +215,7 @@ function FragmentFormula({ molFile }: { molFile: string }) {
 
   if (!formula) return null;
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', fontSize: 12, fontWeight: 600, color: '#444', marginTop: 2 }}>
+    <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600, color: '#444', marginTop: 2 }}>
       <FormulaWithSubscripts formula={formula} />
     </div>
   );
@@ -437,7 +437,7 @@ export function FragmentList({
                     {num}
                   </span>
 
-                  <div style={{ fontSize: 11, opacity: 1, wordBreak: 'break-all', fontFamily: 'system-ui, sans-serif' }}>
+                  <div style={{ fontSize: 11, opacity: 1, wordBreak: 'break-all', fontFamily: 'var(--font-ui)' }}>
                     <FragmentFormula molFile={fragment.molFile} />
                   </div>
                 </div>

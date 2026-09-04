@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -15,7 +16,7 @@ import {
 } from '../api/exercises';
 
 type ExerciseDataContextValue = {
-  selectedExerciseId: number | null; //The id of the currently saved exercise
+  selectedExerciseId: number | null; 
   selectedExercise: ExerciseDetail | null;
   selectedExerciseStatistics: ExerciseStatistics | null;
   loadingSelectedExercise: boolean;
@@ -25,9 +26,7 @@ type ExerciseDataContextValue = {
   setSelectedExerciseStatistics: (statistics: ExerciseStatistics | null) => void;
 };
 
-const ExerciseDataContext = createContext<ExerciseDataContextValue | undefined>(  //An empty context to begin with
-  undefined,
-);
+const ExerciseDataContext = createContext<ExerciseDataContextValue | undefined>(undefined);
 
 export function ExerciseDataProvider({
   children,
@@ -35,25 +34,51 @@ export function ExerciseDataProvider({
   children: ReactNode;
 }) {
   const [selectedExerciseId, setSelectedExerciseId] = useState<number | null>(null);
-  const [selectedExercise, setSelectedExercise] = useState<ExerciseDetail | null>(null); //This is where the data (send by the backend) is stored
+  const [selectedExercise, setSelectedExercise] = useState<ExerciseDetail | null>(null); 
   const [selectedExerciseStatistics, setSelectedExerciseStatistics] = useState<ExerciseStatistics | null>(null);
   const [loadingSelectedExercise, setLoadingSelectedExercise] = useState(false);
   const [selectedExerciseError, setSelectedExerciseError] = useState<string | null>(null);
+  
+  const selectRequestIdRef = useRef(0);
 
+  // Keep a persistent mutable reference of the current state values
+  const trackingRef = useRef({ id: selectedExerciseId, completed: selectedExercise?.completed });
+  
+  // Update the mutable ref on every render cycle so it is always current
+  trackingRef.current = {
+    id: selectedExerciseId,
+    completed: selectedExercise?.completed
+  };
+
+  // This handles the Unmount lifecycle cleanly (e.g., leaving the app or closing the module)
   useEffect(() => {
     return () => {
-      if (selectedExerciseId !== null && selectedExercise?.completed !== true) {
-        void stopExerciseTimer(selectedExerciseId).catch(() => undefined);
+      const { id, completed } = trackingRef.current;
+      if (id !== null && completed !== true) {
+        void stopExerciseTimer(id).catch(() => undefined);
       }
     };
-  }, [selectedExerciseId, selectedExercise?.completed]);
+  }, []); // Run strictly once on component destruction
 
   const selectExerciseById = useCallback(async (exerciseId: number) => {
-    setLoadingSelectedExercise(true);  //Start loading the exercise
+    const requestId = ++selectRequestIdRef.current;
+
+    // FIX FOR SWITCHING: Stop the timer for the active exercise BEFORE clearing state
+    const previousId = trackingRef.current.id;
+    const previousCompleted = trackingRef.current.completed;
+    
+    if (previousId !== null && previousCompleted !== true && previousId !== exerciseId) {
+      void stopExerciseTimer(previousId).catch(() => undefined);
+    }
+
+    setLoadingSelectedExercise(true);  
     setSelectedExerciseError(null);
+    setSelectedExerciseId(exerciseId);
+    setSelectedExercise(null); // Keeps your flash/warning symbol fix fully functional
+    setSelectedExerciseStatistics(null);
 
     try {
-      const detail = await fetchExerciseDetail(exerciseId); // Here the actual fetching happens
+      const detail = await fetchExerciseDetail(exerciseId); 
       let statistics: ExerciseStatistics | null = null;
 
       try {
@@ -62,19 +87,31 @@ export function ExerciseDataProvider({
         statistics = null;
       }
 
-      setSelectedExerciseId(exerciseId);
-      setSelectedExercise(detail); //Here the data is stored
+      if (requestId !== selectRequestIdRef.current) {
+        return;
+      }
+
+      setSelectedExercise(detail); 
       setSelectedExerciseStatistics(statistics);
     } catch (error) {
+      if (requestId !== selectRequestIdRef.current) {
+        return;
+      }
+
       setSelectedExerciseError(
         error instanceof Error ? error.message : 'Failed to load exercise detail.',
       );
     } finally {
-      setLoadingSelectedExercise(false); // End of loading the exercise, so loading state is false (the [selectedExerciseID] was [] before AI)
+      if (requestId === selectRequestIdRef.current) {
+        setLoadingSelectedExercise(false); 
+      }
     }
   }, []);
 
   const clearSelectedExercise = useCallback(async () => {
+    selectRequestIdRef.current += 1;
+
+    // Handles intentional Pause or manual backing out
     if (selectedExercise?.completed !== true && selectedExerciseId !== null) {
       void stopExerciseTimer(selectedExerciseId).catch(() => undefined);
     }
@@ -90,7 +127,7 @@ export function ExerciseDataProvider({
     <ExerciseDataContext.Provider
       value={{
         selectedExerciseId,
-        selectedExercise,  //The actual exercise data is stored here
+        selectedExercise,  
         selectedExerciseStatistics,
         loadingSelectedExercise,
         selectedExerciseError,

@@ -164,13 +164,30 @@ export function ExerciseZipImport({ onImported, onImportingChange }: ExerciseZip
             exerciseSet,
           );
 
+          // Allow an optional 'prefix' CSV column to determine the exercise name
+          // when importing via ZIP: use "<prefix> <problemNumber>".
+          let displayNameUsed = displayName;
           if (!payload) {
-            failures.push(`${exerciseSet} - Row ${i + 2} (${displayName}): ${error}`);
+            failures.push(`${exerciseSet} - Row ${i + 2} (${displayNameUsed}): ${error}`);
             continue;
           }
           if (problemNumber === null) {
-            failures.push(`${exerciseSet} - Row ${i + 2} (${displayName}): Missing Problem/ID value.`);
+            failures.push(`${exerciseSet} - Row ${i + 2} (${displayNameUsed}): Missing Problem/ID value.`);
             continue;
+          }
+
+          try {
+            const normalizedHeaders = headers.map((h) => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
+            const prefixIndex = normalizedHeaders.indexOf("prefix");
+            if (prefixIndex >= 0) {
+              const prefixValue = (row[prefixIndex] ?? "").trim();
+              if (prefixValue) {
+                payload.name = `${prefixValue} ${problemNumber}`;
+                displayNameUsed = `${prefixValue} ${problemNumber}`;
+              }
+            }
+          } catch {
+            // Ignore any unexpected errors while reading prefix - keep original name
           }
 
           const cEntry = findFileByName(filesInCsvDirectory, `${problemNumber}_C.svg`);
@@ -180,7 +197,7 @@ export function ExerciseZipImport({ onImported, onImportingChange }: ExerciseZip
 
           if (!cEntry || !hEntry) {
             failures.push(
-              `${exerciseSet} - Row ${i + 2} (${displayName}): Missing required spectra files for ID ${problemNumber}.`,
+              `${exerciseSet} - Row ${i + 2} (${displayNameUsed}): Missing required spectra files for ID ${problemNumber}.`,
             );
             continue;
           }
@@ -226,7 +243,7 @@ export function ExerciseZipImport({ onImported, onImportingChange }: ExerciseZip
             createdCount += 1;
           } else {
             failures.push(
-              `${exerciseSet} - Row ${i + 2} (${displayName}): ${result.detail ?? "Failed to create exercise."}`,
+              `${exerciseSet} - Row ${i + 2} (${displayNameUsed}): ${result.detail ?? "Failed to create exercise."}`,
             );
           }
         }

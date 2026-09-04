@@ -259,7 +259,7 @@ export function WorkingFragmentsStrip({
                     }
                   }}
                   placeholder="Write a note..."
-                  style={{ width: '100%', minHeight: 45, fontSize: 11, fontFamily: 'system-ui, sans-serif', padding: '4px 6px', borderRadius: 4, border: '1px solid #ccc', resize: 'vertical', boxSizing: 'border-box' }}
+                  style={{ width: '100%', minHeight: 45, fontSize: 11, fontFamily: 'var(--font-ui)', padding: '4px 6px', borderRadius: 4, border: '1px solid #ccc', resize: 'vertical', boxSizing: 'border-box' }}
                 />
               ) : (
                 <div
@@ -270,7 +270,7 @@ export function WorkingFragmentsStrip({
                   title="Click to edit annotation"
                   style={{
                     fontSize: 11,
-                    fontFamily: 'system-ui, sans-serif',
+                    fontFamily: 'var(--font-ui)',
                     padding: '4px 6px',
                     cursor: 'text',
                     wordBreak: 'break-word',
@@ -302,11 +302,12 @@ export function WorkingFragmentsStrip({
                     <Chip
                       key={pid}
                       label={`${
-                                  peak.spectrum === '1H'
-                                    ? '¹H'
-                                    : peak.spectrum === '13C'
-                                      ? '¹³C'
-                                      : peak.spectrum
+                                  peak.displayLabel
+                                    ?? (peak.spectrum === '1H'
+                                      ? '¹H'
+                                      : peak.spectrum === '13C'
+                                        ? '¹³C'
+                                        : peak.spectrum)
                                 } ${ppmFmt(peak.ppm)}`}
                       onRemove={() => unlink(fragment.id, pid)}
                     />

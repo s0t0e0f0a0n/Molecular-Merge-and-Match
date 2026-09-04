@@ -1,8 +1,43 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { formatChemistryText } from '../../utils/formatChemistryText'
+import { useHighlighting, type MergedHighlightBox, type PeakBox } from '../../hooks/useHighlighting'
+import { forceSvgFontFamily } from './svgFontOverride'
 
 type ViewMode = 'fit' | 'scroll'
+
+type CheatOverlaySegmentDefinition = {
+  label: string;
+  backgroundColor: string;
+  textColor: string;
+};
+
+type CheatOverlayDefinition = {
+  innerBordersPpm: number[];
+  segments: CheatOverlaySegmentDefinition[];
+};
+
+const CHEAT_OVERLAY_DEFINITIONS: Record<'H' | 'C', CheatOverlayDefinition> = {
+  H: {
+    innerBordersPpm: [8.5, 6.5, 4.5, 3.0],
+    segments: [
+      { label: "H's on sp² C of aldehydes", backgroundColor: 'rgba(255, 77, 77, 0.15)', textColor: '#5d4037' },
+      { label: "H's on sp² C of aromatics", backgroundColor: 'rgba(255, 77, 255, 0.15)', textColor: '#5d4037' },
+      { label: "H's on sp² C of alkenes", backgroundColor: 'rgba(255, 255, 77, 0.15)', textColor: '#5d4037' },
+      { label: "H's on sp³ C, next to O", backgroundColor: 'rgba(77, 255, 77, 0.15)', textColor: '#5d4037' },      
+      { label: "H's on sp³ C, not next to O", backgroundColor: 'rgba(77, 200, 255, 0.15)', textColor: '#5d4037' },
+    ],
+  },
+  C: {
+    innerBordersPpm: [150, 100, 50],
+    segments: [
+      { label: 'sp² C, next to O', backgroundColor: 'rgba(255, 77, 77, 0.15)', textColor: '#5d4037' },
+      { label: 'sp² C, not next to O', backgroundColor: 'rgba(255, 255, 77, 0.15)', textColor: '#5d4037' },
+      { label: 'sp³ C, next to O', backgroundColor: 'rgba(77, 255, 77, 0.15)', textColor: '#5d4037' },
+      { label: 'sp³ C, not next to O', backgroundColor: 'rgba(77, 200, 255, 0.15)', textColor: '#5d4037' },
+    ],
+  },
+};
 
 const highlightStyles = `
   .peak-highlight-box {
@@ -10,10 +45,24 @@ const highlightStyles = `
     top: 0;
     height: 100%;
     box-sizing: border-box;
+  }
+  .peak-highlight-fill {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    box-sizing: border-box;
+    background-color: rgba(144, 238, 144, 0.4);
+  }
+  .peak-highlight-hitbox {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    box-sizing: border-box;
     transition: background-color 0.1s ease-in-out;
     cursor: pointer;
+    background: transparent;
   }
-  .peak-highlight-box:hover, .peak-highlight-box.active {
+  .peak-highlight-hitbox:hover {
     background-color: rgba(144, 238, 144, 0.4);
   }
 `;
@@ -40,6 +89,64 @@ export interface SpectrumViewerProps {
   frequencyMhz?: number | null;
   /** When true, append "APT" next to a 13C title. Ignored for 1H. */
   apt?: boolean;
+  /** Toggle literal "solvent" text embedded inside source SVG. */
+  showSolventText?: boolean;
+  /** Toggle literal "exchanges with D2O / D₂O" text in 1H source SVGs. */
+  showExchangeText?: boolean;
+  /** Show the cheat segmentation overlay for this spectrum. */
+  showCheatSegmentsOverlay?: boolean;
+  /** Show the spectrum data source label in the bottom-left corner. */
+  showSpectrumDataSource?: boolean;
+  /** Optional text to render as spectrum source metadata. */
+  dataSource?: string | null;
+}
+
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(100, Math.max(0, value));
+}
+
+function ppmToPercent(ppm: number, axisRange: [number, number]): number {
+  const minPpm = axisRange[0];
+  const maxPpm = axisRange[1];
+  const total = maxPpm - minPpm;
+
+  if (!Number.isFinite(total) || total <= 0) {
+    return 0;
+  }
+
+  return clampPercent(((maxPpm - ppm) / total) * 100);
+}
+/** Replace "solvent" and "exchanges with D2O" as setting, with additional variations in the latter */
+function applySvgTextVisibility(
+  text: string,
+  type: 'H' | 'C',
+  showSolventText: boolean,
+  showExchangeText: boolean,
+): string {
+  let processed = text;
+
+  if (!showSolventText) {
+    processed = processed.replace(/\bsolvent\b(?!\s+residual\b)/gi, '');
+  }
+
+  if (type === 'H' && !showExchangeText) {
+    //Replaces the "exchanges with D2O" when it's a single line, including words like "slowly" etc.
+    processed = processed.replace(/exchanges.*?\s+with\s+D(?:₂|2)O/gis, ''); 
+    // Linebreaks in the MestreNova generated SVG's are treated as new <text> elements, so we replace every line.
+    // This leaves empty <text> elements behind in most cases, it clutters but should be harmless.
+    processed = processed.replace(/exchanges/gi, '');
+    processed = processed.replace(/both\s+exchange/gi, '');
+    processed = processed.replace(/(?:\w+\s+)?with\s+D(?:₂|2)O/gi, '');  
+    // When part of a already exchanged water peak, this text is displayed, over 2 lines.
+    processed = processed.replace(/also contains/gi, '');
+    processed = processed.replace(/exchanged\s+protons/gi, '');
+    
+  }
+// clean up empty text elements anyway
+  processed = processed.replace(/<text\b[^>]*>\s*<\/text>/gis, '');  
+
+  return processed;
 }
 
 /** Build the NMR title node: `<sup>n</sup>X-NMR Spectrum [solvent] [freq] [APT]`. */
@@ -77,8 +184,13 @@ function SpectrumCanvas({
   zoom,
   displaySvg,
   svgContent,
+  type,
+  axisRange,
+  showCheatSegmentsOverlay,
+  showSpectrumDataSource,
+  dataSource,
   peakBoxes,
-  isHighlighted,
+  mergedActiveBoxes,
   onHoverPeak,
   onSelectPeak,
 }: {
@@ -86,8 +198,13 @@ function SpectrumCanvas({
   zoom: number;
   displaySvg: string;
   svgContent: string;
-  peakBoxes: { id: string; ppm: number; style: { left: string; width: string } }[];
-  isHighlighted?: (id: string) => boolean;
+  type: 'H' | 'C';
+  axisRange: [number, number];
+  showCheatSegmentsOverlay: boolean;
+  showSpectrumDataSource?: boolean;
+  dataSource?: string | null;
+  peakBoxes: PeakBox[];
+  mergedActiveBoxes: MergedHighlightBox[];
   onHoverPeak?: (id: string | null) => void;
   onSelectPeak?: (id: string) => void;
 }) {
@@ -155,6 +272,15 @@ function SpectrumCanvas({
     };
   }, [svgAspectRatio, viewMode, zoom]);
 
+  const overlayDefinition = useMemo(() => CHEAT_OVERLAY_DEFINITIONS[type], [type]);
+
+  const overlaySegmentEdges = useMemo(() => {
+    const borderPercents = overlayDefinition.innerBordersPpm
+      .map((ppm) => ppmToPercent(ppm, axisRange))
+      .sort((a, b) => a - b);
+    return [0, ...borderPercents, 100];
+  }, [overlayDefinition, axisRange]);
+
   return (
     <div
       ref={spectrumInnerRef}
@@ -182,10 +308,18 @@ function SpectrumCanvas({
           pointerEvents: 'none',
         }}
       >
+        {mergedActiveBoxes.map((box) => (
+          <div
+            key={box.id}
+            className="peak-highlight-fill"
+            style={box.style}
+          />
+        ))}
+
         {peakBoxes.map((box) => (
           <div
             key={box.id}
-            className={`peak-highlight-box ${isHighlighted?.(box.id) ? 'active' : ''}`}
+            className="peak-highlight-box peak-highlight-hitbox"
             style={{
               ...box.style,
               pointerEvents: 'auto',
@@ -196,12 +330,106 @@ function SpectrumCanvas({
             onClick={() => onSelectPeak?.(box.id)}  // This line makes the green highlighting boxes clickable/ linkable. To undo this: Remove this line.
           />
         ))}
+
+        {showCheatSegmentsOverlay && (
+          <div
+            data-testid={`cheat-overlay-${type}`}
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'none',
+            }}
+          >
+            {overlaySegmentEdges.slice(0, -1).map((start, index) => {
+              const end = overlaySegmentEdges[index + 1];
+              const width = Math.max(0, end - start);
+              const segmentDefinition = overlayDefinition.segments[index] ?? {
+                label: `text ${index + 1}`,
+                backgroundColor: 'rgba(255, 217, 102, 0.28)',
+                textColor: '#333',
+              };
+
+              return (
+                <div
+                  key={`segment-${type}-${index}`}
+                  data-testid={`cheat-overlay-${type}-segment-${index}`}
+                  data-segment-label={segmentDefinition.label}
+                  data-segment-color={segmentDefinition.backgroundColor}
+                  style={{
+                    position: 'absolute',
+                    left: `${start}%`,
+                    top: 0,
+                    width: `${width}%`,
+                    height: '100%',
+                    backgroundColor: segmentDefinition.backgroundColor,
+                  }}
+                >
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 6,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: segmentDefinition.textColor,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {segmentDefinition.label}
+                  </div>
+                </div>
+              );
+            })}
+
+            {overlaySegmentEdges.slice(1, -1).map((position, index) => (
+              <div
+                key={`border-${type}-${index}`}
+                data-testid={`cheat-overlay-${type}-border-${index}`}
+                data-position={position.toFixed(3)}
+                style={{
+                  position: 'absolute',
+                  left: `${position}%`,
+                  top: 0,
+                  height: '100%',
+                  borderLeft: '2px dashed rgba(60, 60, 60, 0.6)',
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        {showSpectrumDataSource && dataSource ? (
+          <div
+            style={{
+              position: 'absolute',
+              left: 6,
+              bottom: 6,
+              maxWidth: '50%',
+              padding: '4px 6px',
+              borderRadius: 6,
+              background: 'rgba(0, 0, 0, 0.4)',
+              color: 'white',
+              fontSize: 10,
+              fontStyle: 'italic',
+              lineHeight: 0.6,
+              pointerEvents: 'none',
+              whiteSpace: 'pre-wrap',
+              overflowWrap: 'break-word',
+            }}
+          >Data source: &nbsp;
+            {dataSource}
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
-export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRange, onHoverPeak, onSelectPeak, isHighlighted, embedded = false, solvent, frequencyMhz, apt }: SpectrumViewerProps) {
+export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRange, onHoverPeak, onSelectPeak, isHighlighted, embedded = false, solvent, frequencyMhz, apt, showSolventText = true, showExchangeText = true, showCheatSegmentsOverlay = false, showSpectrumDataSource = false, dataSource = null }: SpectrumViewerProps) {
   // Built-in title: `<sup>n</sup>X-NMR Spectrum [solvent] [freq] [APT]`.
   // Callers can still pass an explicit `title` to override (used by tests).
   const renderedTitle: React.ReactNode = title ?? renderSpectrumTitle(type, solvent, frequencyMhz, apt);
@@ -219,7 +447,10 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
   fetch(src)
     .then((res) => res.text())
     .then((text) => {
-      const processed = text
+      const processed = forceSvgFontFamily(
+        applySvgTextVisibility(text, type, showSolventText, showExchangeText),
+        '--font-spectrum',
+      )
         .replace(/<title[\s\S]*?<\/title>/gi, '')
         .replace(/<desc[\s\S]*?<\/desc>/gi, '')
         .replace(/<metadata[\s\S]*?<\/metadata>/gi, '')
@@ -230,36 +461,20 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
       setSvgContent(processed)
     })
     .catch((err) => console.error('Failed to load SVG', err))
-}, [src])
-
-  const totalAxisRange = axisRange[1] - axisRange[0];
+}, [src, type, showSolventText, showExchangeText])
 
   const highlightWidthPPM = useMemo(() => {
     if (type === 'H') return 0.18; // 0.18 ppm
-    if (type === 'C') return 2.50;  // 2.00 ppm
+    if (type === 'C') return 2.00;  // 2.00 ppm
     return 0;
   }, [type]);
 
-
-  const peakBoxes = useMemo(() => {
-    if (!peaks || totalAxisRange <= 0) return [];
-
-    return peaks.map(peak => {
-      // In NMR, high ppm is on the left. The axis is reversed.
-      // The highlight box is centered on peakPpm. Its left edge in ppm units is at a higher ppm value.
-      const boxLeftEdgePpm = peak.ppm + (highlightWidthPPM / 2);
-
-      // The position of the left edge of the box is calculated relative to the start of the axis (the max ppm value).
-      const leftPercent = ((axisRange[1] - boxLeftEdgePpm) / totalAxisRange) * 100;
-      const widthPercent = (highlightWidthPPM / totalAxisRange) * 100;
-
-      return {
-        id: peak.id,
-        ppm: peak.ppm,
-        style: { left: `${leftPercent}%`, width: `${widthPercent}%` },
-      };
-    });
-  }, [peaks, highlightWidthPPM, axisRange, totalAxisRange]);
+  const { peakBoxes, mergedActiveBoxes } = useHighlighting({
+    peaks,
+    axisRange,
+    highlightWidthPPM,
+    isHighlighted,
+  });
 
   // Controls logic
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.2, 10))
@@ -276,11 +491,11 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
   )
   
   const renderContent = (isModal: boolean) => (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', }}>
       {/* Toolbar */}
       <div
         style={{
-          fontFamily: 'system-ui, sans-serif',
+          fontFamily: 'var(--font-ui)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -371,12 +586,12 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
       <div
         style={{
           flex: 1,
-          width: isModal ? '98%' : '100%',
-          paddingBottom: isModal ? 6 : 2,
-          paddingRight: isModal ? 13 : 3,
-          paddingLeft: isModal ? 13: 3,
+          width: isModal ? '97%' : '100%',
+          paddingBottom: 0,
+          paddingRight: isModal ? 13 : 0,
+          paddingLeft: isModal ? 13: 0,
           paddingTop: 0,
-          fontFamily: 'Aptos',
+          fontFamily: 'var(--font-spectrum)',
           alignSelf: 'center',
           overflowX: viewMode === 'scroll' ? 'auto' : 'hidden',
           overflowY: viewMode === 'scroll' ? 'auto' : 'hidden',
@@ -392,8 +607,13 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
           zoom={zoom}
           displaySvg={displaySvg}
           svgContent={svgContent}
+          type={type}
+          axisRange={axisRange}
+          showCheatSegmentsOverlay={showCheatSegmentsOverlay}
+          showSpectrumDataSource={showSpectrumDataSource}
+          dataSource={dataSource}
           peakBoxes={peakBoxes}
-          isHighlighted={isHighlighted}
+          mergedActiveBoxes={mergedActiveBoxes}
           onHoverPeak={onHoverPeak}
           onSelectPeak={onSelectPeak}
         />
@@ -423,10 +643,17 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9999,
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40
-        }}>
-          <div style={{ width: '95%', background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
+        }}><div
+              style={{
+                width: '95%',
+                height: '84%',
+                alignSelf: 'center',
+                overflow: viewMode === 'scroll' ? 'auto' : 'hidden',
+              }}
+            >
+          <div style={{ width: '100%', height: '100%', background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
             {renderContent(true)}
-          </div>
+          </div></div>
         </div>,
         document.body
       )}

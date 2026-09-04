@@ -16,6 +16,8 @@ export type ExerciseCreatePayload = {
   c13_spectrum_svg: UploadedSvgPayload;
   c13_axis_scale: { begin: number; end: number };
   c13_nmr_text: string;
+  c13_alt_text: string | null;
+  alt_nuc_text: string | null;
   c13_apt: boolean | null;
   molecular_formula: string | null;
   solution_inchi: string | null;
@@ -27,6 +29,8 @@ export type ExerciseCreatePayload = {
   tags: string[];
   additional_spectra: AdditionalSpectrum[];
   solvent?: string | null;
+  h1_data_source?: string | null;
+  c13_data_source?: string | null;
 };
 
 type CreatedExerciseResponse = {
@@ -159,7 +163,7 @@ function buildFallbackSvgText(label: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360">
   <rect x="0" y="0" width="1200" height="360" fill="white"/>
   <line x1="30" y1="310" x2="1170" y2="310" stroke="black" stroke-width="2"/>
-  <text x="40" y="45" font-family="Arial, sans-serif" font-size="20" fill="#444">${label} placeholder (no uploaded SVG)</text>
+  <text x="40" y="45" font-family="Aptos, Ubuntu Sans, system-ui, sans-serif" font-size="20" fill="#444">${label} placeholder (no uploaded SVG)</text>
 </svg>`;
 }
 
@@ -230,6 +234,32 @@ export function buildPayloadFromCsvRow(
     "cnmr",
     "13cnmr",
     "c13nmr",
+  ]);
+  const c13AltText = getFirstValueByAliases(headers, row, [
+    "altcnmr",
+    "alt13cnmr",
+    "c13altnmr",
+  ]);
+  const altNucText = getFirstValueByAliases(headers, row, [
+    "altnuc",
+    "altnucnmr",
+    "alternativenuc",
+  ]);
+  const h1DataSource = getFirstValueByAliases(headers, row, [
+    "datasourceh",
+    "h1datasource",
+    "datasource-h",
+    "datasource_h",
+    "h1_data_source",
+    "sourceh",
+  ]);
+  const c13DataSource = getFirstValueByAliases(headers, row, [
+    "datasourcec",
+    "c13datasource",
+    "datasource-c",
+    "datasource_c",
+    "c13_data_source",
+    "sourcec",
   ]);
   const aptRaw = getFirstValueByAliases(headers, row, ["apt", "c13apt"]);
   const c13Apt = aptRaw === "1" || aptRaw.toLowerCase() === "true" ? true
@@ -341,6 +371,10 @@ export function buildPayloadFromCsvRow(
     c13_spectrum_svg: resolveSvgPayload("", "", "c13"),
     c13_axis_scale: { begin: c13Begin, end: c13End },
     c13_nmr_text: c13NmrText,
+    c13_alt_text: c13AltText || null,
+    alt_nuc_text: altNucText || null,
+    h1_data_source: h1DataSource || null,
+    c13_data_source: c13DataSource || null,
     c13_apt: c13Apt,
     molecular_formula: molecularFormula || null,
     solution_inchi: solutionInchi || null,

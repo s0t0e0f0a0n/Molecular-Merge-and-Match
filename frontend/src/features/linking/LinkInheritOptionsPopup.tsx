@@ -51,7 +51,7 @@ export function LinkInheritOptionsPopup({
             role="dialog"
             aria-label="Link inherit options"
             style={{
-              fontFamily: 'system-ui, sans-serif',  
+              fontFamily: 'var(--font-ui)',
               position: 'fixed',
               inset: 0,
               zIndex: 9999,

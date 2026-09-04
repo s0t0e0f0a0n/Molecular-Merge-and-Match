@@ -8,6 +8,11 @@ export default function WarningPanel() {
 
   const atom_count_DBE_Warning = warningsByType.atom_count_DBE
   const double_peak_assignment_Warning = warningsByType.double_peak_assignment
+  const hasWarnings = atom_count_DBE_Warning.warning || double_peak_assignment_Warning.warning
+
+  if (!hasWarnings) {
+    return null
+  }
 
   //useEffect(() => {
   //  console.log('WarningPanel received warningsByType:', warningsByType)
@@ -42,7 +47,6 @@ export default function WarningPanel() {
       </span>
       )}
 
-      {double_peak_assignment_Warning.warning && (
         <span
           title="At least one peak is assigned to multiple fragments."
           style={{ cursor: 'help', display: 'inline-flex' }}
@@ -53,7 +57,7 @@ export default function WarningPanel() {
             style={{ width: 32, height: 32 }}
           />
         </span>
-      )}
+      
     </div>
   )
 }

@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator, model_validator
+from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 
 from app.api.statistics import (
@@ -19,15 +20,32 @@ from app.api.statistics import (
     mark_exercise_completed,
     mark_exercise_selected,
 )
+from app.core.calculation import calculate_dbe, parse_formula
 from app.core.config import settings
+from app.core.solvent_tokens import (
+    apply_solvent_count_delta,
+    encode_solvent_text,
+    extract_solvent_ids,
+    resolve_solvent_tokens,
+)
+from app.core.tag_tokens import (
+    encode_tags_list,
+    resolve_tag_tokens,
+    extract_tag_ids as extract_tag_ids,
+    apply_tag_count_delta as apply_tag_count_delta,
+)
 from app.db.models import (
     Exercise,
+    Statistics,
+    ExerciseAdditionalNuclei,
     ExerciseAdditionalSpectrum,
+    ExerciseC13Coupling,
     ExerciseC13Peak,
     ExerciseH1Peak,
     Fragment,
     LogbookState,
     WorkingSolution,
+    TagsUsed,
 )
 from app.db.session import get_db
 
@@ -38,6 +56,7 @@ _SVG_EVENT_ATTR_RE = re.compile(
 _ADDITIONAL_SPECTRUM_PRIORITY_BY_NAME = {
     "ir": 1,
     "h-presat": 2,
+    "h-regular": 2,
     "h-31p-dec": 3,
     "h-19f-dec": 3,
     "h-psyche": 4,
@@ -55,10 +74,10 @@ _ADDITIONAL_SPECTRUM_PRIORITY_BY_NAME = {
     "19f-1h-dec": 8,
     "31p": 9,
     "31p-1h-dec": 10,
-    "10B": 11,
-    "11B": 11,
-    "14N": 11,
-    "29Si": 11,
+    "10b": 11,
+    "11b": 11,
+    "14n": 11,
+    "29si": 11,
     "hmbc": 12,
     "h2bc": 13,
     "noesy": 14,
@@ -160,12 +179,16 @@ class ExerciseCreate(BaseModel):
     c13_spectrum_svg: UploadedSvgPayload
     c13_axis_scale: AxisScale
     c13_nmr_text: str = Field(min_length=1)
+    c13_alt_text: str | None = Field(default=None)
+    alt_nuc_text: str | None = Field(default=None)
     c13_apt: bool | None = Field(default=None)
     molecular_formula: str | None = Field(default=None, max_length=100)
     solution_inchi: str | None = Field(default=None)
     solution_cas_number: str | None = Field(default=None, max_length=100)
     alt1_cas_number: str | None = Field(default=None, max_length=100)
     alt2_cas_number: str | None = Field(default=None, max_length=100)
+    h1_data_source: str | None = Field(default=None, max_length=255)
+    c13_data_source: str | None = Field(default=None, max_length=255)
 
     name: str | None = Field(default=None, max_length=255)
     exercise_set: str | None = Field(default=None, max_length=255)
@@ -214,7 +237,18 @@ class H1PeakOut(BaseModel):
 class C13PeakOut(BaseModel):
     id: int
     ppm: float
+    atom_tag: int | None
     atom_count: int
+
+    model_config = {"from_attributes": True}
+
+
+class C13CouplingOut(BaseModel):
+    id: int
+    ppm: float
+    multiplicity: str | None
+    j_values_hz_csv: str | None
+    atom_tag: int | None
     extra_info: str | None
 
     model_config = {"from_attributes": True}
@@ -229,10 +263,24 @@ class AdditionalSpectrumOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AdditionalNucleusOut(BaseModel):
+    id: int
+    nucleus: str
+    frequency_mhz: float | None
+    ppm: float
+    atom_count: int
+    multiplicity: str | None
+    j_values_hz_csv: str | None
+    extra_info: str | None
+
+    model_config = {"from_attributes": True}
+
+
 class ExerciseOut(BaseModel):
     id: int
     name: str | None
     molecular_formula: str | None
+    dbe: float
     exercise_set: str | None
     tags: list[str]
     completed: bool | None = None
@@ -244,6 +292,7 @@ class ExerciseOut(BaseModel):
     h1_nmr_text: str
     h1_frequency_mhz: float | None
     h1_solvent: str | None
+    h1_data_source: str | None
     h1_peaks: list[H1PeakOut]
 
     c13_svg_path: str
@@ -251,10 +300,14 @@ class ExerciseOut(BaseModel):
     c13_axis_start: float
     c13_axis_end: float
     c13_nmr_text: str
+    c13_alt_text: str | None
     c13_frequency_mhz: float | None
     c13_solvent: str | None
+    c13_data_source: str | None
     c13_apt: bool | None
     c13_peaks: list[C13PeakOut]
+    c13_couplings: list[C13CouplingOut]
+    alt_nuclei: list[AdditionalNucleusOut]
 
     additional_spectra: list[AdditionalSpectrumOut]
 
@@ -363,6 +416,50 @@ def _normalize_j_values_to_csv(raw: str) -> str | None:
     return ",".join(values)
 
 
+def _split_peak_entries(peaks_part: str) -> list[str]:
+    entries: list[str] = []
+    current: list[str] = []
+    depth = 0
+
+    for ch in peaks_part:
+        if ch == "(":
+            depth += 1
+        elif ch == ")" and depth > 0:
+            depth -= 1
+
+        if ch == "," and depth == 0:
+            entry = "".join(current).strip()
+            if entry:
+                entries.append(entry)
+            current = []
+            continue
+
+        current.append(ch)
+
+    tail = "".join(current).strip()
+    if tail:
+        entries.append(tail)
+
+    return entries
+
+
+def _parse_peak_descriptor_tokens(descriptor: str) -> list[str]:
+    return [token.strip() for token in descriptor.split(",") if token.strip()]
+
+
+def _extract_multiplicity(tokens: list[str]) -> str | None:
+    return next(
+        (
+            token
+            for token in tokens
+            if not re.match(r"J\s*=", token, flags=re.IGNORECASE)
+            and not re.fullmatch(r"\d+", token)
+            and not re.fullmatch(r"\d+\s*[A-Za-z]+", token, flags=re.IGNORECASE)
+        ),
+        None,
+    )
+
+
 def _parse_h1_nmr_text(text: str) -> tuple[float | None, str | None, list[dict]]:
     h1_re = re.compile(
         r"^\s*1H\s*-\s*NMR\s*\(\s*(.+?)\s*,\s*([0-9]+(?:\.[0-9]+)?)\s*MHz\s*\)\s*:\s*(.+?)\s*;\s*$",
@@ -439,17 +536,172 @@ def _parse_c13_nmr_text(text: str) -> tuple[float | None, str | None, list[dict]
     frequency_mhz = float(m.group(2))
     peaks_part = m.group(3).strip()
 
-    ppm_tokens = re.findall(r"-?[0-9]+(?:\.[0-9]+)?", peaks_part)
-    if not ppm_tokens:
+    entries = _split_peak_entries(peaks_part)
+    if not entries:
         raise HTTPException(
             status_code=422, detail="No valid 13C peaks found in ACS string."
         )
 
-    peaks = [
-        {"ppm": float(token), "atom_count": 1, "extra_info": None}
-        for token in ppm_tokens
-    ]
+    peaks: list[dict] = []
+    for entry in entries:
+        match = re.match(
+            r"^\s*(-?[0-9]+(?:\.[0-9]+)?)\s*(?:\(([^)]*)\))?\s*\.?\s*$",
+            entry,
+        )
+        if not match:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid 13C peak entry: '{entry}'.",
+            )
+
+        ppm = float(match.group(1))
+        descriptor = (match.group(2) or "").strip()
+
+        atom_count = 1
+        atom_tag = None
+        if descriptor:
+            for token in _parse_peak_descriptor_tokens(descriptor):
+                atom_count_match = re.fullmatch(
+                    r"(\d+)\s*C",
+                    token,
+                    flags=re.IGNORECASE,
+                )
+                if atom_count_match:
+                    atom_count = int(atom_count_match.group(1))
+                    continue
+
+                atom_tag_match = re.fullmatch(r"(\d+)", token)
+                if atom_tag_match:
+                    atom_tag = int(atom_tag_match.group(1))
+
+        peaks.append(
+            {
+                "ppm": ppm,
+                "atom_count": atom_count,
+                "atom_tag": atom_tag,
+            }
+        )
+
     return frequency_mhz, solvent, peaks
+
+
+def _parse_c13_couplings_text(text: str) -> tuple[float | None, str | None, list[dict]]:
+    c13_re = re.compile(
+        r"^\s*13C\s*-\s*NMR\s*\(\s*(.+?)\s*,\s*([0-9]+(?:\.[0-9]+)?)\s*MHz\s*\)\s*:\s*(.+?)\s*;\s*$",
+        flags=re.IGNORECASE,
+    )
+    m = c13_re.match(text.strip())
+    if not m:
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid alternative 13C ACS string format. Expected: 13C-NMR (solvent, x MHz): ...;",
+        )
+
+    solvent = m.group(1).strip()
+    frequency_mhz = float(m.group(2))
+    peaks_part = m.group(3).strip()
+
+    entries = _split_peak_entries(peaks_part)
+    if not entries:
+        raise HTTPException(
+            status_code=422,
+            detail="No valid alternative 13C couplings found in ACS string.",
+        )
+
+    couplings: list[dict] = []
+    for entry in entries:
+        match = re.match(
+            r"^\s*(-?[0-9]+(?:\.[0-9]+)?)\s*(?:\(([^)]*)\))?\s*\.?\s*$",
+            entry,
+        )
+        if not match:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid alternative 13C coupling entry: '{entry}'.",
+            )
+
+        ppm = float(match.group(1))
+        descriptor = (match.group(2) or "").strip()
+        tokens = _parse_peak_descriptor_tokens(descriptor)
+
+        multiplicity = _extract_multiplicity(tokens)
+        j_match = re.search(r"J\s*=\s*([0-9.,;\s]+)\s*Hz", descriptor, flags=re.IGNORECASE)
+        j_csv = _normalize_j_values_to_csv(j_match.group(1)) if j_match else None
+
+        atom_tag = None
+        for token in tokens:
+            atom_tag_match = re.fullmatch(r"(\d+)", token)
+            if atom_tag_match:
+                atom_tag = int(atom_tag_match.group(1))
+                break
+
+        couplings.append(
+            {
+                "ppm": ppm,
+                "multiplicity": multiplicity,
+                "j_values_hz_csv": j_csv,
+                "atom_tag": atom_tag,
+                "extra_info": descriptor or None,
+            }
+        )
+
+    return frequency_mhz, solvent, couplings
+
+
+def _parse_alt_nuclei_text(text: str) -> tuple[str, float | None, str | None, list[dict]]:
+    alt_re = re.compile(
+        r"^\s*([0-9]+[A-Za-z]+)\s*-\s*NMR\s*\(\s*(.+?)\s*,\s*([0-9]+(?:\.[0-9]+)?)\s*MHz\s*\)\s*:\s*(.+?)\s*;\s*$",
+        flags=re.IGNORECASE,
+    )
+    m = alt_re.match(text.strip())
+    if not m:
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid alternative nuclei ACS string format. Expected: 31P-NMR (solvent, x MHz): ...;",
+        )
+
+    nucleus = m.group(1).strip()
+    solvent = m.group(2).strip()
+    frequency_mhz = float(m.group(3))
+    peaks_part = m.group(4).strip()
+
+    entries = _split_peak_entries(peaks_part)
+    if not entries:
+        raise HTTPException(
+            status_code=422,
+            detail="No valid alternative nuclei peaks found in ACS string.",
+        )
+
+    peaks: list[dict] = []
+    for entry in entries:
+        match = re.match(
+            r"^\s*(-?[0-9]+(?:\.[0-9]+)?)\s*(?:\(([^)]*)\))?\s*\.?\s*$",
+            entry,
+        )
+        if not match:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid alternative nuclei entry: '{entry}'.",
+            )
+
+        ppm = float(match.group(1))
+        descriptor = (match.group(2) or "").strip()
+        tokens = _parse_peak_descriptor_tokens(descriptor)
+
+        multiplicity = _extract_multiplicity(tokens)
+        j_match = re.search(r"J\s*=\s*([0-9.,;\s]+)\s*Hz", descriptor, flags=re.IGNORECASE)
+        j_csv = _normalize_j_values_to_csv(j_match.group(1)) if j_match else None
+
+        peaks.append(
+            {
+                "ppm": ppm,
+                "multiplicity": multiplicity,
+                "j_values_hz_csv": j_csv,
+                "extra_info": descriptor or None,
+            }
+        )
+
+    return nucleus, frequency_mhz, solvent, peaks
 
 
 def _normalize_hashed_value(raw_value: str | None) -> str | None:
@@ -509,15 +761,27 @@ def _prepare_solution_cas_fields(raw_cas_number: str | None) -> str | None:
     return _normalize_or_hash_solution_cas(raw_cas_number)
 
 
-def _to_response(row: Exercise) -> ExerciseOut:
+def _to_response(row: Exercise, db) -> ExerciseOut:
+    # Aggregate tags from tags_csv. Resolve any %tag{ID} tokens.
     tags = []
+    parts: list[str] = []
     if row.tags_csv:
-        tags = [t for t in (part.strip() for part in row.tags_csv.split(",")) if t]
+        resolved = resolve_tag_tokens(db, row.tags_csv)
+        parts.extend([p.strip() for p in (resolved or "").split(",") if p and p.strip()])
+
+    # Preserve order but unique
+    seen = set()
+    for p in parts:
+        if p in seen:
+            continue
+        seen.add(p)
+        tags.append(p)
 
     return ExerciseOut(
         id=row.id,
         name=row.name,
         molecular_formula=row.molecular_formula,
+        dbe=row.dbe,
         exercise_set=row.exercise_set,
         tags=tags,
         h1_svg_path=row.h1_svg_path,
@@ -526,7 +790,8 @@ def _to_response(row: Exercise) -> ExerciseOut:
         h1_axis_end=row.h1_axis_end,
         h1_nmr_text=row.h1_nmr_text,
         h1_frequency_mhz=row.h1_frequency_mhz,
-        h1_solvent=row.h1_solvent,
+        h1_solvent=resolve_solvent_tokens(db, row.h1_solvent),
+        h1_data_source=row.h1_data_source,
         h1_peaks=[H1PeakOut.model_validate(p) for p in row.h1_peaks],
 
         c13_svg_path=row.c13_svg_path,
@@ -534,11 +799,15 @@ def _to_response(row: Exercise) -> ExerciseOut:
         c13_axis_start=row.c13_axis_start,
         c13_axis_end=row.c13_axis_end,
         c13_nmr_text=row.c13_nmr_text,
+        c13_alt_text=row.c13_alt_text,
         c13_frequency_mhz=row.c13_frequency_mhz,
-        c13_solvent=row.c13_solvent,
+        c13_solvent=resolve_solvent_tokens(db, row.c13_solvent),
+        c13_data_source=row.c13_data_source,
         c13_apt=row.c13_apt,
         completed=row.completed,
         c13_peaks=[C13PeakOut.model_validate(p) for p in row.c13_peaks],
+        c13_couplings=[C13CouplingOut.model_validate(c) for c in row.c13_couplings],
+        alt_nuclei=[AdditionalNucleusOut.model_validate(n) for n in row.alt_nuclei],
         additional_spectra=[
             AdditionalSpectrumOut(
                 id=s.id,
@@ -552,9 +821,40 @@ def _to_response(row: Exercise) -> ExerciseOut:
 
 #The tags are separated to use in the exercise list and only the wanted data for the list is returned.
 def _to_summary_response(row: Exercise) -> ExerciseSummaryOut:
+    # Aggregate tags from tags_csv for summary.
     tags = []
-    if row.tags_csv:
-        tags = [t for t in (part.strip() for part in row.tags_csv.split(",")) if t]
+    parts: list[str] = []
+    hidden_names: set[str] = set()
+    try:
+        with get_db() as _db:
+            if row.tags_csv:
+                resolved = resolve_tag_tokens(_db, row.tags_csv, omit_hidden=True)
+                parts.extend([p.strip() for p in (resolved or "").split(",") if p and p.strip()])
+
+            if parts:
+                normalized_names = {p.lower() for p in parts if p}
+                hidden_names = {
+                    hidden.tag_name.lower()
+                    for hidden in (
+                        _db.query(TagsUsed)
+                        .filter(func.lower(TagsUsed.tag_name).in_(normalized_names))
+                        .filter(TagsUsed.is_hidden.is_(True))
+                        .all()
+                    )
+                }
+    except Exception:
+        # Fallback: plain split of tags_csv only
+        if row.tags_csv:
+            parts = [p.strip() for p in row.tags_csv.split(",") if p and p.strip()]
+
+    seen = set()
+    for p in parts:
+        if not p or p.lower() in hidden_names:
+            continue
+        if p in seen:
+            continue
+        seen.add(p)
+        tags.append(p)
 
     return ExerciseSummaryOut(
         id=row.id,
@@ -585,6 +885,8 @@ def get_exercise(exercise_id: int) -> ExerciseOut:
             .options(
                 selectinload(Exercise.h1_peaks),
                 selectinload(Exercise.c13_peaks),
+                selectinload(Exercise.c13_couplings),
+                selectinload(Exercise.alt_nuclei),
                 selectinload(Exercise.additional_spectra),
             )
             .filter(Exercise.id == exercise_id)
@@ -595,7 +897,7 @@ def get_exercise(exercise_id: int) -> ExerciseOut:
             raise HTTPException(status_code=404, detail="Exercise not found.")
 
         mark_exercise_selected(exercise_id)
-        return _to_response(row)
+        return _to_response(row, db)
 
 @router.get("/", response_model=list[ExerciseOut])
 def list_exercises() -> list[ExerciseOut]:
@@ -605,12 +907,13 @@ def list_exercises() -> list[ExerciseOut]:
             .options(
                 selectinload(Exercise.h1_peaks),
                 selectinload(Exercise.c13_peaks),
+                selectinload(Exercise.c13_couplings),
                 selectinload(Exercise.additional_spectra),
             )
             .order_by(Exercise.id.desc())
             .all()
         )
-        return [_to_response(row) for row in rows]
+        return [_to_response(row, db) for row in rows]
 
 
 @router.post("/{exercise_id}/validate-cas", response_model=CasAnswerValidationOut)
@@ -737,6 +1040,17 @@ def delete_exercise(exercise_id: int) -> None:
             if spectrum.file_path:
                 file_paths.append(spectrum.file_path)
 
+        used_solvent_ids = extract_solvent_ids(exercise.h1_solvent) | extract_solvent_ids(exercise.c13_solvent)
+        apply_solvent_count_delta(db, used_solvent_ids, -1)
+
+        # Decrement tag counts for any tags referenced by this exercise
+        tag_ids = set()
+        try:
+            tag_ids |= extract_tag_ids(exercise.tags_csv)
+        except Exception:
+            pass
+        apply_tag_count_delta(db, tag_ids, -1)
+
         db.delete(exercise)
         db.commit()
 
@@ -757,6 +1071,21 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
     h1_frequency_mhz, h1_solvent, h1_peaks = _parse_h1_nmr_text(body.h1_nmr_text)
     c13_frequency_mhz, c13_solvent, c13_peaks = _parse_c13_nmr_text(body.c13_nmr_text)
 
+    c13_alt_text = _normalize_optional_text(body.c13_alt_text)
+    alt_nuc_text = _normalize_optional_text(body.alt_nuc_text)
+
+    c13_couplings: list[dict] = []
+    if c13_alt_text:
+        _, _, c13_couplings = _parse_c13_couplings_text(c13_alt_text)
+
+    alt_nucleus = None
+    alt_nucleus_frequency = None
+    alt_nuclei_peaks: list[dict] = []
+    if alt_nuc_text:
+        alt_nucleus, alt_nucleus_frequency, _, alt_nuclei_peaks = _parse_alt_nuclei_text(
+            alt_nuc_text
+        )
+
     solvent_override = _normalize_optional_text(body.solvent)
     h1_solvent_override = _normalize_optional_text(body.h1_solvent)
     c13_solvent_override = _normalize_optional_text(body.c13_solvent)
@@ -769,10 +1098,28 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
     if c13_solvent_override:
         c13_solvent = c13_solvent_override
 
+    # If no global `solvent` column provided, prefer solvent values extracted
+    # from the provided NMR text (already parsed above). Normalize them so
+    # subsequent token encoding receives either a non-empty string or None.
+    if solvent_override is None:
+        h1_solvent = _normalize_optional_text(h1_solvent)
+        c13_solvent = _normalize_optional_text(c13_solvent)
+
     solution_inchi_hash = _normalize_solution_hash(body.solution_inchi)
     solution_cas_hash = _prepare_solution_cas_fields(body.solution_cas_number)
     alt1_cas_hash = _prepare_solution_cas_fields(body.alt1_cas_number)
     alt2_cas_hash = _prepare_solution_cas_fields(body.alt2_cas_number)
+
+    molecular_formula = body.molecular_formula.strip() if body.molecular_formula else None
+    formula_dbe = 0.0
+    if molecular_formula:
+        try:
+            formula_dbe = calculate_dbe(parse_formula(molecular_formula))
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid molecular formula: {molecular_formula}",
+            ) from exc
 
     created_file_paths: list[str] = []
 
@@ -812,11 +1159,10 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
 
             exercise = Exercise(
                 name=display_name,
-                molecular_formula=body.molecular_formula.strip()
-                if body.molecular_formula
-                else None,
+                molecular_formula=molecular_formula,
+                dbe=formula_dbe,
                 exercise_set=body.exercise_set.strip() if body.exercise_set else None,
-                tags_csv=",".join(body.tags) if body.tags else None,
+                tags_csv=None,
                 h1_svg_path=_upload_file_path_to_url(h1_path),
                 h1_axis_start=body.h1_axis_scale.begin,
                 h1_axis_end=body.h1_axis_scale.end,
@@ -825,11 +1171,15 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
                 c13_axis_end=body.c13_axis_scale.end,
                 h1_nmr_text=body.h1_nmr_text.strip(),
                 h1_frequency_mhz=h1_frequency_mhz,
-                h1_solvent=h1_solvent,
+                h1_solvent=None,
+                h1_data_source=body.h1_data_source.strip() if body.h1_data_source else None,
                 c13_nmr_text=body.c13_nmr_text.strip(),
                 c13_frequency_mhz=c13_frequency_mhz,
-                c13_solvent=c13_solvent,
+                c13_solvent=None,
+                c13_data_source=body.c13_data_source.strip() if body.c13_data_source else None,
                 c13_apt=body.c13_apt,
+                c13_alt_text=c13_alt_text,
+                alt_nuc_text=alt_nuc_text,
                 solution_inchi_hash=solution_inchi_hash,
                 solution_cas_hash=solution_cas_hash,
                 alt1_cas_hash=alt1_cas_hash,
@@ -838,6 +1188,20 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
 
             db.add(exercise)
             db.flush()
+
+            # Encode and create tags for provided tag list (manual creation).
+            if body.tags:
+                encoded_tags, tag_ids = encode_tags_list(db, body.tags)
+                exercise.tags_csv = encoded_tags
+                apply_tag_count_delta(db, tag_ids, +1)
+
+            encoded_h1_solvent, _ = encode_solvent_text(db, h1_solvent)
+            encoded_c13_solvent, _ = encode_solvent_text(db, c13_solvent)
+            exercise.h1_solvent = encoded_h1_solvent
+            exercise.c13_solvent = encoded_c13_solvent
+
+            used_solvent_ids = extract_solvent_ids(encoded_h1_solvent) | extract_solvent_ids(encoded_c13_solvent)
+            apply_solvent_count_delta(db, used_solvent_ids, +1)
 
             for peak in h1_peaks:
                 db.add(
@@ -856,8 +1220,33 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
                     ExerciseC13Peak(
                         exercise_id=exercise.id,
                         ppm=peak["ppm"],
+                        atom_tag=peak["atom_tag"],
                         atom_count=peak["atom_count"],
-                        extra_info=peak["extra_info"],
+                    )
+                )
+
+            for coupling in c13_couplings:
+                db.add(
+                    ExerciseC13Coupling(
+                        exercise_id=exercise.id,
+                        ppm=coupling["ppm"],
+                        multiplicity=coupling["multiplicity"],
+                        j_values_hz_csv=coupling["j_values_hz_csv"],
+                        atom_tag=coupling["atom_tag"],
+                        extra_info=coupling["extra_info"],
+                    )
+                )
+
+            for alt_peak in alt_nuclei_peaks:
+                db.add(
+                    ExerciseAdditionalNuclei(
+                        exercise_id=exercise.id,
+                        nucleus=alt_nucleus,
+                        frequency_mhz=alt_nucleus_frequency,
+                        ppm=alt_peak["ppm"],
+                        multiplicity=alt_peak["multiplicity"],
+                        j_values_hz_csv=alt_peak["j_values_hz_csv"],
+                        extra_info=alt_peak["extra_info"],
                     )
                 )
 
@@ -896,7 +1285,7 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
                     status_code=500, detail="Failed to load created exercise."
                 )
 
-            return _to_response(created)
+            return _to_response(created, db)
     except Exception:
         for file_path in created_file_paths:
             try:

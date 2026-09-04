@@ -1,8 +1,0 @@
-Changelog Stefan
-
-AdditionalSpectraPopup.tsx
-    Changed image window aspect ratio
-        aspectRatio: '2.5 / 1',
-SpectraPrototype.tsx
-    In Popup / Modal Version, add
-        height: '84%'
