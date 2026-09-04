@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Molecular Merge &amp; Match</title>
+    <script>
+      // Stop Ketcher from crashing
+      window.global = window;
+      window.process = { env: {} };
+
+      window.RDKIT_BINARY_URL = './RDKit_minimal.js';
+    </script>
+    <script>
+      function injectScript(src) {
+        const s = document.createElement('script');
+        // Force the path to be relative to the current file's location
+        const baseUrl = window.location.pathname.split('/').slice(0, -1).join('/');
+        s.src = src.replace('./', baseUrl + '/');
+        s.async = false;
+        document.head.appendChild(s);
+      }
+      injectScript('./RDKit_minimal.js');
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

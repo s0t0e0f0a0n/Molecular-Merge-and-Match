@@ -1,0 +1,128 @@
+[
+	{
+		"names" : "CDCl3,chloroform-/it{d}",
+		"match": "CDCl3",
+		"display": "Chloroform",
+		"preference" : 0
+	},
+	{
+		"names" : "(CD3)2SO,dimethylsulfoxide-/it{d6},DMSO-/it{d6}",
+		"match": "DMSO",
+		"display": "Dimethyl sulfoxide",
+		"preference" : 2
+	},
+	{
+		"names" : "CD3CN,acetonitrile-/it{d3},ACN-/it{d3},MeCN-/it{d3}",
+		"match": "CD3CN",
+		"display": "Acetonitrile",
+		"preference" : 0
+	},
+	{
+		"names" : "CD3OD,methanol-/it{d4},MeOD",
+		"match": "MeOD",
+		"display": "Methanol",
+		"preference" : 1
+	},
+	{
+		"names" : "D2O,water-/it{d2},deuterium oxide",
+		"match": "D2O",
+		"display": "Water",
+		"preference" : 0
+	},
+	{
+		"names" : "C6D6,benzene-/it{d6},PhD",
+		"match": "C6D6",
+		"display": "Benzene",
+		"preference" : 1
+	},
+	{
+		"names" : "(CD3)2CO,acetone-/it{d6},Me2CO-/it{d6}",
+		"match": "Acetone",
+		"display": "Acetone",
+		"preference" : 1
+	},
+	{
+		"names" : "CD2Cl2,dichloromethane-/it{d2},methylene dichloride-/it{d2},DCM-/it{d2}",
+		"match": "DCM",
+		"display": "Dichloromethane",
+		"preference" : 0
+	},
+	{
+		"names" : "C5D5N,pyridine-/it{d5}",
+		"match": "Pyridine",
+		"display": "Pyridine",
+		"preference" : 1
+	},
+	{
+		"names" : "CD3COD,acetic acid-/it{d4},AcOD",
+		"match": "AcOD",
+		"display": "Acetic Acid",
+		"preference" : 1
+	},
+	{
+		"names" : "CD3CD2OD,ethanol-/it{d6},EtOD",
+		"match": "EtOD",
+		"display": "Ethanol",
+		"preference" : 2
+	},
+	{
+		"names" : "CD3NO2,nitromethane-/it{d3},MeNO2-/it{d3}",
+		"match": "CD3NO2",
+		"display": "Nitromethane",
+		"preference" : 0
+	},
+	{
+		"names" : "(CD3)2NCOD,dimethylformamide-/it{d7},DMF-/it{d7}",
+		"match": "DMF",
+		"display": "Dimethylformamide",
+		"preference" : 2
+	},
+	{
+		"names" : "C5D5CD3,toluene-/it{d8},PhCD3",
+		"match": "Toluene",
+		"display": "Toluene",
+		"preference" : 1
+	},
+	{
+		"names" : "C4D8O,tetrahydrofuran-/it{d8},THF-/it{d8}",
+		"match": "THF",
+		"display": "Tetrahydrofuran",
+		"preference" : 2
+	},
+	{
+		"names" : "C4D8O2,/notsub{1}\\,/notsub{4}-dioxane-/it{d8}",
+		"match": "Dioxane",
+		"display": "1,4-Dioxane",
+		"preference" : 1
+	},
+	{
+		"names" : "CCl4,tetrachloromethane",
+		"match": "CCl4",
+		"display": "Tetrachloromethane",
+		"preference" : 0
+	},
+	{
+		"names" : "CF3COOD,trifluoroacetic acid-/it{d},TFA-/it{d}",
+		"match": "TFA",
+		"display": "Trifluoroacetic Acid",
+		"preference" : 0
+	},
+	{
+		"names" : "C2D2Cl2,/notsub{1}\\,/notsub{1}\\,/notsub{2}\\,/notsub{2}-tetrachloroethane-/it{d}",
+		"match": "TCE",
+		"display": "1,1,2,2-Tetrachloroethane",
+		"preference" : 1
+	},
+	{
+		"names" : "C12D12,cyclohexane-/it{d12}",
+		"match": "Cyclohexane",
+		"display": "Cyclohexane",
+		"preference" : 1
+	},
+	{
+		"names" : "C5D5Cl,chlorobenzene-/it{d5}",
+		"match": "Chlorobenzene",
+		"display": "Chlorobenzene",
+		"preference" : 1
+	}
+]

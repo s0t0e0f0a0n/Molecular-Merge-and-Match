@@ -1,0 +1,329 @@
+.settings-panel-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.72);
+    padding: 2rem;
+}
+
+.settings-panel-surface {
+    width: min(980px, 95vw);
+    height: min(760px, 90vh);
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 18px 56px rgba(15, 23, 42, 0.45);
+}
+
+.settings-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f8fafc;
+}
+
+.settings-panel-tabs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.settings-panel-tab {
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.settings-panel-tab:hover {
+    background: #eef2ff;
+    color: #1e293b;
+}
+
+.settings-panel-tab.is-active {
+    background: #ffffff;
+    color: #0f172a;
+    border-color: #cbd5e1;
+}
+
+.settings-panel-close {
+    margin-left: auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 10px;
+    cursor: pointer;
+}
+
+.settings-panel-content {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 16px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.settings-tab-content {
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.settings-tab-title {
+    margin: 0;
+    padding: 14px;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 1.75rem;
+}
+
+.settings-placeholder-text {
+    margin: 0;
+    padding: 14px;
+    color: #64748b;
+    font-size: 14px;
+}
+
+.settings-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.settings-toggle-row:last-child {
+    border-bottom: 0;
+}
+
+.settings-toggle-row.is-disabled {
+    opacity: 0.6;
+}
+
+.settings-toggle-row.is-disabled .settings-toggle-label {
+    color: #64748b;
+}
+
+.settings-select-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.settings-toggle-label {
+    font-size: 14px;
+    color: #0f172a;
+}
+
+.settings-select {
+    min-width: 180px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #0f172a;
+    padding: 6px 10px;
+    font-size: 13px;
+}
+
+.settings-select:focus-visible {
+    outline: 2px solid #0ea5e9;
+    outline-offset: 2px;
+}
+
+.settings-toggle-input {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.settings-toggle-switch {
+    --track-off: rgba(239, 68, 68, 0.25);
+    --track-on: #16a34a;
+    --knob-off: #dc2626;
+    --knob-on: #dcfce7;
+    position: relative;
+    width: 52px;
+    height: 24px;
+    border-radius: 999px;
+    background: var(--track-off);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.settings-toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--knob-off);
+    transition: transform 0.2s ease, background 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.settings-toggle-input:checked + .settings-toggle-switch {
+    background: var(--track-on);
+}
+
+.settings-toggle-input:checked + .settings-toggle-switch::after {
+    background: var(--knob-on);
+    transform: translateX(28px);
+}
+
+.settings-toggle-input:focus-visible + .settings-toggle-switch {
+    outline: 2px solid #0ea5e9;
+    outline-offset: 2px;
+}
+
+.settings-toggle-input:disabled + .settings-toggle-switch {
+    --track-off: #e2e8f0;
+    --track-on: #cbd5e1;
+    --knob-off: #94a3b8;
+    --knob-on: #e2e8f0;
+    cursor: not-allowed;
+}
+
+.settings-toggle-input:disabled + .settings-toggle-switch::after {
+    box-shadow: none;
+}
+
+.settings-solvent-row {
+    padding: 12px 14px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.settings-solvent-row:last-child {
+    border-bottom: 0;
+}
+
+.settings-solvent-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 8px;
+}
+
+.settings-solvent-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.settings-solvent-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #334155;
+}
+
+.settings-solvent-option input {
+    margin: 0;
+}
+
+.settings-solvent-count {
+    margin: 0;
+    font-size: 12px;
+    color: #64748b;
+}
+
+/* Tags grid styles */
+.tags-tab-inner {
+    padding: 12px 14px;
+}
+
+.tags-grid {
+    display: grid;
+    gap: 12px;
+    align-items: start;
+}
+
+.tag-column {
+    border: 1px solid #f1f5f9;
+    border-radius: 6px;
+    padding: 8px;
+    background: #ffffff;
+    overflow: hidden;
+}
+
+.tag-column-header {
+    display: grid;
+    grid-template-columns: 16% 16% 7% 8% 53%;
+    gap: 4px;
+    font-size: 13px;
+    color: #0f172a;
+    font-weight: 600;
+    padding: 6px 4px;
+    border-bottom: 1px solid #eef2ff;
+    margin-bottom: 6px;
+}
+
+.tag-row {
+    display: grid;
+    grid-template-columns: 16% 16% 7% 8% 52%;
+    gap: 4px;
+    align-items: center;
+    min-height: 36px;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.tag-row.is-deleted {
+    color: #94a3b8;
+    opacity: 0.7;
+}
+
+.tag-name {
+    font-size: 13px;
+    color: #0f172a;
+}
+
+.tag-hide,
+.tag-delete {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tag-delete button {
+    border: 1px solid #e2e8f0;
+    font-size: 13px;
+    background: #fff;
+    padding: 1px 4px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.tag-delete button:hover {
+    background: #ff6b6b;
+}
+
+input[type="checkbox"]:hover {
+  outline: 1px dotted darkblue;
+  
+}

@@ -1,0 +1,133 @@
+{
+  "name": "molecular-merge-and-match",
+  "version": "1.3.0",
+  "description": "Molecular Bookkeeping for Structural Analysis",
+  "main": "main.js",
+  "devDependencies": {
+    "electron": "^41.6.1",
+    "electron-builder": "26.14.0"
+  },
+  "scripts": {
+    "clean:win": "if exist dist-electron rmdir /s /q dist-electron && if exist frontend\\dist rmdir /s /q frontend\\dist",
+    "clean:unix": "rm -rf dist-electron frontend/dist",
+    "clean": "npm run clean:win 2>nul || npm run clean:unix",
+    "dist": "electron-builder --publish never",
+    "postinstall": "electron-builder install-app-deps",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "build": {
+    "appId": "com.svdv.molecularmergeandmatch",
+    "productName": "Molecular Merge and Match",
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "build-assets"
+    },
+    "files": [
+      "package.json",
+      "main.js",
+      "preload.js",
+      "frontend/dist/**/*",
+      "build-assets/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/bin/",
+        "to": "bin/",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "backend/data",
+        "to": "data",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "artifactName": "${name}-Setup-${version}.${ext}",
+      "icon": "build-assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "artifactName": "${name}-Setup-${version}.${ext}",
+      "icon": "build-assets/icon.icns",
+      "category": "public.app-category.education"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "flatpak",
+        "deb",
+        "rpm",
+        "apk",
+        "pacman",
+        "snap"
+      ],
+      "executableName": "molecularmergeandmatch",
+      "artifactName": "${name}-Setup-${version}.${ext}",
+      "icon": "build-assets/icon.icns",
+      "category": "Education",
+      "synopsis": "Molecular Bookkeeping for Structural Analysis",
+      "description": "An interactive NMR-based structure elucidation tool for university-level organic chemistry students. Students select molecular fragments, match them to peaks in 1H-NMR and 13C-NMR spectra, combine fragments into a complete molecule, and validate their answer against a teacher-defined solution."
+    },
+    "snapcraft": {
+      "base": "core24",
+      "core24": {
+        "confinement": "strict",
+        "grade": "stable",
+        "extensions": [
+          "gnome"
+        ],
+        "plugs": [
+          "default",
+          "opengl",
+          "desktop",
+          "desktop-legacy",
+          "x11",
+          "wayland"
+        ]
+      }
+    },
+    "flatpak": {
+      "base": "org.electronjs.Electron2.BaseApp",
+      "baseVersion": "24.08",
+      "runtime": "org.freedesktop.Platform",
+      "runtimeVersion": "24.08",
+      "sdk": "org.freedesktop.Sdk",
+      "finishArgs": [
+        "--share=network",
+        "--share=ipc",
+        "--socket=x11",
+        "--socket=wayland",
+        "--socket=pulseaudio",
+        "--filesystem=host"
+      ]
+    },
+    "publish": {
+      "provider": "github",
+      "releaseType": "release"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/s0t0e0f0a0n/Molecular-Merge-and-Match.git"
+  },
+  "keywords": [],
+  "author": "S. van der Vorm & LUDev <s.van.der.vorm@chem.leidenuniv.nl>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/s0t0e0f0a0n/Molecular-Merge-and-Match"
+  },
+  "homepage": "https://github.com/s0t0e0f0a0n/Molecular-Merge-and-Match#readme",
+  "type": "commonjs"
+}

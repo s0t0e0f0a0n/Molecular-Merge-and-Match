@@ -1,0 +1,895 @@
+[
+  {
+    "exercise": {
+      "name": "acetone-d6",
+      "molecular_formula": "C3[2]H6O",
+      "exercise_set": "References",
+      "tags_csv": "%tag{8},%tag{9},%tag{10}",
+      "h1_svg_path": "/references/acetoned_H.svg",
+      "h1_axis_start": 10.1,
+      "h1_axis_end": -0.1,
+      "c13_svg_path": "/references/acetoned_C.svg",
+      "c13_axis_start": 213.0,
+      "c13_axis_end": -2.0,
+      "h1_nmr_text": "1H-NMR (Acetone, 300 MHz): 2.82 (2H, s), 2.78 (1H, t, J = 1.0 Hz), 2.05 (6H, p, J = 2.2 Hz);",
+      "h1_frequency_mhz": 300.0,
+      "h1_solvent": "%solv{7}",
+      "c13_nmr_text": "13C-NMR (Acetone, 75 MHz): 206.14 (1), 30.61 (2), 30.35 (2), 30.09 (2), 29.84 (2), 29.58 (2), 29.33 (2), 29.07 (2);",
+      "c13_alt_text": "13C-NMR (Acetone, 75 MHz): 206.13 (s, 1), 29.84 (hept, J = 19.4 Hz, 2);",
+      "c13_frequency_mhz": 75.0,
+      "c13_solvent": "%solv{7}",
+	    "c13_apt": true,
+      "completed": true,
+      "solution_inchi_hash": "7b3928f4e29c0ca0bb70f04abcacdaa561e057950482dcb1e0b5c7a3612f8378",
+      "solution_cas_hash": "c2f4b7b448cfe55bd38667b359c98c1253e519f5bb09cca8ad00944ee40d259c",
+      "h1_data_source": "prac300/202605/1",
+      "c13_data_source": "prac300/202605/2"
+    },
+    "h1_peaks": [
+      {
+        "ppm": 2.82,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "proton_count": 0,
+        "extra_info": "2H, s"
+      },
+      {
+        "ppm": 2.78,
+        "multiplicity": "t",
+        "j_values_hz_csv": 1.0,
+        "proton_count": 0,
+        "extra_info": "1H, t, J = 1.0 Hz"
+      },
+	  {
+        "ppm": 2.05,
+        "multiplicity": "p",
+        "j_values_hz_csv": 2.2,
+        "proton_count": 1,
+        "extra_info": "6H, p, J = 2.2 Hz"
+      }
+    ],
+    "c13_peaks": [
+      {
+        "ppm": 206.14,
+        "atom_count": 1,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 30.61,
+        "atom_count": 0,
+        "atom_tag": 2
+      },
+	  {
+        "ppm": 30.35,
+        "atom_count": 0,
+        "atom_tag": 2
+      },
+	  {
+        "ppm": 30.09,
+        "atom_count": 0,
+        "atom_tag": 2
+      },
+	  {
+        "ppm": 29.84,
+        "atom_count": 1,
+        "atom_tag": 2
+      },
+	  {
+        "ppm": 29.58,
+        "atom_count": 0,
+        "atom_tag": 2
+      },
+	  {
+        "ppm": 29.33,
+        "atom_count": 0,
+        "atom_tag": 2
+      },
+	  {
+        "ppm": 29.07,
+        "atom_count": 0,
+        "atom_tag": 2
+      }
+    ],
+    "c13_couplings": [
+      {
+        "ppm": 206.13,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "atom_tag": 1,
+        "extra_info": "s, 1"
+      },
+      {
+        "ppm": 29.84,
+        "multiplicity": "hept",
+        "j_values_hz_csv": 19.4,
+        "atom_tag": 2,
+        "extra_info": "hept, J = 19.4 Hz, 1"
+      }
+    ]
+  },
+  {
+    "exercise": {
+      "name": "acetonitrile-d3",
+      "molecular_formula": "C2[2]H3N",
+      "exercise_set": "References",
+      "tags_csv": "%tag{8},%tag{9},%tag{10}",
+      "h1_svg_path": "/references/CD3CN_H.svg",
+      "h1_axis_start": 10.1,
+      "h1_axis_end": -0.1,
+      "c13_svg_path": "/references/CD3CN_C.svg",
+      "c13_axis_start": 213.0,
+      "c13_axis_end": -2.0,
+      "h1_nmr_text": "1H-NMR (CD3CN, 300 MHz): 2.13 (2H, s), 2.10 (1H, t, J = 1.1 Hz), 1.94 (1H, p, J = 2.5 Hz);",
+      "h1_frequency_mhz": 300.0,
+      "h1_solvent": "%solv{3}",
+      "c13_nmr_text": "13C-NMR (CD3CN, 75 MHz): 118.31 (1), 2.15 (2), 1.87 (2), 1.60 (2), 1.32 (2), 1.05 (2), 0.77 (2), 0.49 (2);",
+      "c13_alt_text": "13C-NMR (CD3CN, 75 MHz): 118.31 (s, 1), 1.32 (hept, J = 20.8 Hz, 2);",
+      "c13_frequency_mhz": 75.0,
+      "c13_solvent": "%solv{3}",
+	    "c13_apt": true,
+      "completed": true,
+      "solution_inchi_hash": "82419b411ed68ac3aa063fbaa163f01f11e9c5ae7089f9f3ed786ea03fa3bca7",
+      "solution_cas_hash": "4ef3da238d1bf39beed19990ffd06c2ef61fcecea1a5f3052cdc8fa008d07a64",
+      "h1_data_source": "prac300/202605/9",
+      "c13_data_source": "prac300/202605/10"
+    },
+    "h1_peaks": [
+      {
+        "ppm": 2.13,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "proton_count": 0,
+        "extra_info": "1H, s"
+      },
+      {
+        "ppm": 2.10,
+        "multiplicity": "t",
+        "j_values_hz_csv": 1.1,
+        "proton_count": 0,
+        "extra_info": "1H, t, J = 1.1 Hz"
+      },
+	  {
+        "ppm": 1.94,
+        "multiplicity": "p",
+        "j_values_hz_csv": 2.5,
+        "proton_count": 1,
+        "extra_info": "1H, p, J = 2.5 Hz"
+      }
+    ],
+    "c13_peaks": [
+      {
+        "ppm": 118.31,
+        "atom_count": 1,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 2.15,
+        "atom_count": 0,
+        "atom_tag": 2
+      },
+	  {
+        "ppm": 1.87,
+        "atom_count": 0,
+        "atom_tag": 2
+      },
+	  {
+        "ppm": 1.60,
+        "atom_count": 0,
+        "atom_tag": 2
+      },
+	  {
+        "ppm": 1.32,
+        "atom_count": 1,
+        "atom_tag": 2
+      },
+	  {
+        "ppm": 1.05,
+        "atom_count": 0,
+        "atom_tag": 2
+      },
+	  {
+        "ppm": 0.77,
+        "atom_count": 0,
+        "atom_tag": 2
+      },
+	  {
+        "ppm": 0.49,
+        "atom_count": 0,
+        "atom_tag": 2
+      }
+    ],
+    "c13_couplings": [
+      {
+        "ppm": 118.31,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "atom_tag": 1,
+        "extra_info": "s, 1"
+      },
+      {
+        "ppm": 1.32,
+        "multiplicity": "hept",
+        "j_values_hz_csv": 20.8,
+        "atom_tag": 2,
+        "extra_info": "hept, J = 20.8 Hz, 2"
+      }
+    ]
+  },  
+  {
+    "exercise": {
+      "name": "benzene-d6",
+      "molecular_formula": "C6[2]H6",
+      "exercise_set": "References",
+      "tags_csv": "%tag{8},%tag{9},%tag{10}",
+      "h1_svg_path": "/references/benzened_H.svg",
+      "h1_axis_start": 10.1,
+      "h1_axis_end": -0.1,
+      "c13_svg_path": "/references/benzened_C.svg",
+      "c13_axis_start": 213.0,
+      "c13_axis_end": -2.0,
+      "h1_nmr_text": "1H-NMR (C6D6, 300 MHz): 7.16 (1H, s), 0.40 (1H, s);",
+      "h1_frequency_mhz": 300.0,
+      "h1_solvent": "%solv{6}",
+      "c13_nmr_text": "13C-NMR (C6D6, 75 MHz): 128.38 (1), 128.06 (1), 127.74 (1);",
+      "c13_alt_text": "13C-NMR (C6D6, 75 MHz): 128.06 (t, J = 24.3 Hz, 1);",
+      "c13_frequency_mhz": 75.0,
+      "c13_solvent": "%solv{6}",
+	    "c13_apt": true,      
+      "completed": true,
+      "solution_inchi_hash": "f3bccdd24ecb7855922a8d38c50a9ce17549289579b20e781d3fd92f5ac80f05",
+      "solution_cas_hash": "2ef43eaa23adf58dcfe776567c32d1799a3d19878fb2e9588fa8bc4886c4e14a",
+      "h1_data_source": "prac300/202605/3",
+      "c13_data_source": "prac300/202605/4"
+    },
+    "h1_peaks": [
+      {
+        "ppm": 7.16,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "proton_count": 1,
+        "extra_info": "1H, s"
+      },
+      {
+        "ppm": 0.40,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "proton_count": 0,
+        "extra_info": "1H, s"
+      }
+    ],
+    "c13_peaks": [
+      {
+        "ppm": 128.38,
+        "atom_count": 0,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 128.06,
+        "atom_count": 1,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 127.74,
+        "atom_count": 0,
+        "atom_tag": 1
+      }
+    ],
+    "c13_couplings": [
+      {
+        "ppm": 128.06,
+        "multiplicity": "t",
+        "j_values_hz_csv": 24.3,
+        "atom_tag": 1,
+        "extra_info": "t, J = 24.3 Hz, 1"
+      }
+    ]
+  },
+  {
+    "exercise": {
+      "name": "chloroform-d",
+      "molecular_formula": "C[2]HCl3",
+      "exercise_set": "References",
+      "tags_csv": "%tag{8},%tag{9},%tag{10}",
+      "h1_svg_path": "/references/CDCl3_H.svg",
+      "h1_axis_start": 10.1,
+      "h1_axis_end": -0.1,
+      "c13_svg_path": "/references/CDCl3_C.svg",
+      "c13_axis_start": 213.0,
+      "c13_axis_end": -2.0,
+      "h1_nmr_text": "1H-NMR (CDCl3, 300 MHz): 7.26 (1H, s), 1.55 (1H, s), 0.00 (1H, s);",
+      "h1_frequency_mhz": 300.0,
+      "h1_solvent": "%solv{1}",
+      "c13_nmr_text": "13C-NMR (CDCl3, 75 MHz): 77.58 (1), 77.16 (1), 76.74 (1);",
+      "c13_alt_text": "13C-NMR (CDCl3, 75 MHz): 77.16 (t, J = 31.9 Hz, 1);",
+      "c13_frequency_mhz": 75.0,
+      "c13_solvent": "%solv{1}",
+	    "c13_apt": true,
+      "completed": true,
+      "solution_inchi_hash": "4a23884f530cf2d1d0b5b5bae97a18ea5832da18108460330a1e124a0ba15e42",
+      "solution_cas_hash": "2335449a56d37be2a25d86b9358d7b6c59e51eb2df97f1c081532e02603fd43e",
+      "h1_data_source": "prac300/202605/5",
+      "c13_data_source": "prac300/202605/6"
+    },
+    "h1_peaks": [
+      {
+        "ppm": 7.26,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "proton_count": 1,
+        "extra_info": "1H, s"
+      },
+      {
+        "ppm": 1.55,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "proton_count": 0,
+        "extra_info": "1H, s"
+      },
+      {
+        "ppm": 0.00,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "proton_count": 0,
+        "extra_info": "1H, s"
+      }
+    ],
+    "c13_peaks": [
+      {
+        "ppm": 77.58,
+        "atom_count": 1,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 77.16,
+        "atom_count": 1,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 76.74,
+        "atom_count": 1,
+        "atom_tag": 1
+      }
+    ],
+    "c13_couplings": [
+      {
+        "ppm": 77.16,
+        "multiplicity": "t",
+        "j_values_hz_csv": 31.9,
+        "atom_tag": 1,
+        "extra_info": "t, J = 31.9 Hz, 1"
+      }
+    ]
+  },
+  {
+    "exercise": {
+      "name": "dimethylsulfoxide-d6",
+      "molecular_formula": "C2[2]H6OS",
+      "exercise_set": "References",
+      "tags_csv": "%tag{8},%tag{9},%tag{10}",
+      "h1_svg_path": "/references/DMSOd_H.svg",
+      "h1_axis_start": 10.1,
+      "h1_axis_end": -0.1,
+      "c13_svg_path": "/references/DMSOd_C.svg",
+      "c13_axis_start": 213.0,
+      "c13_axis_end": -2.0,
+      "h1_nmr_text": "1H-NMR (DMSO, 300 MHz): 3.32 (1H, s), 2.50 (1H, p, J = 1.8 Hz);",
+      "h1_frequency_mhz": 300.0,
+      "h1_solvent": "%solv{2}",
+      "c13_nmr_text": "13C-NMR (DMSO, 75 MHz): 40.35 (1), 40.07 (1), 39.80 (1), 39.52 (1), 39.24 (1), 38.96 (1), 38.68 (1);",
+      "c13_alt_text": "13C-NMR (DMSO, 75 MHz): 39.52 (hept, J = 21.0 Hz, 1);",
+      "c13_frequency_mhz": 75.0,
+      "c13_solvent": "%solv{2}",
+	    "c13_apt": true,
+      "completed": true,
+      "solution_inchi_hash": "c96b24cadd8546181eb5c3806c0dae36558dc9b79df8b5d1cb1631563ad8aff6",
+      "solution_cas_hash": "fb9260a1cf986ce435d55eadc437ba3d6c666254f23f309d18e3580de990f1b8",
+      "h1_data_source": "prac300/202605/11",
+      "c13_data_source": "prac300/202605/12"
+    },
+    "h1_peaks": [
+      {
+        "ppm": 3.32,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "proton_count": 0,
+        "extra_info": "1H, s"
+      },
+      {
+        "ppm": 2.50,
+        "multiplicity": "p",
+        "j_values_hz_csv": 1.8,
+        "proton_count": 1,
+        "extra_info": "1H, p, J = 1.8 Hz"
+      }
+    ],
+    "c13_peaks": [
+      {
+        "ppm": 40.35,
+        "atom_count": 1,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 40.07,
+        "atom_count": 1,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 39.80,
+        "atom_count": 1,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 39.52,
+        "atom_count": 1,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 39.24,
+        "atom_count": 1,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 38.96,
+        "atom_count": 1,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 38.68,
+        "atom_count": 1,
+        "atom_tag": 1
+      }
+    ],
+    "c13_couplings": [
+      {
+        "ppm": 39.52,
+        "multiplicity": "hept",
+        "j_values_hz_csv": 21.0,
+        "atom_tag": 1,
+        "extra_info": "hept, J = 21.0 Hz, 1"
+      }
+    ]
+  },
+  {
+    "exercise": {
+      "name": "methanol-d4",
+      "molecular_formula": "C[2]H4O",
+      "exercise_set": "References",
+      "tags_csv": "%tag{8},%tag{9},%tag{10}",
+      "h1_svg_path": "/references/MeOD_H.svg",
+      "h1_axis_start": 10.1,
+      "h1_axis_end": -0.1,
+      "c13_svg_path": "/references/MeOD_C.svg",
+      "c13_axis_start": 213.0,
+      "c13_axis_end": -2.0,
+      "h1_nmr_text": "1H-NMR (MeOD, 300 MHz): 4.87 (1H, s), 3.31 (1H, p, J = 1.6 Hz);",
+      "h1_frequency_mhz": 300.0,
+      "h1_solvent": "%solv{4}",
+      "c13_nmr_text": "13C-NMR (MeOD, 75 MHz): 49.85 (1), 49.57 (1), 49.28 (1), 49.00 (1), 48.72 (1), 48.43 (1), 48.15 (1);",
+      "c13_alt_text": "13C-NMR (MeOD, 75 MHz): 49.00 (hept, J = 21.4 Hz, 1);",
+      "c13_frequency_mhz": 75.0,
+      "c13_solvent": "%solv{4}",
+	    "c13_apt": true,
+      "completed": true,
+      "solution_inchi_hash": "4497374f21092c4f45f5d1eba13d6158b33bfc6fe6c518801376a24f0ec33349",
+      "solution_cas_hash": "4d1e72bd02c28263b87269ca171626cab4ee3fd1ed8c4a3f447908d47c1258c1",
+      "h1_data_source": "prac300/202605/7",
+      "c13_data_source": "prac300/202605/8"
+    },
+    "h1_peaks": [
+      {
+        "ppm": 4.87,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "proton_count": 0,
+        "extra_info": "1H, s"
+      },
+      {
+        "ppm": 3.31,
+        "multiplicity": "p",
+        "j_values_hz_csv": 1.6,
+        "proton_count": 1,
+        "extra_info": "1H, p, J = 1.6 Hz"
+      }
+    ],
+    "c13_peaks": [
+      {
+        "ppm": 49.85,
+        "atom_count": 0,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 49.57,
+        "atom_count": 0,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 49.28,
+        "atom_count": 0,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 49.00,
+        "atom_count": 1,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 48.72,
+        "atom_count": 0,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 48.43,
+        "atom_count": 0,
+        "atom_tag": 1
+      },
+	  {
+        "ppm": 48.15,
+        "atom_count": 0,
+        "atom_tag": 1
+      }
+    ],
+    "c13_couplings": [
+      {
+        "ppm": 49.00,
+        "multiplicity": "hept",
+        "j_values_hz_csv": 21.4,
+        "atom_tag": 1,
+        "extra_info": "hept, J = 21.4 Hz, 1"
+      }
+    ]
+  },
+  {
+    "exercise": {
+      "name": "water-d2",
+      "molecular_formula": "[2]H2O",
+      "exercise_set": "References",
+      "tags_csv": "%tag{8},%tag{9},%tag{10}",
+      "h1_svg_path": "/references/D2O_H.svg",
+      "h1_axis_start": 10.1,
+      "h1_axis_end": -0.1,
+      "c13_svg_path": "/references/D2O_C.svg",
+      "c13_axis_start": 213.0,
+      "c13_axis_end": -2.0,
+      "h1_nmr_text": "1H-NMR (D2O, 300 MHz): 4.79 (1H, s);",
+      "h1_frequency_mhz": 300.0,
+      "h1_solvent": "%solv{5}",
+      "c13_nmr_text": "13C-NMR (D2O, 75 MHz): ;",
+      "c13_frequency_mhz": 75.0,
+      "c13_solvent": "%solv{5}",
+	    "c13_apt": false,
+      "completed": true,
+      "solution_inchi_hash": "0d5bb44e2fc4ed97a1e93ef846dd025663d8f5fe8532d57d2757a9c8050d6832",
+      "solution_cas_hash": "c2c4778c0202331ff59eeee92e7c1976555e703daa73d9a1ed9ff20168bc68d4",
+      "h1_data_source": "prac300/202605/13",
+      "c13_data_source": "prac300/202605/14"
+    },
+    "h1_peaks": [
+      {
+        "ppm": 4.79,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "proton_count": 1,
+        "extra_info": "1H, s"
+      }
+    ]
+  },
+  {
+    "exercise": {
+      "name": "Example",
+      "molecular_formula": "C8H8O2",
+      "exercise_set": "Examples",
+      "tags_csv": "%tag{2},%tag{8},%tag{24}",
+      "h1_svg_path": "/examples/ex2_H.svg",
+      "h1_axis_start": 10.1,
+      "h1_axis_end": -0.1,
+      "c13_svg_path": "/examples/ex2_C.svg",
+      "c13_axis_start": 213.0,
+      "c13_axis_end": -2.0,
+      "h1_nmr_text": "1H-NMR (CDCl3, 300 MHz): 8.04 (2H, m), 7.54 (1H, m), 7.42 (2H, m), 3.90 (3H, s);",
+      "h1_frequency_mhz": 300.0,
+      "h1_solvent": "%solv{1}",
+      "c13_nmr_text": "13C-NMR (CDCl3, 75 MHz): 167.1, 133.0, 130.2, 129.6, 128.4, 52.1;",
+      "c13_frequency_mhz": 75.0,
+      "c13_solvent": "%solv{1}",
+	    "c13_apt": true,      
+      "completed": false,
+      "solution_inchi_hash": "098da47f606f5d650d105e13bbccb58343a68bddb917eebc7f5cd23000c20461",
+      "solution_cas_hash": "4e54f5760f2c8151ca823e5b736307f3ea71ba72cbc7f3626235a51dabad71fe",
+      "h1_data_source": "prac300/202504SvdV/105",
+      "c13_data_source": "prac300/202504SvdV/106"
+    },
+    "h1_peaks": [
+      {
+        "ppm": 8.04,
+        "multiplicity": "m",
+        "j_values_hz_csv": null,
+        "proton_count": 2,
+        "extra_info": "2H, m"
+      },
+      {
+        "ppm": 7.54,
+        "multiplicity": "m",
+        "j_values_hz_csv": null,
+        "proton_count": 1,
+        "extra_info": "1H, m"
+      },
+      {
+        "ppm": 7.42,
+        "multiplicity": "m",
+        "j_values_hz_csv": null,
+        "proton_count": 2,
+        "extra_info": "2H, m"
+      },
+      {
+        "ppm": 3.90,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "proton_count": 3,
+        "extra_info": "3H, s"
+      }
+    ],
+    "c13_peaks": [
+      {
+        "ppm": 167.1,
+        "atom_count": 1
+      },
+      {
+        "ppm": 133.0,
+        "atom_count": 1
+      },
+      {
+        "ppm": 130.2,
+        "atom_count": 1
+      },
+      {
+        "ppm": 129.6,
+        "atom_count": 1
+      },
+      {
+        "ppm": 128.4,
+        "atom_count": 1
+      },
+      {
+        "ppm": 52.1,
+        "atom_count": 1
+      }
+    ],
+    "additional_spectra": [
+      {
+        "label": "C-bbdec",
+        "file_path": "/examples/ex2_C-bbdec.svg",
+        "priority": 5
+      },
+      {
+        "label": "C-DEPT-135",
+        "file_path": "/examples/ex2_C-DEPT-135.svg",
+        "priority": 5
+      },
+      {
+        "label": "IR",
+        "file_path": "/examples/ex2_IR.svg",
+        "priority": 1
+      }
+    ]
+  },
+  {
+    "exercise": {
+      "name": "Sucrose",
+      "molecular_formula": "C12H22O11",
+      "exercise_set": "Examples",
+      "tags_csv": "%tag{8},%tag{11}",
+      "h1_svg_path": "/examples/ex1_H.svg",
+      "h1_axis_start": 10.1,
+      "h1_axis_end": -0.1,
+      "c13_svg_path": "/examples/ex1_C.svg",
+      "c13_axis_start": 213.0,
+      "c13_axis_end": -2.0,
+      "h1_nmr_text": "1H-NMR (D2O, 500 MHz): 5.37 (1H, d, J = 3.9 Hz), 4.79 (8H, bs), 4.17 (1H, d, J = 8.7 Hz), 4.00 (1H, t, J = 8.6 Hz), 3.85 (1H, ddd, J = 8.4, 6.2, 3.8 Hz), 3.82 - 3.75 (5H, m), 3.71 (1H, dd, J = 10.0, 9.1 Hz), 3.63 (2H, s), 3.51 (1H, dd, J = 10.0, 3.9 Hz), 3.43 (1H, dd, J = 9.8, 9.1 Hz);",
+      "h1_frequency_mhz": 500.0,
+      "h1_solvent": "%solv{5}",
+      "c13_nmr_text": "13C-NMR (D2O, 126 MHz): 103.6, 92.1, 81.3, 76.3, 73.9, 72.5, 72.3, 71.0, 69.2, 62.3, 61.3, 60.1;",
+      "c13_frequency_mhz": 126.0,
+      "c13_solvent": "%solv{5}",
+	    "c13_apt": true,
+      "completed": true,
+      "solution_inchi_hash": "f55c3ff3ff10c1cead53ca1dd27cf9cb91e33f5787251b1e4dd34405d834c4a8",
+      "solution_cas_hash": "f9d2c5db3a58b02126616c5c939890387bf51b1b135c32fdff04cf2fb2d5b699",
+      "h1_data_source": "av500/Stefan1811biosyn/29",
+      "c13_data_source": "av500/Stefan1811biosyn/32"
+    },
+    "h1_peaks": [
+      {
+        "ppm": 5.37,
+        "multiplicity": "d",
+        "j_values_hz_csv": "3.9",
+        "proton_count": 1,
+        "extra_info": "1H, d, J = 3.9 Hz"
+      },
+      {
+        "ppm": 4.79,
+        "multiplicity": "bs",
+        "j_values_hz_csv": null,
+        "proton_count": 8,
+        "extra_info": "8H, bs"
+      },
+      {
+        "ppm": 4.17,
+        "multiplicity": "d",
+        "j_values_hz_csv": "8.7",
+        "proton_count": 1,
+        "extra_info": "1H, d, J = 8.7 Hz"
+      },
+      {
+        "ppm": 4.00,
+        "multiplicity": "t",
+        "j_values_hz_csv": "8.6",
+        "proton_count": 1,
+        "extra_info": "1H, t, J = 8.6 Hz"
+      },
+      {
+        "ppm": 3.85,
+        "multiplicity": "ddd",
+        "j_values_hz_csv": "8.4,6.2,3.8",
+        "proton_count": 1,
+        "extra_info": "1H, ddd, J = 8.4, 6.2, 3.8 Hz"
+      },
+      {
+        "ppm": 3.785,
+        "multiplicity": "m",
+        "j_values_hz_csv": null,
+        "proton_count": 5,
+        "extra_info": "5H, m"
+      },
+      {
+        "ppm": 3.71,
+        "multiplicity": "dd",
+        "j_values_hz_csv": "10.0,9.1",
+        "proton_count": 1,
+        "extra_info": "1H, dd, J = 10.0, 9.1 Hz"
+      },
+      {
+        "ppm": 3.63,
+        "multiplicity": "s",
+        "j_values_hz_csv": null,
+        "proton_count": 2,
+        "extra_info": "2H, s"
+      },
+      {
+        "ppm": 3.51,
+        "multiplicity": "dd",
+        "j_values_hz_csv": "10.0,3.9",
+        "proton_count": 1,
+        "extra_info": "1H, dd, J = 10.0, 3.9 Hz"
+      },
+      {
+        "ppm": 3.43,
+        "multiplicity": "dd",
+        "j_values_hz_csv": "9.8,9.1",
+        "proton_count": 1,
+        "extra_info": "1H, dd, J = 9.8, 9.1 Hz"
+      }
+    ],
+    "c13_peaks": [
+      {
+        "ppm": 103.6,
+        "atom_count": 1
+      },
+      {
+        "ppm": 92.1,
+        "atom_count": 1
+      },
+      {
+        "ppm": 81.3,
+        "atom_count": 1
+      },
+      {
+        "ppm": 76.3,
+        "atom_count": 1
+      },
+      {
+        "ppm": 73.9,
+        "atom_count": 1
+      },
+      {
+        "ppm": 72.5,
+        "atom_count": 1
+      },
+      {
+        "ppm": 72.3,
+        "atom_count": 1
+      },
+      {
+        "ppm": 71.0,
+        "atom_count": 1
+      },
+      {
+        "ppm": 69.2,
+        "atom_count": 1
+      },
+      {
+        "ppm": 62.3,
+        "atom_count": 1
+      },
+      {
+        "ppm": 61.3,
+        "atom_count": 1
+      },
+      {
+        "ppm": 60.1,
+        "atom_count": 1
+      }
+    ],
+    "additional_spectra": [
+      {
+        "label": "C-bbdec",
+        "file_path": "/examples/ex1_C-bbdec.svg",
+        "priority": 5
+      },
+      {
+        "label": "COSY",
+        "file_path": "/examples/ex1_COSY.svg",
+        "priority": 6
+      },
+      {
+        "label": "C-DEPT-135",
+        "file_path": "/examples/ex1_C-DEPT-135.svg",
+        "priority": 5
+      },
+      {
+        "label": "C-GATED",
+        "file_path": "/examples/ex1_C-GATED.svg",
+        "priority": 5
+      },
+      {
+        "label": "H2BC",
+        "file_path": "/examples/ex1_H2BC.svg",
+        "priority": 13
+      },
+      {
+        "label": "HMBC",
+        "file_path": "/examples/ex1_HMBC.svg",
+        "priority": 12
+      },
+      {
+        "label": "H-presat",
+        "file_path": "/examples/ex1_H-presat.svg",
+        "priority": 2
+      },
+      {
+        "label": "HSQC",
+        "file_path": "/examples/ex1_HSQC.svg",
+        "priority": 6
+      },
+      {
+        "label": "HSQC-TOCSY",
+        "file_path": "/examples/ex1_HSQC-TOCSY.svg",
+        "priority": 17
+      },
+      {
+        "label": "INADEQUATE",
+        "file_path": "/examples/ex1_INADEQUATE.svg",
+        "priority": 20
+      },
+      {
+        "label": "IR",
+        "file_path": "/examples/ex1_IR.svg",
+        "priority": 1
+      },
+      {
+        "label": "meHSQC",
+        "file_path": "/examples/ex1_meHSQC.svg",
+        "priority": 6
+      },
+      {
+        "label": "NOESY",
+        "file_path": "/examples/ex1_NOESY.svg",
+        "priority": 14
+      },
+      {
+        "label": "TOCSY",
+        "file_path": "/examples/ex1_TOCSY.svg",
+        "priority": 16
+      }
+    ]
+  }
+]
