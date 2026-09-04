@@ -63,6 +63,15 @@ async function fileToBase64(file: File): Promise<string> {
   return btoa(binary);
 }
 
+async function hashTextToHex(text: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 interface ExerciseCreationFormProps {
   onCreated?: () => void | Promise<void>;
 }
@@ -182,6 +191,18 @@ export function ExerciseCreationForm({ onCreated }: ExerciseCreationFormProps) {
       return;
     }
 
+    const solutionInchiText = solutionInchi.trim();
+    const solutionCasNumberText = solutionCasNumber.trim();
+    const normalizedSolutionInchiText = solutionInchiText.startsWith("InChI=")
+      ? solutionInchiText
+      : `InChI=${solutionInchiText}`;
+    const hashedSolutionInchi = solutionInchiText
+      ? await hashTextToHex(normalizedSolutionInchiText)
+      : null;
+    const hashedSolutionCasNumber = solutionCasNumberText
+      ? await hashTextToHex(solutionCasNumberText)
+      : null;
+
     const payload: ExerciseCreatePayload = {
       h1_spectrum_svg: resolveSvgPayload(h1SvgFilename, h1SvgText, "h1"),
       h1_axis_scale: {
@@ -197,8 +218,8 @@ export function ExerciseCreationForm({ onCreated }: ExerciseCreationFormProps) {
       c13_nmr_text: c13NmrText.trim(),
       c13_apt: null,
       molecular_formula: molecularFormula.trim() || null,
-      solution_inchi: solutionInchi.trim() || null,
-      solution_cas_number: solutionCasNumber.trim() || null,
+      solution_inchi: hashedSolutionInchi,
+      solution_cas_number: hashedSolutionCasNumber,
       name: name.trim() || null,
       exercise_set: exerciseSet.trim() || null,
       tags: parsedTags,
@@ -273,21 +294,21 @@ export function ExerciseCreationForm({ onCreated }: ExerciseCreationFormProps) {
             />
           </div>
           <div>
-            <label style={labelStyle}>Solution InChI hash</label>
+            <label style={labelStyle}>Solution InChI text</label>
             <input
               value={solutionInchi}
               onChange={(e) => setSolutionInchi(e.target.value)}
               style={inputStyle}
-              placeholder="SHA-256 hash (hex) of InChI"
+              placeholder="Any text will be hashed with SHA-256 before submit"
             />
           </div>
           <div>
-            <label style={labelStyle}>CAS number hash</label>
+            <label style={labelStyle}>CAS number text</label>
             <input
               value={solutionCasNumber}
               onChange={(e) => setSolutionCasNumber(e.target.value)}
               style={inputStyle}
-              placeholder="SHA-256 hash (hex) of normalized CAS number"
+              placeholder="Any text will be hashed with SHA-256 before submit"
             />
           </div>
           <div>

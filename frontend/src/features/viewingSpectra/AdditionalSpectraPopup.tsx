@@ -16,15 +16,15 @@ export function AdditionalSpectraPopup({ spectra }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState(0)
   const [viewMode, setViewMode] = useState<ViewMode>('fit')
-  const [zoom, setZoom] = useState(1.5)
+  const [zoom, setZoom] = useState(1.2)
 
   if (spectra.length === 0) return null
 
   const safeTab = Math.min(activeTab, spectra.length - 1)
   const active = spectra[safeTab]
 
-  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.5, 10))
-  const handleZoomOut = () => setZoom((z) => Math.max(z - 0.5, 1))
+  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.2, 10))
+  const handleZoomOut = () => setZoom((z) => Math.max(z - 0.2, 1))
 
   function open() {
     setActiveTab(0)
@@ -66,7 +66,7 @@ export function AdditionalSpectraPopup({ spectra }: Props) {
         >
           <div
             style={{
-              width: '90%',
+              width: '95%',
               background: 'white',
               borderRadius: 12,
               display: 'flex',
@@ -79,11 +79,15 @@ export function AdditionalSpectraPopup({ spectra }: Props) {
             <div
               style={{
                 display: 'flex',
+
                 alignItems: 'stretch',
                 borderBottom: '1px solid #eee',
                 background: '#f9f9f9',
                 flexShrink: 0,
-                padding: '0 12px',
+                paddingRight: '12px',
+                paddingLeft: '12px',
+                paddingTop: '2px',
+                paddingBottom: '2px',
                 gap: 4,
               }}
             >
@@ -200,11 +204,12 @@ export function AdditionalSpectraPopup({ spectra }: Props) {
               </div>
             </div>
 
-            {/* Spectrum image — 3:1 ratio, scrollable in scroll mode */}
+            {/* Spectrum image — 2.5:1 ratio, scrollable in scroll mode SvdV: alignSelf added, only relevant when width<100%, changed aspectratio,changed height in img style*/}
             <div
               style={{
-                width: '100%',
-                aspectRatio: '3 / 1',
+                width: '98.5%',
+                alignSelf: 'center',
+                aspectRatio: '5 / 2',
                 overflow: viewMode === 'scroll' ? 'auto' : 'hidden',
               }}
             >
@@ -216,6 +221,7 @@ export function AdditionalSpectraPopup({ spectra }: Props) {
                   display: 'block',
                   width: viewMode === 'fit' ? '100%' : `${zoom * 100}%`,
                   height: viewMode === 'fit' ? '100%' : 'auto',
+                  padding: 7,
                   objectFit: viewMode === 'fit' ? 'contain' : undefined,
                   minWidth: '100%',
                 }}

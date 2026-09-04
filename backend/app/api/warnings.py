@@ -51,10 +51,10 @@ def count_atoms_in_fragments(fragments: list[str]) -> dict[str, int]:
 
 
 def calculate_dbe(atom_counts: dict[str, int]) -> float:
-    c = atom_counts.get("C", 0)
+    c = sum(atom_counts.get(symbol, 0) for symbol in ["C", "Si", "Sn"])
     h = atom_counts.get("H", 0)
-    n = atom_counts.get("N", 0)
-    x = sum(atom_counts.get(symbol, 0) for symbol in ["F", "Cl", "Br", "I"])
+    n = sum(atom_counts.get(symbol, 0) for symbol in ["N", "P", "B"])
+    x = sum(atom_counts.get(symbol, 0) for symbol in ["F", "Cl", "Br", "I", "D", "[2]H", "[2H]"])
 
     dbe = c + 1 - (h + x - n) / 2
     return dbe
@@ -72,7 +72,9 @@ def parse_formula(formula: str) -> dict[str, int]:
 
     # Remove spaces
     formula = formula.strip().replace(" ", "")
-
+    # replace the deuterium isotope notation, with "D"still gives frontend error symbol.
+    # replace with "H" avoids this
+    formula = formula.replace("[2]H", "H") 
     # Remove charge at the end, like +, -, 2+, 3-
     formula = re.sub(r'(\d*[+-])$', '', formula)
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRDKit } from '../../context/RDKitContext'
 import { usePredefinedFragments, type PredefinedFragment } from '../../hooks/usePredefinedFragments'
 
-const THUMB_SIZE = 100;
+const THUMB_SIZE = 78;
 
 interface PredefinedFragmentMenuProps {
       onAdd: (name: string, smiles: string, molFile: string) => void;
@@ -68,10 +68,10 @@ function FragmentButton({
         style={{
           fontSize: 11,
           fontWeight: 600,
-          marginTop: 6,
+          marginTop: 0,
           textAlign: 'center',
-          lineHeight: 1.2,
-          minHeight: 26,
+          lineHeight: 1.4,
+          minHeight: 22,
         }}
       >
         {fragment.name}
@@ -80,7 +80,7 @@ function FragmentButton({
         type="button"
         onClick={handleAdd}
         style={{
-          marginTop: 4,
+          marginTop: 0,
           padding: '3px 10px',
           borderRadius: 6,
           border: '1px solid #4CAF50',
@@ -184,8 +184,8 @@ export function PredefinedFragmentMenu({ onAdd }: PredefinedFragmentMenuProps) {
             top: '100%',
             left: 0,
             marginTop: 6,
-            width: 280,
-            maxHeight: 420,
+            width: 336,
+            maxHeight: 485,
             overflowY: 'auto',
             background: 'white',
             border: '1px solid #ddd',
@@ -217,11 +217,11 @@ export function PredefinedFragmentMenu({ onAdd }: PredefinedFragmentMenuProps) {
             <div style={{ fontSize: 11, color: '#E53935' }}>{searchError}</div>
           )}
 
-          {/* Fragment grid — 2 columns */}
+          {/* Fragment grid — 3 columns */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(2, auto)',
+              gridTemplateColumns: 'repeat(3, auto)',
               gap: 8,
               justifyContent: 'start',
             }}

@@ -55,20 +55,24 @@ function getDirectoryName(path: string): string | null {
   return parts[parts.length - 1] || null;
 }
 
-function findFirstCsvEntry(zip: JSZip): JSZipObject | null {
-  const csvEntries = Object.values(zip.files)
-    .filter((entry) => !entry.dir && entry.name.toLowerCase().endsWith(".csv"))
+function normalizeDirectoryPath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
+function getAllCsvEntries(zip: JSZip): JSZipObject[] {
+  return Object.values(zip.files)
+    .filter((entry): entry is JSZipObject => !entry.dir && entry.name.toLowerCase().endsWith(".csv"))
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-  return csvEntries[0] ?? null;
 }
 
 function getFilesInDirectory(zip: JSZip, directoryPath: string): JSZipObject[] {
-  const normalizedDirectoryPath = directoryPath.toLowerCase();
-  return Object.values(zip.files).filter((entry) => {
+  const normalizedDirectoryPath = normalizeDirectoryPath(directoryPath).toLowerCase();
+  return Object.values(zip.files).filter((entry): entry is JSZipObject => {
     if (entry.dir) {
       return false;
     }
-    return getParentDirectory(entry.name).toLowerCase() === normalizedDirectoryPath;
+    const entryDirPath = normalizeDirectoryPath(getParentDirectory(entry.name)).toLowerCase();
+    return entryDirPath === normalizedDirectoryPath;
   });
 }
 
@@ -89,7 +93,8 @@ function toAdditionalSpectrumLabel(problemNumber: number, path: string): string 
     return null;
   }
 
-  const rawLabel = filename.slice(prefix.length).replace(/[_-]+/g, " ").trim();
+  // const rawLabel = filename.slice(prefix.length).replace(/[_-]+/g, " ").trim();
+  const rawLabel = filename.slice(prefix.length).trim();
   return rawLabel || null;
 }
 
@@ -120,19 +125,9 @@ export function ExerciseZipImport({ onImported, onImportingChange }: ExerciseZip
 
     try {
       const zip = await JSZip.loadAsync(file);
-      const csvEntry = findFirstCsvEntry(zip);
-      if (!csvEntry) {
+      const allCsvEntries = getAllCsvEntries(zip);
+      if (allCsvEntries.length === 0) {
         setErrorText("ZIP must contain at least one .csv file.");
-        return;
-      }
-
-      const csvDirectoryPath = getParentDirectory(csvEntry.name);
-      const exerciseSet = getDirectoryName(csvDirectoryPath);
-      const filesInCsvDirectory = getFilesInDirectory(zip, csvDirectoryPath);
-      const csvText = await csvEntry.async("text");
-      const { headers, rows } = parseCsv(csvText);
-      if (headers.length === 0 || rows.length === 0) {
-        setErrorText(`${getFileName(csvEntry.name)} is empty or invalid.`);
         return;
       }
 
@@ -144,82 +139,96 @@ export function ExerciseZipImport({ onImported, onImportingChange }: ExerciseZip
       let createdCount = 0;
       const failures: string[] = [];
 
-      for (let i = 0; i < rows.length; i += 1) {
-        const row = rows[i];
-        const { payload, error, displayName, problemNumber } = buildPayloadFromCsvRow(
-          headers,
-          row,
-          defaultH1AxisBegin,
-          defaultH1AxisEnd,
-          defaultC13AxisBegin,
-          defaultC13AxisEnd,
-          exerciseSet,
-        );
-
-        if (!payload) {
-          failures.push(`Row ${i + 2} (${displayName}): ${error}`);
-          continue;
-        }
-        if (problemNumber === null) {
-          failures.push(`Row ${i + 2} (${displayName}): Missing Problem/ID value.`);
+      // Process each CSV file (one per folder)
+      for (const csvEntry of allCsvEntries) {
+        const csvDirectoryPath = getParentDirectory(csvEntry.name);
+        const exerciseSet = getDirectoryName(csvDirectoryPath);
+        const filesInCsvDirectory = getFilesInDirectory(zip, csvDirectoryPath);
+        const csvText = await csvEntry.async("text");
+        const { headers, rows } = parseCsv(csvText);
+        if (headers.length === 0 || rows.length === 0) {
+          failures.push(`${getFileName(csvEntry.name)} in folder "${exerciseSet}" is empty or invalid.`);
           continue;
         }
 
-        const cEntry = findFileByName(filesInCsvDirectory, `${problemNumber}_C.svg`);
-        const hEntry =
-          findFileByName(filesInCsvDirectory, `${problemNumber}_H.svg`) ??
-          findFileByName(filesInCsvDirectory, `${problemNumber}_H.csv`);
-
-        if (!cEntry || !hEntry) {
-          failures.push(
-            `Row ${i + 2} (${displayName}): Missing required spectra files for ID ${problemNumber}.`,
+        // Process each row in this CSV
+        for (let i = 0; i < rows.length; i += 1) {
+          const row = rows[i];
+          const { payload, error, displayName, problemNumber } = buildPayloadFromCsvRow(
+            headers,
+            row,
+            defaultH1AxisBegin,
+            defaultH1AxisEnd,
+            defaultC13AxisBegin,
+            defaultC13AxisEnd,
+            exerciseSet,
           );
-          continue;
-        }
 
-        const additionalEntries = filesInCsvDirectory.filter((entry) => {
-          const fileName = getFileName(entry.name).toLowerCase();
-          if (!fileName.endsWith(".svg")) {
-            return false;
+          if (!payload) {
+            failures.push(`${exerciseSet} - Row ${i + 2} (${displayName}): ${error}`);
+            continue;
           }
-          if (!fileName.startsWith(`${problemNumber}_`.toLowerCase())) {
-            return false;
+          if (problemNumber === null) {
+            failures.push(`${exerciseSet} - Row ${i + 2} (${displayName}): Missing Problem/ID value.`);
+            continue;
           }
-          return (
-            fileName !== `${problemNumber}_h.svg` &&
-            fileName !== `${problemNumber}_c.svg`
-          );
-        });
 
-        const [hSvgText, cSvgText, additionalSpectra] = await Promise.all([
-          hEntry.async("text"),
-          cEntry.async("text"),
-          Promise.all(
-            additionalEntries.map(async (entry) => ({
-              filename: toSvgFilename(entry.name),
-              file_base64: await entry.async("base64"),
-              label: toAdditionalSpectrumLabel(problemNumber, entry.name),
-            })),
-          ),
-        ]);
+          const cEntry = findFileByName(filesInCsvDirectory, `${problemNumber}_C.svg`);
+          const hEntry =
+            findFileByName(filesInCsvDirectory, `${problemNumber}_H.svg`) ??
+            findFileByName(filesInCsvDirectory, `${problemNumber}_H.csv`);
 
-        payload.h1_spectrum_svg = {
-          filename: toSvgFilename(hEntry.name),
-          svg_text: hSvgText,
-        };
-        payload.c13_spectrum_svg = {
-          filename: toSvgFilename(cEntry.name),
-          svg_text: cSvgText,
-        };
-        payload.additional_spectra = additionalSpectra;
+          if (!cEntry || !hEntry) {
+            failures.push(
+              `${exerciseSet} - Row ${i + 2} (${displayName}): Missing required spectra files for ID ${problemNumber}.`,
+            );
+            continue;
+          }
 
-        const result = await postExercise(payload);
-        if (result.ok) {
-          createdCount += 1;
-        } else {
-          failures.push(
-            `Row ${i + 2} (${displayName}): ${result.detail ?? "Failed to create exercise."}`,
-          );
+          const additionalEntries = filesInCsvDirectory.filter((entry) => {
+            const fileName = getFileName(entry.name).toLowerCase();
+            if (!fileName.endsWith(".svg")) {
+              return false;
+            }
+            if (!fileName.startsWith(`${problemNumber}_`.toLowerCase())) {
+              return false;
+            }
+            return (
+              fileName !== `${problemNumber}_h.svg` &&
+              fileName !== `${problemNumber}_c.svg`
+            );
+          });
+
+          const [hSvgText, cSvgText, additionalSpectra] = await Promise.all([
+            hEntry.async("text"),
+            cEntry.async("text"),
+            Promise.all(
+              additionalEntries.map(async (entry) => ({
+                filename: toSvgFilename(entry.name),
+                file_base64: await entry.async("base64"),
+                label: toAdditionalSpectrumLabel(problemNumber, entry.name),
+              })),
+            ),
+          ]);
+
+          payload.h1_spectrum_svg = {
+            filename: toSvgFilename(hEntry.name),
+            svg_text: hSvgText,
+          };
+          payload.c13_spectrum_svg = {
+            filename: toSvgFilename(cEntry.name),
+            svg_text: cSvgText,
+          };
+          payload.additional_spectra = additionalSpectra;
+
+          const result = await postExercise(payload);
+          if (result.ok) {
+            createdCount += 1;
+          } else {
+            failures.push(
+              `${exerciseSet} - Row ${i + 2} (${displayName}): ${result.detail ?? "Failed to create exercise."}`,
+            );
+          }
         }
       }
 

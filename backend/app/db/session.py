@@ -16,6 +16,7 @@ from app.db.models import (
     ExerciseH1Peak,
     Fragment,
     PredefinedFragment,
+    WorkingSolution,
 )
 
 
@@ -121,7 +122,7 @@ def _seed_exercises() -> None:
             for p in example.get("h1_peaks", []):
                 db.add(ExerciseH1Peak(
                     exercise_id=exercise_id,
-                    ppm=p["ppm"],
+                    ppm=p["ppm"], #why not p.get()?
                     multiplicity=p.get("multiplicity"),
                     j_values_hz_csv=p.get("j_values_hz_csv"),
                     proton_count=p.get("proton_count"),
@@ -132,6 +133,7 @@ def _seed_exercises() -> None:
                 db.add(ExerciseC13Peak(
                     exercise_id=exercise_id,
                     ppm=p["ppm"],
+                    atom_tag=p.get("atom_tag"),
                     atom_count=p.get("atom_count"),
                     extra_info=p.get("extra_info"),
                 ))
@@ -141,12 +143,60 @@ def _seed_exercises() -> None:
                     exercise_id=exercise_id,
                     file_path=s["file_path"],
                     label=s.get("label"),
+                    priority=s.get("priority") or 0,
                 ))
 
         db.commit()
 
     finally:
         db.close()
+
+def _seed_preloaded_fragments() -> None:
+    """Insert preloaded fragments from seed file if table is empty."""
+
+    db = SessionLocal()
+    try:
+        if db.query(Fragment).count() > 0:
+            return
+        seed_path = _get_seed_file_path("preloaded_fragments_seed.json")
+        if not os.path.exists(seed_path):
+            return
+        with open(seed_path) as f:
+            frags = json.load(f)
+        for frag in frags:
+            db.add(Fragment(
+                exercise_id=frag["exercise_id"], label=frag["label"],
+                smiles=frag["smiles"], mol_file=frag["mol_file"],
+                annotation=frag["annotation"],
+            ))
+        db.commit()
+    finally:
+        db.close()
+
+
+def _seed_preloaded_solutions() -> None:
+    """Insert predefined answers from seed file if table is empty."""
+
+    db = SessionLocal()
+    try:
+        if db.query(WorkingSolution).count() > 0:
+            return
+        seed_path = _get_seed_file_path("preloaded_solutions_seed.json")
+        if not os.path.exists(seed_path):
+            return
+        with open(seed_path) as f:
+            answers = json.load(f)
+        for answer in answers:
+            db.add(WorkingSolution(
+                exercise_id=answer["exercise_id"], 
+                smiles=answer["smiles"], 
+                mol_file=answer["mol_file"],
+                dbe=answer["dbe"],
+            ))
+        db.commit()
+    finally:
+        db.close()
+
 
 
 def _migrate_add_missing_columns() -> None:
@@ -237,6 +287,8 @@ def init_db() -> None:
     _purge_soft_deleted_fragments()
     _seed_predefined_fragments()
     _seed_exercises()
+    _seed_preloaded_fragments()
+    _seed_preloaded_solutions()
 
 
 @contextmanager

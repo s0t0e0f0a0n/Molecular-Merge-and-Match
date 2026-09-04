@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import './index.css'
+import './index.css' //kan ik hier globale dark/light theme dingen in doen?
 import App from './App'
 import { ExerciseDataProvider } from './context/ExerciseDataContext'
 import { HistoryProvider } from './context/HistoryContext'

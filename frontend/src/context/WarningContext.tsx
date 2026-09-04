@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 export type WarningType = 'atom_count_DBE' | 'double_peak_assignment'
 
@@ -13,6 +13,7 @@ type WarningsByType = Record<WarningType, WarningResponse>
 type WarningContextValue = {
   warningsByType: WarningsByType
   setWarningResult: (warning: WarningResponse) => void
+  resetWarnings: () => void
 }
 
 const defaultWarnings: WarningsByType = {
@@ -40,9 +41,13 @@ export function WarningProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  const resetWarnings = useCallback(() => {
+    setWarningsByType(defaultWarnings)
+  }, [])
+
   const value = useMemo(
-    () => ({ warningsByType, setWarningResult }),
-    [warningsByType, setWarningResult],
+    () => ({ warningsByType, setWarningResult, resetWarnings }),
+    [warningsByType, setWarningResult, resetWarnings],
   )
 
   return (

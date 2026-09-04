@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useWarning } from '../../context/WarningContext';
 import { SpectrumViewer } from '../viewingSpectra/SpectraPrototype';
 import { AdditionalSpectraPopup } from '../viewingSpectra/AdditionalSpectraPopup';
 import { PeakList } from '../linking/PeakTableColumn';
@@ -42,6 +43,7 @@ import { fetchUserSettings, updateUserSettings } from '../../api/settings';
 
 export function MolecularBookkeepingPage() {
   const { rdkit } = useRDKit();
+  const { resetWarnings } = useWarning();
   const {
   selectedExerciseId,
   selectedExercise,
@@ -70,6 +72,15 @@ export function MolecularBookkeepingPage() {
     setCasAnswerIsCorrect(null);
     setValidatingCasAnswer(false);
   }, [selectedExerciseId]);
+
+  useLayoutEffect(() => {
+    if (loadingSelectedExercise || selectedExerciseId === null) {
+      resetWarnings();
+      return;
+    }
+
+    resetWarnings();
+  }, [selectedExerciseId, loadingSelectedExercise, resetWarnings]);
 
   useEffect(() => {
     if (casAnswerIsCorrect === null) return;
@@ -601,6 +612,7 @@ const cAxisRange: [number, number] | null =
     fragments,
     selectedExercise?.molecular_formula ?? undefined,
     savedFormulaDbe,
+    selectedExerciseId,
   );
 
   // Made string ids of currently-active (non-soft-deleted) fragments. Passed
@@ -1085,9 +1097,9 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <img
             src={`${import.meta.env.BASE_URL}atom.png`}
-            alt="Molecular Bookkeeping"
-            title="Molecular Bookkeeping"
-            style={{ width: 24, height: 24, verticalAlign: 'middle' }}
+            alt="Molecular Merge and Match"
+            title="Molecular Merge and Match"
+            style={{ width: 36, height: 36, verticalAlign: 'middle' }}
           />
           {selectedExercise ? (
             <div
@@ -1098,8 +1110,8 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
                 {selectedExercise.name ?? `Exercise ${selectedExercise.id}`}
               </span> */}
               {selectedExercise.molecular_formula && (
-                <span style={{ fontWeight: 500, color: '#555' }}>
-                  {formatChemistryText(selectedExercise.molecular_formula)}
+                <span style={{ fontSize: 24, fontWeight: 700, color: '#555' }}>
+                  {formatChemistryText(selectedExercise.molecular_formula.replace(/\[2\]H/g, 'D'))}
                 </span>
               )}
             </div>

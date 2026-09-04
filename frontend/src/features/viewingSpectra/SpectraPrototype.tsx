@@ -168,7 +168,7 @@ function SpectrumCanvas({
       }}
     >
       <div
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: '100%', height: '100%', }}
         dangerouslySetInnerHTML={{ __html: displaySvg }}
       />
 
@@ -206,7 +206,7 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
   // Callers can still pass an explicit `title` to override (used by tests).
   const renderedTitle: React.ReactNode = title ?? renderSpectrumTitle(type, solvent, frequencyMhz, apt);
   const [viewMode, setViewMode] = useState<ViewMode>('fit')
-  const [zoom, setZoom] = useState(1.5) // Multiplier for 'scroll' mode
+  const [zoom, setZoom] = useState(1.2) // Multiplier for 'scroll' mode
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const [svgContent, setSvgContent] = useState<string>('')
 
@@ -236,7 +236,7 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
 
   const highlightWidthPPM = useMemo(() => {
     if (type === 'H') return 0.18; // 0.18 ppm
-    if (type === 'C') return 2.00;  // 2.00 ppm
+    if (type === 'C') return 2.50;  // 2.00 ppm
     return 0;
   }, [type]);
 
@@ -262,8 +262,8 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
   }, [peaks, highlightWidthPPM, axisRange, totalAxisRange]);
 
   // Controls logic
-  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.5, 10))
-  const handleZoomOut = () => setZoom((z) => Math.max(z - 0.5, 1))
+  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.2, 10))
+  const handleZoomOut = () => setZoom((z) => Math.max(z - 0.2, 1))
  
   const displaySvg = svgContent.replace(
     /<svg([^>]*)>/,
@@ -371,8 +371,16 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
       <div
         style={{
           flex: 1,
+          width: isModal ? '98%' : '100%',
+          paddingBottom: isModal ? 6 : 2,
+          paddingRight: isModal ? 13 : 3,
+          paddingLeft: isModal ? 13: 3,
+          paddingTop: 0,
+          fontFamily: 'Aptos',
+          alignSelf: 'center',
           overflowX: viewMode === 'scroll' ? 'auto' : 'hidden',
           overflowY: viewMode === 'scroll' ? 'auto' : 'hidden',
+          
           position: 'relative',
           background: 'white',
           borderBottomLeftRadius: 12,
@@ -416,7 +424,7 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9999,
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40
         }}>
-          <div style={{ width: '100%', height: '100%', background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
+          <div style={{ width: '95%', height: '100%', background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
             {renderContent(true)}
           </div>
         </div>,

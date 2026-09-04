@@ -75,7 +75,9 @@ function setupUserData() {
             'exercises_seed.json', 
             'exercise_h1_peaks_seed.json', 
             'exercise_c13_peaks_seed.json', 
-            'predefined_fragments_seed.json'
+            'predefined_fragments_seed.json',
+            'preloaded_fragments_seed.json',
+            'preloaded_solutions_seed.json'
         ];
         for (const file of seedFiles) {
             const srcPath = path.join(sourceDataDir, file);

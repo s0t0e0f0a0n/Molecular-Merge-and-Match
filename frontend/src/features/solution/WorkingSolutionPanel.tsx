@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRDKit } from '../../context/RDKitContext';
 import { useExerciseData } from '../../context/ExerciseDataContext';
 import { validateExerciseSolutionHash } from '../../api/exercises';
@@ -24,7 +24,7 @@ export function formulaToCounts(formula: string): Map<string, number> {
 
   return counts;
 }
-
+// waar kan ik deuterium aanpassen?
 export function formatMissingAtoms(targetFormula: string | undefined, currentFormula: string): string {
   if (!targetFormula) return 'Target formula is not available yet.';
 
@@ -141,7 +141,8 @@ export function WorkingSolutionPanel({
   formulaDbe,
 }: WorkingSolutionPanelProps) {
   const { setWarningResult } = useWarning();
-  const { selectedExercise } = useExerciseData();
+  const warningRequestIdRef = useRef(0);
+  const { selectedExercise, loadingSelectedExercise } = useExerciseData();
   const molecularFormula = selectedExercise?.molecular_formula ?? undefined;
   const { rdkit } = useRDKit();
   const [svg, setSvg] = useState('');
@@ -156,7 +157,18 @@ export function WorkingSolutionPanel({
 
   // Atom count and DBE count warning
 useEffect(() => {
+  if (loadingSelectedExercise) {
+    setWarningResult({
+      type: 'atom_count_DBE',
+      warning: false,
+      info: 'Loading exercise',
+    });
+    return;
+  }
+
   const smiles = solution?.smiles;
+  const requestId = ++warningRequestIdRef.current;
+  const controller = new AbortController();
 
   if (!smiles) {
     setWarningResult({
@@ -164,12 +176,15 @@ useEffect(() => {
       warning: false,
       info: 'No molecule present',
     });
-    return;
+    return () => {
+      controller.abort();
+    };
   }
 
   fetch('/api/v1/warnings/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    signal: controller.signal,
     body: JSON.stringify({
       type: 'atom_count_DBE',
       fragments: [smiles],
@@ -184,12 +199,24 @@ useEffect(() => {
       }
 
       const data: WarningResponse = await res.json();
+      if (requestId !== warningRequestIdRef.current || controller.signal.aborted) {
+        return;
+      }
+
       setWarningResult(data);
     })
     .catch((err) => {
+      if (controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
+        return;
+      }
+
       console.error('Failed to update molecule warning', err);
     });
-}, [solution?.smiles, molecularFormula, formulaDbe, setWarningResult]);
+
+  return () => {
+    controller.abort();
+  };
+}, [solution?.smiles, molecularFormula, formulaDbe, exerciseId, loadingSelectedExercise, setWarningResult]);
 
   // Calculate molecular formula when the answer is updated
   const currentFormula = useMemo(() => {

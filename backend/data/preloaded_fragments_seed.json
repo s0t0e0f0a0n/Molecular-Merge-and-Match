@@ -1,0 +1,30 @@
+[
+	{
+		"exercise_id" : "exercise-9",
+		"label" : "Fragment 1",
+		"smiles" : "C",
+		"mol_file" : "\n     RDKit          2D\n\n  1  0  0  0  0  0  0  0  0  0999 V2000\n    0.0000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n",
+		"annotation" : "next to sp2"
+	},
+	{
+		"exercise_id" : "exercise-9",
+		"label" : "Fragment 2",
+		"smiles" : "CC",
+		"mol_file" : "\n     RDKit          2D\n\n  2  1  0  0  0  0  0  0  0  0999 V2000\n    0.0000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2990    0.7500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\nM  END\n",
+		"annotation" : "CH2 next to O"
+	},
+	{
+		"exercise_id" : "exercise-9",
+		"label" : "Fragment 3",
+		"smiles" : "O",
+		"mol_file" : "\n     RDKit          2D\n\n  1  0  0  0  0  0  0  0  0  0999 V2000\n    0.0000    0.0000    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n",
+		"annotation" : null
+	},
+	{
+		"exercise_id" : "exercise-9",
+		"label" : "Fragment 4",
+		"smiles" : "C=O",
+		"mol_file" : "\n     RDKit          2D\n\n  2  1  0  0  0  0  0  0  0  0999 V2000\n    0.0000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2990    0.7500    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  2  0\nM  END\n",
+		"annotation" : null
+	}
+]

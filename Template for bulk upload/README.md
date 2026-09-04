@@ -204,7 +204,7 @@ Two answer types are supported:
 
 ### InChI Answer
 
-The preferred answer format is an InChI string.
+The preferred answer format is an InChI string (starting with "InChI=").
 
 The SHA256 hash of the InChI is stored in the `InChI` column.
 

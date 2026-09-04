@@ -1,8 +1,9 @@
+import base64
 import hashlib
 from pathlib import Path
 
 from app.core.config import settings
-from app.db.models import Exercise
+from app.db.models import Exercise, ExerciseAdditionalSpectrum
 from app.db.session import SessionLocal
 
 INCHI_CCO = "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3"
@@ -77,6 +78,34 @@ def test_solution_inchi_hash_stores_hash(client):
         assert row.solution_inchi_hash is not None
 
         assert row.solution_inchi_hash == INCHI_HASH_CCO
+    finally:
+        db.close()
+
+
+def test_create_exercise_stores_additional_spectrum_priority_from_filename(client):
+    payload = _exercise_payload()
+    payload["additional_spectra"] = [
+        {
+            "filename": "42_HSQC.svg",
+            "file_base64": base64.b64encode(b"<svg></svg>").decode("ascii"),
+            "label": "HSQC",
+        }
+    ]
+
+    response = client.post("/api/v1/exercises/", json=payload)
+    assert response.status_code == 201
+
+    db = SessionLocal()
+    try:
+        exercise = db.query(Exercise).first()
+        assert exercise is not None
+        spectrum = (
+            db.query(ExerciseAdditionalSpectrum)
+            .filter(ExerciseAdditionalSpectrum.exercise_id == exercise.id)
+            .first()
+        )
+        assert spectrum is not None
+        assert spectrum.priority == 10
     finally:
         db.close()
 

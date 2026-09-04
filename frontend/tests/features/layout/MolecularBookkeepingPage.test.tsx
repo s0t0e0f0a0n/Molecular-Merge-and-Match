@@ -832,6 +832,92 @@ it('shows incorrect solution feedback when validation fails', async () => {
       ).toBeInTheDocument();
     });
 
+    it('clears warnings immediately when switching exercises before a new response arrives', async () => {
+      const user = userEvent.setup();
+      let resolveFirstWarning: ((response: Response) => void) | undefined;
+      let warningRequestCount = 0;
+
+      mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+        if (url.includes('/dbe')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ dbe: null }),
+          } as Response);
+        }
+
+        if (url.includes('/fragments/') && !init?.method) {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve([
+                {
+                  id: 7,
+                  exercise_id: 'exercise-1',
+                  label: 'Methane',
+                  smiles: 'C',
+                  mol_file: 'mol-block',
+                },
+              ]),
+          } as Response);
+        }
+
+        if (url.includes('/warnings') && init?.method === 'POST') {
+          const body = JSON.parse(init.body as string);
+
+          if (body.type === 'double_peak_assignment') {
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  type: 'double_peak_assignment',
+                  warning: false,
+                  info: '',
+                }),
+            } as Response);
+          }
+
+          warningRequestCount += 1;
+
+          if (warningRequestCount === 1) {
+            return new Promise<Response>((resolve) => {
+              resolveFirstWarning = resolve;
+            });
+          }
+
+          return new Promise<Response>(() => undefined);
+        }
+
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([]),
+        } as Response);
+      });
+
+      renderPage();
+
+      await screen.findByTitle('Fragment 1');
+      await user.click(screen.getByTitle('Fragment 1'));
+      await user.click(await screen.findByText('2.46'));
+
+      act(() => {
+        resolveFirstWarning?.({
+          ok: true,
+          json: () => Promise.resolve({
+            type: 'atom_count_DBE',
+            warning: true,
+            info: 'Too many atoms',
+          }),
+        } as Response);
+      });
+
+      expect(await screen.findByRole('img', { name: 'Atom count warning' })).toBeInTheDocument();
+
+      await user.click(await screen.findByTestId('exercise-menu-button'));
+      await user.click(await screen.findByRole('button', { name: /Exercise 2/ }));
+
+      expect(screen.queryByRole('img', { name: 'Atom count warning' })).not.toBeInTheDocument();
+    });
+
     it('sends the saved student DBE value to the warning backend', async () => {
     const user = userEvent.setup();
 

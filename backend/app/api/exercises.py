@@ -30,9 +30,60 @@ _SVG_SCRIPT_RE = re.compile(r"<script[\s\S]*?</script\s*>", re.IGNORECASE)
 _SVG_EVENT_ATTR_RE = re.compile(
     r"""\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)""", re.IGNORECASE
 )
+_ADDITIONAL_SPECTRUM_PRIORITY_BY_NAME = {
+    "ir": 1,
+    "h-presat": 2,
+    "h-31p-dec": 3,
+    "h-19f-dec": 3,
+    "h-psyche": 4,
+    "h-noe-diff": 4,
+    "c-bbdec": 5,
+    "c-dept-135": 5,
+    "c-dept-90": 5,
+    "c-dept-45": 5,
+    "c-gated": 5,
+    "cosy": 6,
+    "hsqc": 6,
+    "hmqc": 6,
+    "mehsqc": 6,
+    "19f": 7,
+    "19f-1h-dec": 8,
+    "31p": 9,
+    "31p-1h-dec": 10,
+    "10B": 11,
+    "11B": 11,
+    "14N": 11,
+    "29Si": 11,
+    "hmbc": 12,
+    "h2bc": 13,
+    "noesy": 14,
+    "roesy": 14,
+    "hoesy": 15,
+    "tocsy": 16,
+    "hsqc-tocsy": 17,
+    "hsqc-hecade": 18,
+    "hmbc-gated": 19,
+    "inadequate": 20,
+    "inad-sym": 21,
+}
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/exercises", tags=["exercises"])
+
+
+def _priority_for_additional_spectrum_filename(filename: str) -> int:
+    stem = Path(filename).stem
+    if not stem:
+        return 0
+
+    parts = stem.split("_")
+    if len(parts) > 1:
+        token = "_".join(parts[1:]).strip()
+    else:
+        token = stem.strip()
+
+    normalized_token = token.lower().replace(" ", "")
+    return _ADDITIONAL_SPECTRUM_PRIORITY_BY_NAME.get(normalized_token, 0)
 
 
 class AxisScale(BaseModel):
@@ -105,7 +156,6 @@ class ExerciseCreate(BaseModel):
     c13_axis_scale: AxisScale
     c13_nmr_text: str = Field(min_length=1)
     c13_apt: bool | None = Field(default=None)
-
     molecular_formula: str | None = Field(default=None, max_length=100)
     solution_inchi: str | None = Field(default=None)
     solution_cas_number: str | None = Field(default=None, max_length=100)
@@ -167,6 +217,7 @@ class AdditionalSpectrumOut(BaseModel):
     id: int
     file_path: str
     label: str | None
+    priority: int
 
     model_config = {"from_attributes": True}
 
@@ -247,7 +298,7 @@ def _upload_file_path_to_url(file_path: str) -> str:
 def _abs_path_to_url(path: str) -> str:
     """Convert an absolute upload path to a routable URL path served by the static mount."""
     # Already a public URL
-    if path.startswith("/uploads/") or path.startswith("/examples/"):
+    if path.startswith("/uploads/") or path.startswith("/examples/") or path.startswith("/references/"):
         return path
 
     uploads_dir = Path(settings.sqlite_path).resolve().parent / "uploads"
@@ -483,6 +534,7 @@ def _to_response(row: Exercise) -> ExerciseOut:
                 id=s.id,
                 file_path=s.file_path,
                 label=s.label,
+                priority=s.priority,
             )
             for s in row.additional_spectra
         ],
@@ -773,6 +825,9 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
                         exercise_id=exercise.id,
                         file_path=_upload_file_path_to_url(file_path),
                         label=spectrum.label,
+                        priority=_priority_for_additional_spectrum_filename(
+                            spectrum.filename
+                        ),
                     )
                 )
 
