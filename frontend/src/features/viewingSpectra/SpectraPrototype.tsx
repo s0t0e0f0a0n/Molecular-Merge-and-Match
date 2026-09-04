@@ -424,7 +424,7 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9999,
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40
         }}>
-          <div style={{ width: '95%', height: '100%', background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
+          <div style={{ width: '95%', background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
             {renderContent(true)}
           </div>
         </div>,

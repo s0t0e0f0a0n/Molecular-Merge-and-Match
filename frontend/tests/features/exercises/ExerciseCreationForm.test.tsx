@@ -12,6 +12,16 @@ function mockOkResponse(data: MockResponseData): Response {
   } as Response;
 }
 
+async function hashTextToHex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(text),
+  );
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 const mockFetch = vi.fn();
 
 vi.stubGlobal("fetch", mockFetch);
@@ -35,6 +45,7 @@ describe("ExerciseCreationForm", () => {
 
   it("submits successfully without uploaded SVG files by using placeholders", async () => {
     const user = userEvent.setup();
+    const casInput = "7a05a4f3dc259426ffd8be334301a471197bb1f72b72e81dac2aa0cd62adec71";
 
     render(<ExerciseCreationForm />);
 
@@ -47,8 +58,8 @@ describe("ExerciseCreationForm", () => {
       "13C-NMR (CDCl3, 75 MHz): 24.3;",
     );
     await user.type(
-      screen.getByPlaceholderText(/SHA-256 hash \(hex\) of normalized CAS number/i),
-      "7a05a4f3dc259426ffd8be334301a471197bb1f72b72e81dac2aa0cd62adec71",
+      screen.getAllByPlaceholderText(/Any text will be hashed with SHA-256 before submit/i)[1],
+      casInput,
     );
 
     await user.click(screen.getByRole("button", { name: /Create exercise/i }));
@@ -77,9 +88,7 @@ describe("ExerciseCreationForm", () => {
 
     expect(body.h1_axis_scale).toEqual({ begin: 10.1, end: -0.1 });
     expect(body.c13_axis_scale).toEqual({ begin: 213.0, end: -2.0 });
-    expect(body.solution_cas_number).toBe(
-      "7a05a4f3dc259426ffd8be334301a471197bb1f72b72e81dac2aa0cd62adec71",
-    );
+    expect(body.solution_cas_number).toBe(await hashTextToHex(casInput));
 
     expect(
       await screen.findByText(/Exercise 101 created\./i),

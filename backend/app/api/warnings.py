@@ -74,7 +74,7 @@ def parse_formula(formula: str) -> dict[str, int]:
     formula = formula.strip().replace(" ", "")
     # replace the deuterium isotope notation, with "D"still gives frontend error symbol.
     # replace with "H" avoids this
-    formula = formula.replace("[2]H", "H") 
+    formula = formula.replace("[2]H", "H")
     # Remove charge at the end, like +, -, 2+, 3-
     formula = re.sub(r'(\d*[+-])$', '', formula)
 

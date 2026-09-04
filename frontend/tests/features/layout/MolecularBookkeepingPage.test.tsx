@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MolecularBookkeepingPage } from '../../../src/features/layout/MolecularBookkeepingPage';
 import { ExerciseDataProvider } from '../../../src/context/ExerciseDataContext'
@@ -8,6 +8,11 @@ import { WarningProvider } from '../../../src/context/WarningContext';
 import {
   fetchExerciseSummaries,
   fetchExerciseDetail,
+  fetchExerciseStatistics,
+  pauseExerciseTimer,
+  resumeExerciseTimer,
+  stopExerciseTimer,
+  type ExerciseStatistics,
 } from '../../../src/api/exercises';
 import { mockSummaries, mockExercise1, mockExercise2 } from './MockExercises';
 
@@ -20,6 +25,83 @@ let rdkitMock: {
     delete: () => void;
   };
 } | null = null;
+
+const statisticsStore = new Map<number, ExerciseStatistics>();
+
+function toIso(timestampMs: number): string {
+  return new Date(timestampMs).toISOString();
+}
+
+function buildStatistics(
+  exerciseId: number,
+  overrides: Partial<ExerciseStatistics> = {},
+): ExerciseStatistics {
+  return {
+    exercise_id: String(exerciseId),
+    incorrect_count: 0,
+    start_counting: null,
+    stop_counting: null,
+    timer_total: 0,
+    started_at: toIso(Date.now()),
+    completed_at: null,
+    ...overrides,
+  };
+}
+
+function cloneStatistics(statistics: ExerciseStatistics): ExerciseStatistics {
+  return { ...statistics };
+}
+
+function ensureMockStatisticsForExercise(exerciseId: number, completed: boolean) {
+  const now = Date.now();
+  const existing = statisticsStore.get(exerciseId);
+
+  if (completed) {
+    const completedAt = existing?.completed_at ?? toIso(now);
+    statisticsStore.set(
+      exerciseId,
+      buildStatistics(exerciseId, {
+        timer_total: existing?.timer_total ?? 125,
+        started_at: existing?.started_at ?? completedAt,
+        start_counting: existing?.start_counting ?? null,
+        stop_counting: existing?.stop_counting ?? completedAt,
+        completed_at: completedAt,
+      }),
+    );
+    return;
+  }
+
+  statisticsStore.set(
+    exerciseId,
+    buildStatistics(exerciseId, {
+      timer_total: existing?.timer_total ?? 0,
+      started_at: existing?.started_at ?? toIso(now),
+      start_counting: toIso(now + 5_000),
+      stop_counting: null,
+      completed_at: null,
+    }),
+  );
+}
+
+function finalizeMockTimerSegment(
+  statistics: ExerciseStatistics,
+  stoppedAtMs: number,
+  countShortElapsed: boolean,
+): ExerciseStatistics {
+  if (!statistics.start_counting || statistics.stop_counting) {
+    return cloneStatistics(statistics);
+  }
+
+  const elapsedSeconds = (stoppedAtMs - Date.parse(statistics.start_counting)) / 1000;
+  return {
+    ...statistics,
+    stop_counting: toIso(stoppedAtMs),
+    timer_total:
+      statistics.timer_total + (
+        countShortElapsed || elapsedSeconds >= 20 ? Math.max(0, Math.trunc(elapsedSeconds)) : 0
+      ),
+  };
+}
 
   const renderPage = () =>
   render(
@@ -39,17 +121,61 @@ let rdkitMock: {
     ...actual,
     fetchExerciseSummaries: vi.fn(),
     fetchExerciseDetail: vi.fn(),
+    fetchExerciseStatistics: vi.fn(),
+    pauseExerciseTimer: vi.fn(),
+    resumeExerciseTimer: vi.fn(),
+    stopExerciseTimer: vi.fn(),
   };
 });
 
 
 // Mock fetch for API hooks (relative URLs fail in jsdom)
-const mockFetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>((url) => {
+const mockFetchImpl = (url: string, init?: RequestInit): Promise<Response> => {
+  if (url.includes('/statistics/')) {
+    const parsedUrl = new URL(url, 'http://localhost');
+    const exerciseId = Number(parsedUrl.searchParams.get('exercise_id'));
+    const existing = statisticsStore.get(exerciseId);
+
+    if (init?.method === 'POST') {
+      if (!existing) {
+        return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({ detail: 'Statistics not found.' }) } as Response);
+      }
+
+      let next = cloneStatistics(existing);
+      const now = Date.now();
+
+      if (parsedUrl.pathname.endsWith('/pause')) {
+        next = finalizeMockTimerSegment(existing, now, true);
+      } else if (parsedUrl.pathname.endsWith('/resume')) {
+        if (existing.completed_at === null) {
+          next = {
+            ...existing,
+            start_counting: toIso(now),
+            stop_counting: null,
+          };
+        }
+      } else if (parsedUrl.pathname.endsWith('/stop')) {
+        next = finalizeMockTimerSegment(existing, now, existing.completed_at !== null);
+      }
+
+      statisticsStore.set(exerciseId, next);
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(cloneStatistics(next)) } as Response);
+    }
+
+    if (!existing) {
+      return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({ detail: 'Statistics not found.' }) } as Response);
+    }
+
+    return Promise.resolve({ ok: true, json: () => Promise.resolve(cloneStatistics(existing)) } as Response);
+  }
+
   if (url.includes('/dbe')) {
     return Promise.resolve({ ok: true, json: () => Promise.resolve({ dbe: null }) } as Response);
   }
   return Promise.resolve({ ok: true, json: () => Promise.resolve([]) } as Response);
-});
+};
+
+const mockFetch = vi.fn(mockFetchImpl);
 vi.stubGlobal('fetch', mockFetch);
 
 // Avoid SpectrumViewer fetching SVGs in Node (invalid URL). The mock reads
@@ -91,6 +217,7 @@ describe('MolecularBookkeepingPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch.mockClear();
+    statisticsStore.clear();
     sessionStorage.clear();
     window.history.replaceState(null, '', '/');
     rdkitMock = null;
@@ -98,10 +225,68 @@ describe('MolecularBookkeepingPage', () => {
     vi.mocked(fetchExerciseSummaries).mockResolvedValue(mockSummaries);
 
     vi.mocked(fetchExerciseDetail).mockImplementation(async (exerciseId: number) => {
-      if (exerciseId === 1) return mockExercise1;
-      if (exerciseId === 2) return mockExercise2;
+      if (exerciseId === 1) {
+        ensureMockStatisticsForExercise(1, true);
+        return mockExercise1;
+      }
+      if (exerciseId === 2) {
+        ensureMockStatisticsForExercise(2, false);
+        return mockExercise2;
+      }
       throw new Error(`Unknown mock exercise id: ${exerciseId}`);
     });
+
+    vi.mocked(fetchExerciseStatistics).mockImplementation(async (exerciseId: number) => {
+      const statistics = statisticsStore.get(exerciseId);
+      if (!statistics) {
+        throw new Error('Statistics not found.');
+      }
+      return cloneStatistics(statistics);
+    });
+
+    vi.mocked(pauseExerciseTimer).mockImplementation(async (exerciseId: number) => {
+      const statistics = statisticsStore.get(exerciseId);
+      if (!statistics) {
+        throw new Error('Statistics not found.');
+      }
+      const next = finalizeMockTimerSegment(statistics, Date.now(), true);
+      statisticsStore.set(exerciseId, next);
+      return cloneStatistics(next);
+    });
+
+    vi.mocked(resumeExerciseTimer).mockImplementation(async (exerciseId: number) => {
+      const statistics = statisticsStore.get(exerciseId);
+      if (!statistics) {
+        throw new Error('Statistics not found.');
+      }
+      const next = statistics.completed_at === null
+        ? {
+            ...statistics,
+            start_counting: toIso(Date.now()),
+            stop_counting: null,
+          }
+        : cloneStatistics(statistics);
+      statisticsStore.set(exerciseId, next);
+      return cloneStatistics(next);
+    });
+
+    vi.mocked(stopExerciseTimer).mockImplementation(async (exerciseId: number) => {
+      const statistics = statisticsStore.get(exerciseId);
+      if (!statistics) {
+        throw new Error('Statistics not found.');
+      }
+      const next = finalizeMockTimerSegment(
+        statistics,
+        Date.now(),
+        statistics.completed_at !== null,
+      );
+      statisticsStore.set(exerciseId, next);
+      return cloneStatistics(next);
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   afterAll(() => {
@@ -118,7 +303,7 @@ async function selectExerciseViaMenu(user: ReturnType<typeof userEvent.setup>, e
 it('renders the top bar with title, current exercise display, and editor button', async () => {
   renderPage();
 
-  expect(await screen.findByAltText('Molecular Bookkeeping')).toBeInTheDocument();
+  expect(await screen.findByAltText('Molecular Merge and Match')).toBeInTheDocument();
   expect(await screen.findByRole('button', { name: /Open molecule editor/ })).toBeInTheDocument();
   expect(await screen.findByTestId('exercise-menu-button')).toBeInTheDocument();
 });
@@ -181,6 +366,14 @@ it('loads exercise summaries and selects the first exercise by default', async (
   });
 });
 
+it('shows the stored total time for a completed exercise', async () => {
+  renderPage();
+
+  await waitFor(() => {
+    expect(screen.getByTestId('exercise-timer-display')).toHaveTextContent('2:05');
+  });
+});
+
 it('renders peaks from the first selected exercise', async () => {
   renderPage();
 
@@ -205,6 +398,95 @@ it('shows the second exercise data after selecting it', async () => {
   expect(await screen.findByText('1.20')).toBeInTheDocument();
 });
 
+it('starts the timer after the backend 5 second open delay for incomplete exercises', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-07-25T12:00:00.000Z'));
+
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  await act(async () => {
+    renderPage();
+    await Promise.resolve();
+  });
+
+  fireEvent.click(screen.getByTestId('exercise-menu-button'));
+  fireEvent.click(screen.getByRole('button', { name: /Exercise 2/ }));
+
+  await act(async () => {
+    await Promise.resolve();
+  });
+
+  expect(screen.getByTestId('exercise-timer-display')).toHaveTextContent('0:00');
+
+  act(() => {
+    vi.advanceTimersByTime(5_000);
+  });
+  expect(screen.getByTestId('exercise-timer-display')).toHaveTextContent('0:00');
+
+  act(() => {
+    vi.advanceTimersByTime(1_000);
+  });
+  expect(screen.getByTestId('exercise-timer-display')).toHaveTextContent('0:01');
+});
+
+it('resumes the visible timer immediately after pause', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-07-25T12:00:00.000Z'));
+
+  await act(async () => {
+    renderPage();
+    await Promise.resolve();
+  });
+
+  fireEvent.click(screen.getByTestId('exercise-menu-button'));
+  fireEvent.click(screen.getByRole('button', { name: /Exercise 2/ }));
+
+  await act(async () => {
+    await Promise.resolve();
+  });
+
+  act(() => {
+    vi.advanceTimersByTime(26_000);
+  });
+  expect(screen.getByTestId('exercise-timer-display')).toHaveTextContent('0:21');
+
+  fireEvent.click(screen.getByTestId('pause-exercise-button'));
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(screen.getByTestId('exercise-timer-display')).toHaveTextContent('0:21');
+
+  act(() => {
+    vi.advanceTimersByTime(5_000);
+  });
+  expect(screen.getByTestId('exercise-timer-display')).toHaveTextContent('0:21');
+
+  fireEvent.click(screen.getByTestId('paused-exercise-overlay'));
+  await act(async () => {
+    await Promise.resolve();
+  });
+
+  act(() => {
+    vi.advanceTimersByTime(1_000);
+  });
+  expect(screen.getByTestId('exercise-timer-display')).toHaveTextContent('0:22');
+});
+
+it('shows a completion checkmark in the exercise menu for completed exercises', async () => {
+  const user = userEvent.setup();
+  renderPage();
+
+  const exerciseMenuButton = await screen.findByTestId('exercise-menu-button');
+  await user.click(exerciseMenuButton);
+  const matchingExerciseButtons = await screen.findAllByRole('button', { name: /^Exercise 1\b/ });
+  const completedExerciseButton = matchingExerciseButtons.find((button) => button !== exerciseMenuButton);
+
+  expect(completedExerciseButton).toBeDefined();
+  if (!completedExerciseButton) {
+    throw new Error('Expected a separate completed exercise entry for Exercise 1');
+  }
+  expect(within(completedExerciseButton).getByText('✓')).toBeInTheDocument();
+});
+
 it('switches exercise via the Exercises menu', async () => {
   const user = userEvent.setup();
   renderPage();
@@ -226,9 +508,12 @@ it('shows mocked exercises in the selector', async () => {
   const user = userEvent.setup();
   renderPage();
 
-  await user.click(await screen.findByTestId('exercise-menu-button'));
+  const exerciseMenuButton = await screen.findByTestId('exercise-menu-button');
+  await user.click(exerciseMenuButton);
 
-  expect(await screen.findByRole('button', { name: /^Exercise 1$/ })).toBeInTheDocument();
+  const matchingExerciseButtons = await screen.findAllByRole('button', { name: /^Exercise 1\b/ });
+
+  expect(matchingExerciseButtons.some((button) => button !== exerciseMenuButton)).toBe(true);
   expect(await screen.findByRole('button', { name: /^Exercise 2$/ })).toBeInTheDocument();
 });
 
@@ -334,6 +619,90 @@ it('validates solution answer and sends a solution hash', async () => {
   });
 
   expect(await screen.findByText('Your answer is correct.')).toBeInTheDocument();
+});
+
+it('stops the visible timer immediately when solution validation succeeds', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-07-25T12:00:00.000Z'));
+
+  const fakeSolution = { smiles: 'C', mol_file: 'fake-mol' };
+
+  if (!globalThis.crypto?.subtle) {
+    vi.stubGlobal('crypto', {
+      subtle: {
+        digest: async () => new Uint8Array(32).buffer,
+      },
+    });
+  }
+
+  rdkitMock = {
+    get_mol: () => ({
+      is_valid: () => true,
+      get_svg: () => '<svg viewBox="0 0 10 10"></svg>',
+      get_svg_with_highlights: () => '<svg viewBox="0 0 10 10"></svg>',
+      get_inchi: () => 'InChI=1S/CH4/h1H4',
+      delete: () => {},
+    }),
+  };
+
+  mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+    if (url.includes('/dbe')) {
+      return Promise.resolve({
+        ok: true, json: () => Promise.resolve({ dbe: null }),
+      } as Response);
+    }
+    if (url.includes('/working-solution/')) {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(fakeSolution),
+      } as Response);
+    }
+    if (url.includes('/validate-solution') && init?.method === 'POST') {
+      const existing = statisticsStore.get(2);
+      if (existing) {
+        const finalized = finalizeMockTimerSegment(existing, Date.now(), true);
+        statisticsStore.set(2, {
+          ...finalized,
+          completed_at: finalized.stop_counting,
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ is_correct: true }),
+      } as Response);
+    }
+    return Promise.resolve({ ok: true, json: () => Promise.resolve([]) } as Response);
+  });
+
+  await act(async () => {
+    renderPage();
+    await Promise.resolve();
+  });
+
+  fireEvent.click(screen.getByTestId('exercise-menu-button'));
+  fireEvent.click(screen.getByRole('button', { name: /Exercise 2/ }));
+
+  await act(async () => {
+    await Promise.resolve();
+  });
+
+  act(() => {
+    vi.advanceTimersByTime(26_000);
+  });
+  expect(screen.getByTestId('exercise-timer-display')).toHaveTextContent('0:21');
+
+  fireEvent.click(screen.getByRole('button', { name: /Validate answer/i }));
+  await act(async () => {
+    await Promise.resolve();
+  });
+
+  expect(screen.getByTestId('exercise-timer-display')).toHaveTextContent('0:21');
+
+  act(() => {
+    vi.advanceTimersByTime(5_000);
+  });
+  expect(screen.getByTestId('exercise-timer-display')).toHaveTextContent('0:21');
+  expect(screen.getByText('Your answer is correct.')).toBeInTheDocument();
 });
 
 it('shows incorrect solution feedback when validation fails', async () => {
@@ -555,7 +924,7 @@ it('shows incorrect solution feedback when validation fails', async () => {
       expect(await screen.findByText(/No actions yet/)).toBeInTheDocument();
 
       // Click on the title of the page (so outside the panel).
-      await user.click(screen.getByAltText('Molecular Bookkeeping'));
+      await user.click(screen.getByAltText('Molecular Merge and Match'));
 
       await waitFor(() => {
         expect(screen.queryByText(/No actions yet/)).not.toBeInTheDocument();

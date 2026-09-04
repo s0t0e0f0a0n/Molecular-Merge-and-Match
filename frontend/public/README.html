@@ -1,0 +1,749 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome file</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><h1 id="molecular-merge-and-match-molecular-bookkeeping-for-structural-analysis">Molecular Merge and Match: Molecular Bookkeeping for Structural Analysis</h1>
+<p>An interactive NMR-based structure elucidation tool for university-level organic chemistry students. Students select molecular fragments, match them to peaks in 1H-NMR and 13C-NMR spectra, combine fragments into a complete molecule, and validate their answer against a teacher-defined solution.</p>
+<p>Built for the Software Engineering course at Leiden University (2026).</p>
+<h2 id="tech-stack">Tech Stack</h2>
+
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Technology</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Frontend</td>
+<td>React 18, TypeScript, Vite</td>
+</tr>
+<tr>
+<td>Backend</td>
+<td>Python 3.12, FastAPI, SQLAlchemy</td>
+</tr>
+<tr>
+<td>Database</td>
+<td>SQLite (local, file-based)</td>
+</tr>
+<tr>
+<td>Chemistry</td>
+<td>Ketcher (molecule drawing), RDKit (analysis &amp; rendering)</td>
+</tr>
+<tr>
+<td>Testing</td>
+<td>Vitest + React Testing Library (frontend), Pytest (backend)</td>
+</tr>
+<tr>
+<td>Linting</td>
+<td>ESLint v9 + TypeScript-ESLint (frontend), Ruff (backend)</td>
+</tr>
+<tr>
+<td>Deployment</td>
+<td>Docker + nginx (full-stack), GitHub Pages (frontend preview)</td>
+</tr>
+<tr>
+<td>CI/CD</td>
+<td>GitHub Actions</td>
+</tr>
+<tr>
+<td>Packaging</td>
+<td>Electron-builder</td>
+</tr>
+</tbody>
+</table><h2 id="project-structure">Project Structure</h2>
+<pre><code>2026-18-Molecular_Bookkeeping_for_structural_analysis/
+├── .github/
+│   └── workflows/
+│       ├── cd-backend.yml           # CD: build &amp; publish backend Docker image (triggers on backend/** changes)
+│       ├── cd-electron.yml          # CD: build &amp; publish app installers (triggers on version tags or manually in github actions)
+│       ├── cd-frontend.yml          # CD: build &amp; publish frontend Docker image (triggers on frontend/** changes)
+│       ├── ci.yml                   # CI: lint + typecheck + tests on every PR and relevant push to main
+│       └── deploy-frontend-gh-pages.yml  # Deploy static frontend to GitHub Pages
+│
+├── backend/
+│   ├── app/
+│   │   ├── main.py                  # FastAPI application factory, CORS setup, startup events
+│   │   ├── api/
+│   │   │   ├── exercises.py         # GET /api/v1/exercises/ and POST /api/v1/exercises
+│   │   │   ├── fragments.py         # CRUD API for working fragments per exercise
+│   │   │   ├── health.py            # GET /api/v1/health
+│   │   │   ├── info.py              # GET /api/v1/info
+│   │   │   ├── logbook.py           # GET/PUT/DELETE for logbook state
+│   │   │   ├── predefined_fragments.py # CRUD API for predefined fragment library
+│   │   │   ├── reset.py             # POST to delete fragments, working solution, logbook with current exercise id.
+│   │   │   ├── router.py            # Aggregates all v1 routers under /api/v1
+│   │   │   ├── settings.py          # GET/PUT for changing user settings (the link inheritance behaviour)
+│   │   │   ├── warnings.py			 # GET /api/v1/warnings
+│   │   │   └── working_solution.py  # GET/PUT/DELETE for the working solution per exercise
+│   │   ├── core/
+│   │   │   └── config.py            # Pydantic-based settings from environment variables
+│   │   └── db/
+│   │       ├── base.py              # SQLAlchemy DeclarativeBase
+│   │       ├── models.py            # ORM models (Fragment, WorkingSolution, PredefinedFragment, Exercise)
+│   │       └── session.py           # Engine, session factory, init_db()
+│   ├── data/
+│   │   ├── examples/				 # Example spectra (SVG)
+│   │   ├── uploads/
+│   │   │   └── exercises/
+│   │   │       ├── additional/      # Additional spectra (IR, MS, …)
+│   │   │       ├── c13/             # 13C-NMR SVGs
+│   │   │       └── h1/              # 1H-NMR SVGs
+│   │   ├── app.db                   # SQLite database (created at runtime)
+│   │   ├── examples_seed.json       # Seed containing example exercises which are imported when the database is created.
+│   │   └── predefined_fragments_seed.json # Seed data for predefined fragment library
+│   ├── tests/
+│   │   ├── conftest.py              # TestClient fixture
+│   │   ├── test_exercises_api.py    # Exercises endpoint tests
+│   │   ├── test_fragments_api.py    # Tests regarding to fragments, logbook and EP/BVA tests
+│   │   ├── test_health.py           # Health endpoint tests
+│   │   ├── test_logbook_api.py      # Logbook testing
+│   │   ├── test_predefined_fragments_api.py # Predefined fragment tests
+│   │   ├── test_reset_api.py        # test resetting a single exercise
+│   │   ├── test_seeded_cas_answers.py # test to confirm that validation through cas hash works
+│   │   └── test_warnings.py         # Tests on how SMILES are converted to atom count and DBE
+│   ├── Dockerfile                   # Container image for the backend
+│   ├── main_electron.py             # Build entry point for Python sidecar executable
+│   ├── pyproject.toml               # Ruff linter configuration
+│   ├── README.md                    # Backend readme
+│   ├── requirements.txt             # Python runtime dependencies
+│   └── requirements-dev.txt         # Dev/test dependencies (pytest, ruff)
+│
+├── build-assets/
+│   ├── icon.icns
+│   └── icon.png					 # Icon for Electron app (min. 256x256px, .png or .ico)
+│
+├── docs/
+│   └── architecture-decisions.md	 # Technical decision records
+│   └── installation-guide.md        # How to install the application on Windows, MACOS and Linux
+│   └── packaging.md                 # Walkthrough guide for building the app with Electron-builder
+│
+├── frontend/
+│   ├── src/
+│   │   ├── App.tsx                  # Root component
+│   │   ├── index.css                # General style file
+│   │   ├── main.tsx                 # React entry point
+│   │   ├── vite-env.d.ts            # TypeScript declarations for Vite-specific features
+│   │   ├── api/
+│   │   │   ├── exercises.ts         # Centralized fetch helper for /api/v1/exercises (CRUD + validation + reset)
+│   │   │   ├── logbook.ts           # Handles fetching, saving, and deleting logbook data through the API
+│   │   │   └── settings.ts          # Centrelized GET/PUT helper for /api/v1
+│   │   ├── components/
+│   │   │   ├── ApiStatus.tsx        # Backend connectivity indicator
+│   │   │   ├── Container.tsx        # Content container
+│   │   │   ├── ExpandedMoleculeView.tsx # Popup window to enlarge the molecule during merging
+│   │   │   ├── FragmentList.tsx     # Shared fragment list with atom merge overlays
+│   │   │   ├── fragmentTypes.ts     # Shared fragment type definitions
+│   │   │   ├── FullscreenButton.tsx # Button to toggle fullscreen
+│   │   │   ├── Header.tsx           # Top navigation bar
+│   │   │   ├── KetcherEditor.tsx    # Ketcher drawing editor integration
+│   │   │   ├── Layout.tsx           # Page layout wrapper (header + content)
+│   │   │   ├── RDKitViewer.tsx      # RDKit molecule viewer with descriptor computation
+│   │   │   └── StereoChoiceDialog.tsx # Cis/trans configuration dialog after merge
+│   │   ├── context/
+│   │   │   ├── ExerciseDataContext.tsx	# React context provider for data of the selected exercise
+│   │   │   ├── HistoryContext.tsx  	# React context provider for the logbook
+│   │   │   ├── RDKitContext.tsx        # React context provider for RDKit WASM instance
+│   │   │   └── WarningContext.tsx      # React context provider for data of the warnings
+│   │   ├── features/
+│   │   │   ├── exercises/
+│   │   │   │   ├── ExerciseCreationForm.tsx       # Form for creating exercises
+│   │   │   │   ├── ExerciseImportUtils.ts		   # Parsing of the data, both from ZIP and manual input
+│   │   │   │   └── ExerciseZipImport.tsx          # ZIP-based bulk exercise import (CSV manifest + spectra)
+│   │   │   ├── history/
+│   │   │   │   └── LogbookPanel.tsx			   # Collapsible logbook panel
+│   │   │   ├── layout/
+│   │   │   │   ├── LoadingExerciseOverlay.tsx     # Loading screen, when loading an exercise
+│   │   │   │   └── MolecularBookkeepingPage.tsx   # Main dashboard layout, merge orchestration. 
+│   │   │   ├── linking/
+│   │   │   │   ├── LinkInheritOptionsPopup.tsx	   # Popup to change link inheritance settings
+│   │   │   │   ├── PeakTableColumn.tsx            # Peak list component
+│   │   │   │   └── WorkingFragmentsStrip.tsx      # Bottom fragment strip with merge/link controls
+│   │   │   ├── molecule/
+│   │   │   │   ├── MoleculeEditorPopup.tsx        # Draggable floating editor popup
+│   │   │   │   ├── MoleculeWorkspace.tsx          # Toggle between Ketcher editor and RDKit viewer
+│   │   │   │   └── PredefinedFragmentMenu.tsx     # Dropdown overlay for browsing/adding predefined fragments
+│   │   │   ├── solution/
+│   │   │   │   └── WorkingSolutionPanel.tsx       # Working solution display with merge atom overlays
+│   │   │   ├── viewingSpectra/
+│   │   │   │   ├── AdditionalSpectraPopup.tsx     # Modal popup with tabs for additional spectra (IR, MS, …)
+│   │   │   │   └── SpectraPrototype.tsx           # Interactive 1H/13C-NMR spectrum display
+│   │   │   └── warning/
+│   │   │       ├── atom_count.svg				   # warning icon to be displayed when there are to many atoms or DBE
+│   │   │       ├── double_assignment.svg		   # warning icon to be displayed when more than one fragment is linked to a peak
+│   │   │       └── WarningPanel.tsx			   # Warnings are shown is this box
+│   │   ├── hooks/
+│   │   │   ├── useFragments.ts      # CRUD hook for working fragments
+│   │   │   ├── useLinkedFragmentWarnings.ts # fragment and linking information is send to the backend here and warning information is send to the warning context
+│   │   │   ├── useLinking.ts        # Peak-to-fragment linking state machine
+│   │   │   ├── usePredefinedFragments.ts # Fetches predefined fragment library from backend
+│   │   │   └── useWorkingSolution.ts # Hook for working solution API
+│   │   ├── test/
+│   │   │   └── setup.ts             # Vitest setup (SVG mocks)
+│   │   ├── types/
+│   │   │   ├── molecule.ts          # MolGraph, MergeState, NewStereoBond type definitions
+│   │   │   └── peak.ts 			 # PeakDef type definition
+│   │   └── utils/
+│   │       ├── formatChemistryText.tsx # Formatting text above spectra, uses subscript for numbers and allows for italic using /it{} and numbers without subscript using /notsub{}
+│   │       ├── mergeFragments.ts    # Atom-to-atom merge algorithm for MolGraphs
+│   │       ├── molParser.ts         # V2000 MOL block parser/serializer
+│   │       ├── stereoDetection.ts   # Cis/trans stereo bond detection and toggling
+│   │       └── svgMergePointLocator.ts # Locates atom positions in RDKit SVGs
+│   ├── tests/
+│   │   ├── components/
+│   │   │   ├── KetcherEditor.smoke.test.tsx
+│   │   │   └── KetcherEditor.test.tsx
+│   │   ├── context/
+│   │   │   └── HistoryContext.test.tsx
+│   │   ├── features/
+│   │   │   ├── exercises/
+│   │   │   │   └── ExerciseCreationForm.test.tsx
+│   │   │   ├── layout/
+│   │   │   │   ├── LoadingExerciseOverlay.test.tsx
+│   │   │   │   ├── MockExercises.ts
+│   │   │   │   └── MolecularBookkeepingPage.test.tsx
+│   │   │   ├── molecule/
+│   │   │   │   ├── MoleculeEditorPopup.test.tsx
+│   │   │   │   └── MoleculeWorkspace.test.tsx
+│   │   │   ├── solution/
+│   │   │   │   └── WorkingSolutionPanel.test.tsx
+│   │   │   └── viewingSpectra/ 
+│   │   │       └── SpectrumTitle.test.tsx
+│   │   └── utils/
+│   │       ├── formatChemistryText.test.tsx
+│   │       ├── mergeFragments.test.ts
+│   │       ├── molParser.test.ts
+│   │       ├── stereoDetection.test.ts
+│   │       └── svgMergePointLocator.test.ts
+│   ├── Dockerfile                   # Multi-stage image: Node build → nginx serve
+│   ├── eslint.config.js             # ESLint v9 flat config (TypeScript + React rules)
+│   ├── index.html         	         # html which is used during the built
+│   ├── nginx.conf                   # nginx: SPA fallback + /api/ reverse-proxy to backend
+│   ├── package.json
+│   ├── package-lock.json			
+│   ├── README.md					 # Frontend README
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
+│   └── vite.config.ts               # Build config + dev proxy + Node polyfills for Ketcher
+│
+├── .gitignore
+├── docker-compose.yml               # One-command full-stack startup
+├── LICENSE           				 # MIT License
+├── main.js                          # Main entry point of Electron
+├── package.json                     # Specifies Electron build configuration
+├── preload.js                       # Preload script
+└── README.md
+</code></pre>
+<h2 id="getting-started">Getting Started</h2>
+<h3 id="option-1-—-docker-recommended-no-local-installs-needed">Option 1 — Docker (recommended, no local installs needed)</h3>
+<p>Requires <a href="https://www.docker.com/products/docker-desktop/">Docker Desktop</a>.</p>
+<pre class=" language-bash"><code class="prism  language-bash">docker compose up --build
+</code></pre>
+
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Frontend</td>
+<td><a href="http://localhost">http://localhost</a></td>
+</tr>
+<tr>
+<td>Backend</td>
+<td><a href="http://localhost:8000">http://localhost:8000</a></td>
+</tr>
+<tr>
+<td>API docs</td>
+<td><a href="http://localhost:8000/docs">http://localhost:8000/docs</a></td>
+</tr>
+</tbody>
+</table><p>The SQLite database is persisted in <code>backend/data/</code> via a volume mount, so data survives container restarts.</p>
+<hr>
+<h3 id="option-2-—-local-development">Option 2 — Local development</h3>
+<h4 id="prerequisites">Prerequisites</h4>
+<ul>
+<li>Python 3.12+</li>
+<li>Node.js 20+</li>
+</ul>
+<h4 id="backend">Backend</h4>
+<pre class=" language-bash"><code class="prism  language-bash"><span class="token function">cd</span> backend
+python -m venv venv
+
+<span class="token comment"># macOS / Linux</span>
+<span class="token function">source</span> venv/bin/activate
+<span class="token comment"># Windows</span>
+venv\Scripts\activate
+
+pip <span class="token function">install</span> -r requirements.txt
+uvicorn app.main:app --reload
+</code></pre>
+<p>The backend runs at <strong><a href="http://localhost:8000">http://localhost:8000</a></strong>. The SQLite database (<code>data/app.db</code>) is created automatically on first startup. Swagger docs: <a href="http://localhost:8000/docs">http://localhost:8000/docs</a>.</p>
+<h4 id="frontend">Frontend</h4>
+<pre class=" language-bash"><code class="prism  language-bash"><span class="token function">cd</span> frontend
+<span class="token function">npm</span> <span class="token function">install</span>
+<span class="token function">npm</span> run dev
+</code></pre>
+<p>The frontend runs at <strong><a href="http://localhost:5173">http://localhost:5173</a></strong>. The Vite dev server proxies all <code>/api/*</code> requests to the backend automatically.</p>
+<h4 id="verify-everything-works">Verify everything works</h4>
+<p>Open <a href="http://localhost:5173">http://localhost:5173</a> — the connectivity indicator in the header should show the backend as reachable.</p>
+<h2 id="running-tests--linters">Running Tests &amp; Linters</h2>
+<h3 id="frontend-1">Frontend</h3>
+<pre class=" language-bash"><code class="prism  language-bash"><span class="token function">cd</span> frontend
+<span class="token function">npm</span> run lint          <span class="token comment"># ESLint (TypeScript + React rules)</span>
+<span class="token function">npm</span> run typecheck     <span class="token comment"># TypeScript type check without building</span>
+<span class="token function">npm</span> run test:run      <span class="token comment"># Vitest — single headless run</span>
+<span class="token function">npm</span> run test:coverage <span class="token comment"># Vitest with coverage report (output: frontend/coverage/)</span>
+<span class="token function">npm</span> run <span class="token function">test</span>          <span class="token comment"># Vitest in watch mode (development)</span>
+</code></pre>
+<h3 id="backend-1">Backend</h3>
+<pre class=" language-bash"><code class="prism  language-bash"><span class="token function">cd</span> backend
+<span class="token function">source</span> venv/bin/activate   <span class="token comment"># activate venv first</span>
+
+ruff check <span class="token keyword">.</span>               <span class="token comment"># Ruff linter (import order, whitespace, unused imports)</span>
+python -m pytest           <span class="token comment"># Pytest (runs from backend/ so app imports resolve correctly)</span>
+</code></pre>
+<h2 id="key-features-current-state">Key Features (Current State)</h2>
+
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Status</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ketcher molecule editor</td>
+<td>Implemented</td>
+<td>Draw molecular structures, export SMILES and MOL block; invalid structures (valence violations) are blocked from export; existing fragments can be re-opened for editing from the Working Fragments strip — peak links are preserved; chunk is prefetched at page load so the editor is ready instantly on first open (prevents edits being lost during the initial load delay)</td>
+</tr>
+<tr>
+<td>RDKit molecule viewer</td>
+<td>Implemented</td>
+<td>Visualize molecules, compute descriptors (MW, LogP, InChI, HBA/HBD, ring count)</td>
+</tr>
+<tr>
+<td>Spectrum display</td>
+<td>Implemented</td>
+<td>Interactive SVG-based 1H-NMR and 13C-NMR viewers with hover, click, zoom, scroll, and fullscreen popup</td>
+</tr>
+<tr>
+<td>Peak-to-fragment linking</td>
+<td>Implemented</td>
+<td>Visualization using badges and hover highlight</td>
+</tr>
+<tr>
+<td>Exercise menu</td>
+<td>Implemented</td>
+<td>Exercises are orderd in sollapsible sets in the menu and filters can be used to select exercises of a specific type</td>
+</tr>
+<tr>
+<td>Health/info API</td>
+<td>Implemented</td>
+<td>Backend health check and server information endpoints</td>
+</tr>
+<tr>
+<td>Predefined fragment library</td>
+<td>Implemented</td>
+<td>Backend API with seed data, frontend dropdown with search and RDKit thumbnails</td>
+</tr>
+<tr>
+<td>Fragment merging (to solution)</td>
+<td>Implemented</td>
+<td>Atom-to-atom merge of a fragment into the working solution</td>
+</tr>
+<tr>
+<td>Fragment merging (to fragment)</td>
+<td>Implemented</td>
+<td>Atom-to-atom merge of two fragments, result appears as a new fragment</td>
+</tr>
+<tr>
+<td>Double bond configuration choice</td>
+<td>Implemented</td>
+<td>After merge, detects new stereogenic double bonds via a graph-level CIP-priority comparison (sphere-by-sphere expansion with multi-bond phantom atoms and ring-closure handling) and prompts the user to choose between the two possible geometric configurations (Option 1 / Option 2). Handles conjugated dienes by reusing shared slashes between adjacent stereo bonds.</td>
+</tr>
+<tr>
+<td>Send to fragments (unsolution)</td>
+<td>Implemented</td>
+<td>Send the working solution back to the fragment list, with option to keep or clear the solution</td>
+</tr>
+<tr>
+<td>Exercise/bundle/spectra API</td>
+<td>Implemented</td>
+<td>Create exercises, parse ACS NMR text, persist spectra files, store peaks</td>
+</tr>
+<tr>
+<td>Exercise creation (teacher)</td>
+<td>Implemented</td>
+<td>Frontend form supports single and bulk CSV exercise creation; bulk import maps <code>{N}_&lt;label&gt;.svg</code> files to additional spectra automatically</td>
+</tr>
+<tr>
+<td>ZIP exercise import</td>
+<td>Implemented</td>
+<td>Bulk import via <code>.zip</code> containing a CSV manifest plus spectra folders; export is not implemented</td>
+</tr>
+<tr>
+<td>Additional spectra popup</td>
+<td>Implemented</td>
+<td>“Additional Spectra” button opens a modal with one tab per spectrum (IR, MS, …); supports Fit and Scroll (150% default zoom) view modes</td>
+</tr>
+<tr>
+<td>Atom count and DBE warning (fragments)</td>
+<td>Implemented</td>
+<td>From all linked fragments the SMILES are send to the backend when an extra fragment is linked or a fragment is no longer linked, where the atoms are counted and compared the the atoms in the molecule formula, H’s are ignored. The DBE is calculated and compared with the student entered DBE. If there are too many H’s of DBEs then the warning appears</td>
+</tr>
+<tr>
+<td>Atom count and DBE warning (solution)</td>
+<td>Implemented</td>
+<td>The SMILES is send to the backend on every change, where the atoms are counted and compared the the atoms in the molecule formula, H’s are not ignored. The DBE is calculated and compared with the student entered DBE. If there are too many H’s of DBEs then the warning appears</td>
+</tr>
+<tr>
+<td>Double peak assignment waring</td>
+<td>Implemented</td>
+<td>If a peak is linked more than once, the warning appears</td>
+</tr>
+<tr>
+<td>CAS answer validation</td>
+<td>Implemented</td>
+<td>Students can enter a CAS number; spaces are removed and the answer is validated via SHA-256 hash comparison</td>
+</tr>
+<tr>
+<td>Structure answer validation</td>
+<td>Implemented</td>
+<td>SMILES are converted to InChI and this is hashed using SHA256 for an exact comparison with the correct answer hash in the database</td>
+</tr>
+<tr>
+<td>Undo/redo logbook</td>
+<td>Implemented</td>
+<td>Per-exercise action history with editable entries, persisted to the backend (<code>/api/v1/logbook</code>) and restored on exercise load</td>
+</tr>
+<tr>
+<td>Desktop packaging</td>
+<td>Implemented</td>
+<td>Packaged using electron-builder manually (<code>packaging.md</code>), or with the GitHub Actions workflow (<code>cd-electron.yml</code>), to create installers for Windows, MacOS &amp; Linux</td>
+</tr>
+</tbody>
+</table><h2 id="cicd">CI/CD</h2>
+<h3 id="continuous-integration-—-ci.yml">Continuous Integration — <code>ci.yml</code></h3>
+<p>Triggered on every <strong>pull request</strong> targeting <code>main</code>, and on <strong>push to <code>main</code></strong> when <code>backend/**</code>, <code>frontend/**</code>, or the workflow file itself changes (doc-only pushes are skipped). Two jobs run in parallel:</p>
+
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Steps</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Frontend</td>
+<td>ESLint → <code>tsc --noEmit</code> → Vitest with coverage</td>
+</tr>
+<tr>
+<td>Backend</td>
+<td>Ruff → Pytest</td>
+</tr>
+</tbody>
+</table><p>Both jobs use dependency caching (npm and pip) to keep runs fast. A coverage artifact is uploaded after each frontend run.</p>
+<h4 id="static-analysis-tools">Static analysis tools</h4>
+
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Scope</th>
+<th>What it checks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ESLint v9</strong></td>
+<td>Frontend TypeScript</td>
+<td>React hooks rules, unused vars, explicit <code>any</code>, fast-refresh compatibility</td>
+</tr>
+<tr>
+<td><strong>TypeScript</strong> (<code>tsc --noEmit</code>)</td>
+<td>Frontend</td>
+<td>Full type correctness without producing build output</td>
+</tr>
+<tr>
+<td><strong>Ruff</strong></td>
+<td>Backend Python</td>
+<td>Pycodestyle (E/W), Pyflakes (F), import order (I)</td>
+</tr>
+</tbody>
+</table><h3 id="continuous-delivery-—-cd-backend.yml--cd-frontend.yml">Continuous Delivery — <code>cd-backend.yml</code> / <code>cd-frontend.yml</code></h3>
+<p>Two independent workflows, each triggered on <strong>push to <code>main</code></strong> only when their own code changes:</p>
+
+<table>
+<thead>
+<tr>
+<th>Workflow</th>
+<th>Trigger paths</th>
+<th>Publishes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cd-backend.yml</code></td>
+<td><code>backend/**</code></td>
+<td><code>ghcr.io/&lt;owner&gt;/&lt;repo&gt;/backend:main</code></td>
+</tr>
+<tr>
+<td><code>cd-frontend.yml</code></td>
+<td><code>frontend/**</code></td>
+<td><code>ghcr.io/&lt;owner&gt;/&lt;repo&gt;/frontend:main</code></td>
+</tr>
+</tbody>
+</table><p>Each image is also tagged with the short commit SHA. Docker layer caching via GitHub Actions cache keeps rebuild times low. A README-only push triggers neither workflow.</p>
+<p>To run the published images without a local build:</p>
+<pre class=" language-bash"><code class="prism  language-bash"><span class="token comment"># pull pre-built images and start the stack</span>
+docker compose pull
+docker compose up
+</code></pre>
+<h3 id="deployment-—-cd-electron.yml">Deployment — <code>cd-electron.yml</code></h3>
+<p>Github Releases, packaging workflow triggered on <strong>pushing a version tag (e.g. <code>v1.0.0</code>)</strong>:</p>
+
+<table>
+<thead>
+<tr>
+<th>Workflow</th>
+<th>Triggers on</th>
+<th>Publishes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cd-electron</code></td>
+<td>push tag <code>v*</code></td>
+<td>installers for Windows/macOS/Linux (<code>.exe</code>/<code>.dmg</code>/<code>.deb</code>)</td>
+</tr>
+</tbody>
+</table><p>The installers are automatically published to the release assets corresponding to the tag.<br>
+To assist installing and running the application, an <code>installation-guide.md</code> is provided.</p>
+<h3 id="frontend-preview-—-deploy-frontend-gh-pages.yml">Frontend preview — <code>deploy-frontend-gh-pages.yml</code></h3>
+<p>Triggered on push to <code>main</code> when <code>frontend/**</code> changes. Builds the Vite app and publishes it to <strong>GitHub Pages</strong> as a live static preview (no backend).</p>
+<h2 id="architecture-overview">Architecture Overview</h2>
+<p>The application follows a client-server architecture running locally on the student’s machine:</p>
+<pre><code>┌──────────────────────────────────────────────────────────────┐
+│ Frontend (React + TypeScript)                                │
+│                                                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐    │
+│  │ Spectra      │  │ Molecule     │  │ Exercise &amp;       │    │
+│  │ Viewer       │  │ Workspace    │  │ Logbook UI       │    │
+│  └──────────────┘  └──────────────┘  └──────────────────┘    │
+│                                                              │
+│  ┌──────────────┐  ┌──────────────┐                          │
+│  │ RDKit (WASM) │  │ Ketcher      │                          │
+│  │ Rendering    │  │ Editor       │                          │
+│  └──────────────┘  └──────────────┘                          │
+│                                                              │
+│  React Contexts (Exercise, History, Warnings, RDKit)         │
+└──────────────────────────┬───────────────────────────────────┘
+                           │
+                           │ REST API (/api/v1/*)
+                           │ JSON over HTTP
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│ Backend (FastAPI + Python)                                   │
+│                                                              │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐                │
+│  │ Exercises  │ │ Fragments  │ │ Validation │                │
+│  │ API        │ │ API        │ │ API        │                │
+│  └────────────┘ └────────────┘ └────────────┘                │
+│                                                              │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐                │
+│  │ Logbook    │ │ Working    │ │ Warnings   │                │
+│  │ API        │ │ Solution   │ │ API        │                │
+│  └────────────┘ │ API        │ └────────────┘                │
+│                 └────────────┘                               │
+│                                                              │
+│  ┌────────────────────────────────────────────┐              │
+│  │ SQLite Database + Exercise Asset Storage   │              │
+│  └────────────────────────────────────────────┘              │
+└──────────────────────────────────────────────────────────────┘
+
+Desktop deployment:
+┌────────────────────┐
+│ Electron Shell     │
+│ (Desktop App)      │
+└────────────────────┘
+</code></pre>
+<p>The frontend is organized as a split-screen structure elucidation workspace. The left side of the interface is dedicated to spectral analysis, displaying stacked ¹H and ¹³C NMR spectra together with peak lists and spectral navigation controls. The right side contains the structure-building workspace, including the current solution, working fragments, and validation tools. A top bar provides access to exercise management functions, validation actions, and warning indicators which provide feedback during the structure elucidation process.</p>
+<h2 id="api-endpoints">API Endpoints</h2>
+<p>All endpoints are prefixed with <code>/api/v1</code>.</p>
+
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/health</code></td>
+<td>Returns <code>{"status": "ok"}</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/info</code></td>
+<td>App name, API prefix, environment</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/exercises/summaries</code></td>
+<td>List exercise summaries</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/exercises/{exercise_id}</code></td>
+<td>Get a single exercise</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/exercises/</code></td>
+<td>List exercises</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/exercises/</code></td>
+<td>Create an exercise</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/exercises/{exercise_id}/validate-cas</code></td>
+<td>Validate a CAS answer for an exercise</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/exercises/{exercise_id}/validate-solution</code></td>
+<td>Validate the constructed structure via SHA-256 hash</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/exercises/{exercise_id}/dbe</code></td>
+<td>Get DBE value for an exercise</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/v1/exercises/{exercise_id}/dbe</code></td>
+<td>Update DBE value for an exercise</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/exercises/reset</code></td>
+<td>Reset an exercise (<code>?exercise_id=</code>): clears fragments, working solution, and logbook</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/fragments/</code></td>
+<td>List working fragments for an exercise (<code>?exercise_id=</code>)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/fragments/</code></td>
+<td>Create a working fragment</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/v1/fragments/{fragment_id}</code></td>
+<td>Update a working fragment’s structure (SMILES + MOL block)</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/v1/fragments/{fragment_id}</code></td>
+<td>Soft-delete a working fragment</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/fragments/{fragment_id}/restore</code></td>
+<td>Restore a soft-deleted working fragment</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/v1/fragments/{fragment_id}/annotation</code></td>
+<td>Update a working fragment’s annotation</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/working-solution/</code></td>
+<td>Get working solution for an exercise (<code>?exercise_id=</code>)</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/v1/working-solution/</code></td>
+<td>Save/update working solution</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/v1/working-solution/</code></td>
+<td>Clear working solution</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/logbook/</code></td>
+<td>Get logbook state for an exercise (<code>?exercise_id=</code>)</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/v1/logbook/</code></td>
+<td>Save/update logbook state</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/v1/logbook/</code></td>
+<td>Clear logbook state and hard-delete soft-deleted fragments</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/predefined-fragments/</code></td>
+<td>List predefined fragments (supports <code>?search=</code> regex filter)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/predefined-fragments/</code></td>
+<td>Create a predefined fragment</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/v1/predefined-fragments/{fragment_id}</code></td>
+<td>Delete a predefined fragment</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/warnings/</code></td>
+<td>Compute warnings for a given fragment/linking payload</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/settings/</code></td>
+<td>Get user settings (e.g. link-inheritance behaviour)</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/v1/settings/</code></td>
+<td>Update user settings</td>
+</tr>
+</tbody>
+</table><h2 id="license">License</h2>
+<p>MIT</p>
+</div>
+</body>
+
+</html>

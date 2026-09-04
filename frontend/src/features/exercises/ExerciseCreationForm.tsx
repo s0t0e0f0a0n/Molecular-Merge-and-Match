@@ -220,6 +220,8 @@ export function ExerciseCreationForm({ onCreated }: ExerciseCreationFormProps) {
       molecular_formula: molecularFormula.trim() || null,
       solution_inchi: hashedSolutionInchi,
       solution_cas_number: hashedSolutionCasNumber,
+      alt1_cas_number: null,
+      alt2_cas_number: null,
       name: name.trim() || null,
       exercise_set: exerciseSet.trim() || null,
       tags: parsedTags,

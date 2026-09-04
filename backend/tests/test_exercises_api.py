@@ -1,9 +1,10 @@
 import base64
 import hashlib
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from app.core.config import settings
-from app.db.models import Exercise, ExerciseAdditionalSpectrum
+from app.db.models import Exercise, ExerciseAdditionalSpectrum, Statistics
 from app.db.session import SessionLocal
 
 INCHI_CCO = "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3"
@@ -105,7 +106,7 @@ def test_create_exercise_stores_additional_spectrum_priority_from_filename(clien
             .first()
         )
         assert spectrum is not None
-        assert spectrum.priority == 10
+        assert spectrum.priority == 6
     finally:
         db.close()
 
@@ -166,6 +167,28 @@ def test_create_exercise_with_solution_cas_stores_only_hash(client):
         db.close()
 
 
+def test_create_exercise_keeps_alt_cas_fields_optional(client):
+    response = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_cas_number="64-17-5"),
+    )
+    assert response.status_code == 201
+    created_id = response.json()["id"]
+
+    db = SessionLocal()
+    try:
+        row = (
+            db.query(Exercise)
+            .filter(Exercise.id == created_id)
+            .first()
+        )
+        assert row is not None
+        assert row.alt1_cas_hash is None
+        assert row.alt2_cas_hash is None
+    finally:
+        db.close()
+
+
 def test_validate_cas_returns_true_when_input_matches_hash(client):
     create_response = client.post(
         "/api/v1/exercises/",
@@ -182,6 +205,38 @@ def test_validate_cas_returns_true_when_input_matches_hash(client):
     assert response.json() == {"is_correct": True}
 
 
+def test_validate_cas_accepts_alt1_and_alt2_hashes_without_incrementing_incorrect_count(client):
+    payload = _exercise_payload(solution_cas_number="64-17-5")
+    payload["alt1_cas_number"] = "67-56-1"
+    payload["alt2_cas_number"] = "57-13-6"
+
+    create_response = client.post(
+        "/api/v1/exercises/",
+        json=payload,
+    )
+    assert create_response.status_code == 201
+    created_id = create_response.json()["id"]
+
+    response = client.post(
+        f"/api/v1/exercises/{created_id}/validate-cas",
+        json={"cas_number": "67-56-1"},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"is_correct": True}
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.incorrect_count == 0
+    finally:
+        db.close()
+
+
 def test_validate_cas_returns_false_when_input_does_not_match_hash(client):
     create_response = client.post(
         "/api/v1/exercises/",
@@ -196,6 +251,30 @@ def test_validate_cas_returns_false_when_input_does_not_match_hash(client):
     )
     assert response.status_code == 200
     assert response.json() == {"is_correct": False}
+
+
+def test_validate_cas_marks_exercise_completed_on_correct_match(client):
+    create_response = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_cas_number="64-17-5"),
+    )
+    assert create_response.status_code == 201
+    created_id = create_response.json()["id"]
+
+    response = client.post(
+        f"/api/v1/exercises/{created_id}/validate-cas",
+        json={"cas_number": " 64 - 17 - 5 "},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"is_correct": True}
+
+    db = SessionLocal()
+    try:
+        row = db.query(Exercise).filter(Exercise.id == created_id).first()
+        assert row is not None
+        assert row.completed is True
+    finally:
+        db.close()
 
 
 def test_validate_solution_returns_true_when_input_matches_hash(client):
@@ -229,6 +308,537 @@ def test_validate_solution_returns_false_when_input_does_not_match_hash(client):
     )
     assert response.status_code == 200
     assert response.json() == {"is_correct": False}
+
+
+def test_validate_solution_marks_exercise_completed_on_correct_match(client):
+    create_response = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_HASH_CCO),
+    )
+    assert create_response.status_code == 201
+    created_id = create_response.json()["id"]
+
+    response = client.post(
+        f"/api/v1/exercises/{created_id}/validate-solution",
+        json={"solution_hash": INCHI_HASH_CCO},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"is_correct": True}
+
+    db = SessionLocal()
+    try:
+        row = db.query(Exercise).filter(Exercise.id == created_id).first()
+        assert row is not None
+        assert row.completed is True
+
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.completed_at is not None
+    finally:
+        db.close()
+
+
+def test_completed_at_is_not_overwritten_on_repeated_correct_validation(client):
+    create_response = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_cas_number="64-17-5"),
+    )
+    assert create_response.status_code == 201
+    created_id = create_response.json()["id"]
+
+    detail_response = client.get(f"/api/v1/exercises/{created_id}")
+    assert detail_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        stats_row.completed_at = datetime(2024, 1, 1, 12, 0, 0)
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.post(
+        f"/api/v1/exercises/{created_id}/validate-cas",
+        json={"cas_number": "64-17-5"},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"is_correct": True}
+
+    stats_response = client.get(f"/api/v1/statistics/?exercise_id={created_id}")
+    assert stats_response.status_code == 200
+    assert stats_response.json()["completed_at"] == "2024-01-01T12:00:00"
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.completed_at == datetime(2024, 1, 1, 12, 0, 0)
+    finally:
+        db.close()
+
+
+def test_completed_exercise_does_not_mutate_statistics_on_immediate_incorrect_attempt(client):
+    create_response = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_HASH_CCO),
+    )
+    assert create_response.status_code == 201
+    created_id = create_response.json()["id"]
+
+    detail_response = client.get(f"/api/v1/exercises/{created_id}")
+    assert detail_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        stats_row.start_counting = datetime.now() - timedelta(seconds=18)
+        stats_row.stop_counting = None
+        stats_row.completed_at = None
+        stats_row.incorrect_count = 0
+        stats_row.timer_total = 0
+        db.commit()
+    finally:
+        db.close()
+
+    complete_response = client.post(
+        f"/api/v1/exercises/{created_id}/validate-solution",
+        json={"solution_hash": INCHI_HASH_CCO},
+    )
+    assert complete_response.status_code == 200
+    assert complete_response.json() == {"is_correct": True}
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.completed_at is not None
+        assert stats_row.stop_counting is not None
+        assert stats_row.stop_counting == stats_row.completed_at
+        baseline_completed_at = stats_row.completed_at
+        baseline_stop_counting = stats_row.stop_counting
+        baseline_timer_total = stats_row.timer_total
+        baseline_incorrect_count = stats_row.incorrect_count
+    finally:
+        db.close()
+
+    incorrect_response = client.post(
+        f"/api/v1/exercises/{created_id}/validate-solution",
+        json={"solution_hash": hashlib.sha256(b"wrong-hash").hexdigest()},
+    )
+    assert incorrect_response.status_code == 200
+    assert incorrect_response.json() == {"is_correct": False}
+
+    # Selecting or closing an already completed exercise must not mutate stats either.
+    detail_response = client.get(f"/api/v1/exercises/{created_id}")
+    assert detail_response.status_code == 200
+    stop_response = client.post(f"/api/v1/statistics/stop?exercise_id={created_id}")
+    assert stop_response.status_code == 200
+    resume_response = client.post(f"/api/v1/statistics/resume?exercise_id={created_id}")
+    assert resume_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.completed_at == baseline_completed_at
+        assert stats_row.stop_counting == baseline_stop_counting
+        assert stats_row.timer_total == baseline_timer_total
+        assert stats_row.incorrect_count == baseline_incorrect_count
+    finally:
+        db.close()
+
+
+def test_pause_then_resume_restarts_counting_for_incomplete_exercise(client):
+    create_response = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_HASH_CCO),
+    )
+    assert create_response.status_code == 201
+    created_id = create_response.json()["id"]
+
+    detail_response = client.get(f"/api/v1/exercises/{created_id}")
+    assert detail_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        stats_row.start_counting = datetime.now() - timedelta(seconds=25)
+        stats_row.stop_counting = None
+        stats_row.timer_total = 0
+        db.commit()
+    finally:
+        db.close()
+
+    pause_response = client.post(f"/api/v1/statistics/pause?exercise_id={created_id}")
+    assert pause_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.stop_counting is not None
+        paused_total = stats_row.timer_total
+        assert paused_total >= 20
+    finally:
+        db.close()
+
+    resume_response = client.post(f"/api/v1/statistics/resume?exercise_id={created_id}")
+    assert resume_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.stop_counting is None
+        assert stats_row.start_counting is not None
+        assert stats_row.timer_total == paused_total
+        resumed_start = stats_row.start_counting
+        assert resumed_start is not None
+
+        stats_row.start_counting = resumed_start - timedelta(seconds=8)
+        db.commit()
+    finally:
+        db.close()
+
+    second_pause_response = client.post(f"/api/v1/statistics/pause?exercise_id={created_id}")
+    assert second_pause_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.stop_counting is not None
+        assert stats_row.timer_total >= paused_total + 8
+    finally:
+        db.close()
+
+
+def test_selecting_exercise_creates_statistics_row_once(client):
+    create_response = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_HASH_CCO),
+    )
+    assert create_response.status_code == 201
+    created_id = create_response.json()["id"]
+
+    first_get = client.get(f"/api/v1/exercises/{created_id}")
+    assert first_get.status_code == 200
+
+    second_get = client.get(f"/api/v1/exercises/{created_id}")
+    assert second_get.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_rows = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .all()
+        )
+        assert len(stats_rows) == 1
+    finally:
+        db.close()
+
+
+def test_incorrect_solution_validation_increments_statistics_counter(client):
+    create_response = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_HASH_CCO),
+    )
+    assert create_response.status_code == 201
+    created_id = create_response.json()["id"]
+
+    response = client.post(
+        f"/api/v1/exercises/{created_id}/validate-solution",
+        json={"solution_hash": hashlib.sha256(b"wrong-hash").hexdigest()},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"is_correct": False}
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.incorrect_count == 1
+    finally:
+        db.close()
+
+
+def test_selecting_incomplete_exercise_sets_started_at_and_start_counting(client):
+    create_response = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_HASH_CCO),
+    )
+    assert create_response.status_code == 201
+    created_id = create_response.json()["id"]
+
+    detail_response = client.get(f"/api/v1/exercises/{created_id}")
+    assert detail_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.started_at is not None
+        assert stats_row.start_counting is not None
+        assert stats_row.stop_counting is None
+    finally:
+        db.close()
+
+
+def test_selecting_incomplete_exercise_sets_start_counting_and_can_stop_timer(client):
+    create_response = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_HASH_CCO),
+    )
+    assert create_response.status_code == 201
+    created_id = create_response.json()["id"]
+
+    detail_response = client.get(f"/api/v1/exercises/{created_id}")
+    assert detail_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.start_counting is not None
+        assert stats_row.stop_counting is None
+
+        stats_row.start_counting = datetime.now() - timedelta(seconds=25)
+        db.commit()
+    finally:
+        db.close()
+
+    stop_response = client.post(
+        f"/api/v1/statistics/stop?exercise_id={created_id}",
+    )
+    assert stop_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.stop_counting is not None
+        assert stats_row.timer_total >= 20
+    finally:
+        db.close()
+
+
+def test_completed_exercise_keeps_elapsed_time_below_twenty_seconds(client):
+    create_response = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_HASH_CCO),
+    )
+    assert create_response.status_code == 201
+    created_id = create_response.json()["id"]
+
+    detail_response = client.get(f"/api/v1/exercises/{created_id}")
+    assert detail_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        exercise = db.query(Exercise).filter(Exercise.id == created_id).first()
+        assert exercise is not None
+        exercise.completed = True
+
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        stats_row.start_counting = datetime.now() - timedelta(seconds=18)
+        db.commit()
+    finally:
+        db.close()
+
+    stop_response = client.post(
+        f"/api/v1/statistics/stop?exercise_id={created_id}",
+    )
+    assert stop_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.stop_counting is not None
+        assert stats_row.timer_total >= 18
+    finally:
+        db.close()
+
+
+def test_completion_immediately_stops_counting_and_updates_timer_total(client):
+    create_response = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_HASH_CCO),
+    )
+    assert create_response.status_code == 201
+    created_id = create_response.json()["id"]
+
+    detail_response = client.get(f"/api/v1/exercises/{created_id}")
+    assert detail_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        stats_row.start_counting = datetime.now() - timedelta(seconds=18)
+        stats_row.stop_counting = None
+        stats_row.timer_total = 0
+        stats_row.completed_at = None
+        db.commit()
+    finally:
+        db.close()
+
+    validate_response = client.post(
+        f"/api/v1/exercises/{created_id}/validate-solution",
+        json={"solution_hash": INCHI_HASH_CCO},
+    )
+    assert validate_response.status_code == 200
+    assert validate_response.json() == {"is_correct": True}
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.completed_at is not None
+        assert stats_row.stop_counting is not None
+        assert stats_row.stop_counting == stats_row.completed_at
+        assert stats_row.timer_total >= 18
+    finally:
+        db.close()
+
+    stop_response = client.post(
+        f"/api/v1/statistics/stop?exercise_id={created_id}",
+    )
+    assert stop_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.stop_counting == stats_row.completed_at
+        assert stats_row.timer_total >= 18
+        assert stats_row.timer_total < 25
+    finally:
+        db.close()
+
+
+def test_short_elapsed_time_is_not_added_to_timer_total(client):
+    create_response = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_HASH_CCO),
+    )
+    assert create_response.status_code == 201
+    created_id = create_response.json()["id"]
+
+    detail_response = client.get(f"/api/v1/exercises/{created_id}")
+    assert detail_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        stats_row.start_counting = datetime.now() - timedelta(seconds=10)
+        stats_row.timer_total = 0
+        db.commit()
+    finally:
+        db.close()
+
+    stop_response = client.post(
+        f"/api/v1/statistics/stop?exercise_id={created_id}",
+    )
+    assert stop_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        stats_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(created_id))
+            .first()
+        )
+        assert stats_row is not None
+        assert stats_row.timer_total == 0
+    finally:
+        db.close()
 
 
 def test_list_exercises_returns_created_exercise(client):

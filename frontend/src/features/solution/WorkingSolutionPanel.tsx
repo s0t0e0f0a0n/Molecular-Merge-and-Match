@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRDKit } from '../../context/RDKitContext';
 import { useExerciseData } from '../../context/ExerciseDataContext';
-import { validateExerciseSolutionHash } from '../../api/exercises';
+import {
+  fetchExerciseStatistics,
+  validateExerciseSolutionHash,
+} from '../../api/exercises';
 import { parseMolBlock } from '../../utils/molParser';
 import { findHighlightedAtomPositions } from '../../utils/svgMergePointLocator';
 import { ExpandedMoleculeView } from '../../components/ExpandedMoleculeView';
@@ -142,7 +145,11 @@ export function WorkingSolutionPanel({
 }: WorkingSolutionPanelProps) {
   const { setWarningResult } = useWarning();
   const warningRequestIdRef = useRef(0);
-  const { selectedExercise, loadingSelectedExercise } = useExerciseData();
+  const {
+    selectedExercise,
+    loadingSelectedExercise,
+    setSelectedExerciseStatistics,
+  } = useExerciseData();
   const molecularFormula = selectedExercise?.molecular_formula ?? undefined;
   const { rdkit } = useRDKit();
   const [svg, setSvg] = useState('');
@@ -374,6 +381,15 @@ useEffect(() => {
       const hash = await sha256Hex(inchi);
       const result = await validateExerciseSolutionHash(exerciseId, hash);
       setValidationResult(result.is_correct);
+      if (result.is_correct) {
+        try {
+          const statistics = await fetchExerciseStatistics(exerciseId);
+          setSelectedExerciseStatistics(statistics);
+        } catch (error) {
+          console.error('statistics refresh failed', error);
+        }
+        window.dispatchEvent(new CustomEvent('exercise-completed', { detail: { exerciseId } }));
+      }
     } catch {
       setValidationError('Unable to validate the working solution.');
     } finally {

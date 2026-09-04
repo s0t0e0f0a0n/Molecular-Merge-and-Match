@@ -20,6 +20,8 @@ export type ExerciseCreatePayload = {
   molecular_formula: string | null;
   solution_inchi: string | null;
   solution_cas_number: string | null;
+  alt1_cas_number: string | null;
+  alt2_cas_number: string | null;
   name: string | null;
   exercise_set?: string | null;
   tags: string[];
@@ -210,6 +212,14 @@ export function buildPayloadFromCsvRow(
     "casnumber",
     "casnr",
   ]);
+  const alt1CasNumberRaw = getFirstValueByAliases(headers, row, [
+    "alt1cassha",
+    "alt1cashash",
+  ]);
+  const alt2CasNumberRaw = getFirstValueByAliases(headers, row, [
+    "alt2cassha",
+    "alt2cashash",
+  ]);
   const solventRaw = getFirstValueByAliases(headers, row, ["solvent"]);
   const h1NmrText = getFirstValueByAliases(headers, row, [
     "hnmr",
@@ -261,6 +271,8 @@ export function buildPayloadFromCsvRow(
     problemNumber !== null ? `Exercise ${problemNumber}` : molecularFormula || "(unnamed)";
   const solutionInchi = solutionInchiRaw.trim().toLowerCase();
   const solutionCasNumber = solutionCasNumberRaw.trim().toLowerCase();
+  const alt1CasNumber = alt1CasNumberRaw.trim().toLowerCase();
+  const alt2CasNumber = alt2CasNumberRaw.trim().toLowerCase();
 
   if (!h1NmrText) {
     return { payload: null, error: "Missing 1H NMR text.", displayName, problemNumber };
@@ -305,6 +317,22 @@ export function buildPayloadFromCsvRow(
       problemNumber,
     };
   }
+  if (alt1CasNumber && !isHashLikeValue(alt1CasNumber)) {
+    return {
+      payload: null,
+      error: "Invalid alt1 CAS hash. Expected 64 alphanumeric characters.",
+      displayName,
+      problemNumber,
+    };
+  }
+  if (alt2CasNumber && !isHashLikeValue(alt2CasNumber)) {
+    return {
+      payload: null,
+      error: "Invalid alt2 CAS hash. Expected 64 alphanumeric characters.",
+      displayName,
+      problemNumber,
+    };
+  }
 
   const payload: ExerciseCreatePayload = {
     h1_spectrum_svg: resolveSvgPayload("", "", "h1"),
@@ -317,6 +345,8 @@ export function buildPayloadFromCsvRow(
     molecular_formula: molecularFormula || null,
     solution_inchi: solutionInchi || null,
     solution_cas_number: solutionCasNumber || null,
+    alt1_cas_number: alt1CasNumber || null,
+    alt2_cas_number: alt2CasNumber || null,
     name: problemNumber !== null ? `Exercise ${problemNumber}` : null,
     exercise_set: exerciseSet?.trim() || null,
     tags,

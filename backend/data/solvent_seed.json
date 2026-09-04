@@ -1,0 +1,113 @@
+User can choose display of solvent
+User can still input additional info in solvent field
+Idea:
+Solvent field contains variable {solvent} plus optionally extra text.
+The matching solvent is then extracted from the NMR text
+
+[
+	{
+		"names" : "CDCl3,chloroform-/it{d}",
+		"match": "CDCl3",
+		"preference" : 0
+	},
+	{
+		"names" : "(CD3)2SO,dimethylsulfoxide-/it{d6},DMSO-/it{d6}",
+		"match": "DMSO",
+		"preference" : 0
+	},
+	{
+		"names" : "CD3CN,acetonitrile-/it{d3},ACN-/it{d3}",
+		"match": "CD3CN",
+		"preference" : 0
+	},
+	{
+		"names" : "CD3OD,methanol-/it{d4},MeOD",
+		"match": "MeOD",
+		"preference" : 0
+	},
+	{
+		"names" : "D2O,water-/it{d2}",
+		"match": "D2O",
+		"preference" : 0
+	},
+	{
+		"names" : "C6D6,benzene-/it{d6},PhD",
+		"match": "C6D6",
+		"preference" : 0
+	},
+	{
+		"names" : "(CD3)2CO,acetone-/it{d6},Me2CO-/it{d6}",
+		"match": "Acetone",
+		"preference" : 0
+	},
+	{
+		"names" : "CD2Cl2,dichloromethane-/it{d2},DCM-/it{d2}",
+		"match": "DCM",
+		"preference" : 0
+	},
+	{
+		"names" : "C5D5N,pyridine-/it{d5}",
+		"match": "Pyridine",
+		"preference" : 0
+	},
+	{
+		"names" : "CD3COD,acetic acid-/it{d4}],AcOD",
+		"match": "AcOD",
+		"preference" : 0
+	},
+	{
+		"names" : "CD3CD2OD,ethanol-/it{d6},EtOD",
+		"match": "EtOD",
+		"preference" : 0
+	},
+	{
+		"names" : "CD3NO2,nitromethane-/it{d3}],MeNO2-/it{d3}",
+		"match": "CD3NO2",
+		"preference" : 0
+	},
+	{
+		"names" : "(CD3)2NCOD,dimethylformamide-/it{d7}],DMF-/it{d7}",
+		"match": "DMF",
+		"preference" : 0
+	},
+	{
+		"names" : "C5D5CD3,toluene-/it{d8}],PhCD3",
+		"match": "Toluene",
+		"preference" : 0
+	},
+	{
+		"names" : "C4D8O,tetrahydrofuran-/it{d8}],THF-/it{d8}",
+		"match": "THF",
+		"preference" : 0
+	},
+	{
+		"names" : "C4D8O2,1*4-dioxane-/it{d8}]",
+		"match": "Dioxane",
+		"preference" : 0
+	},
+	{
+		"names" : "CCl4,tetrachloromethane",
+		"match": "CCl4",
+		"preference" : 0
+	},
+	{
+		"names" : "CF3COOD,trifluoroacetic acid-/it{d},TFA-/it{d}",
+		"match": "TFA",
+		"preference" : 0
+	},
+	{
+		"names" : "C2D2Cl2;1*1*2*2-tetrachloroethane-/it{d}",
+		"match": "TCE",
+		"preference" : 0
+	},
+	{
+		"names" : "C12D12,cyclohexane-/it{d12}",
+		"match": "Cyclohexane",
+		"preference" : 0
+	},
+	{
+		"names" : "C5D5Cl,chlorobenzene-/it{d5}",
+		"match": "Chlorobenzene",
+		"preference" : 0
+	}
+]

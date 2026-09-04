@@ -196,7 +196,6 @@ Built for the Software Engineering course at Leiden University (2026).
 │   └── vite.config.ts               # Build config + dev proxy + Node polyfills for Ketcher
 │
 ├── .gitignore
-├── CHANGELOG.md                     # Release notes
 ├── docker-compose.yml               # One-command full-stack startup
 ├── LICENSE           				 # MIT License
 ├── main.js                          # Main entry point of Electron
@@ -229,7 +228,7 @@ The SQLite database is persisted in `backend/data/` via a volume mount, so data 
 
 #### Prerequisites
 
-- Python 3.12
+- Python 3.12+
 - Node.js 20+
 
 #### Backend

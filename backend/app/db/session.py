@@ -110,6 +110,7 @@ def _seed_exercises() -> None:
                 c13_frequency_mhz=e.get("c13_frequency_mhz"),
                 c13_solvent=e.get("c13_solvent"),
                 c13_apt=e.get("c13_apt"),
+                completed=e.get("completed"),
                 solution_inchi_hash=e.get("solution_inchi_hash"),
                 solution_cas_hash=e.get("solution_cas_hash"),
             )
@@ -188,8 +189,8 @@ def _seed_preloaded_solutions() -> None:
             answers = json.load(f)
         for answer in answers:
             db.add(WorkingSolution(
-                exercise_id=answer["exercise_id"], 
-                smiles=answer["smiles"], 
+                exercise_id=answer["exercise_id"],
+                smiles=answer["smiles"],
                 mol_file=answer["mol_file"],
                 dbe=answer["dbe"],
             ))
@@ -224,6 +225,30 @@ def _migrate_add_missing_columns() -> None:
         if "exercise_set" not in existing_exercise:
             conn.execute(text("ALTER TABLE exercises ADD COLUMN exercise_set TEXT"))
             conn.commit()
+        if "tags_hidden" not in existing_exercise:
+            conn.execute(text("ALTER TABLE exercises ADD COLUMN tags_hidden TEXT"))
+            conn.commit()
+        if "tags_user" not in existing_exercise:
+            conn.execute(text("ALTER TABLE exercises ADD COLUMN tags_user TEXT"))
+            conn.commit()
+        if "bookmark" not in existing_exercise:
+            conn.execute(text("ALTER TABLE exercises ADD COLUMN bookmark INTEGER"))
+            conn.commit()
+        if "completed" not in existing_exercise:
+            conn.execute(text("ALTER TABLE exercises ADD COLUMN completed BOOLEAN DEFAULT 0"))
+            conn.commit()
+        if "available_at" not in existing_exercise:
+            conn.execute(text("ALTER TABLE exercises ADD COLUMN available_at DATETIME"))
+            conn.commit()
+        if "stop_at" not in existing_exercise:
+            conn.execute(text("ALTER TABLE exercises ADD COLUMN stop_at DATETIME"))
+            conn.commit()
+        if "alt1_cas_hash" not in existing_exercise:
+            conn.execute(text("ALTER TABLE exercises ADD COLUMN alt1_cas_hash TEXT"))
+            conn.commit()
+        if "alt2_cas_hash" not in existing_exercise:
+            conn.execute(text("ALTER TABLE exercises ADD COLUMN alt2_cas_hash TEXT"))
+            conn.commit()
 
         # solution_smiles_hash and cas_answer was removed from the model; drop it so it
         # does not cause NOT NULL constraint failures on INSERT.
@@ -241,6 +266,13 @@ def _migrate_add_missing_columns() -> None:
             conn.commit()
         if "solution_cas_hash" not in existing_exercise:
             conn.execute(text("ALTER TABLE exercises ADD COLUMN solution_cas_hash TEXT"))
+            conn.commit()
+
+        # Update Statistics model
+        result_statistics = conn.execute(text("PRAGMA table_info(statistics)"))
+        existing_statistics = {row[1] for row in result_statistics}
+        if "started_at" not in existing_statistics:
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN started_at DATETIME"))
             conn.commit()
 
         # Update WorkingSolution model

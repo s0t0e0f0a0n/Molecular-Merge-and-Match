@@ -12,6 +12,35 @@ function tabLabel(spectrum: ApiAdditionalSpectrum, index: number): string {
   return spectrum.label ?? `Spectrum ${index + 1}`
 }
 
+function getSpectrumSortName(spectrum: ApiAdditionalSpectrum): string {
+  return (spectrum.label ?? spectrum.file_path ?? '').toLocaleLowerCase()
+}
+
+function compareSpectra(left: ApiAdditionalSpectrum, right: ApiAdditionalSpectrum): number {
+  const leftPriority = left.priority ?? 0
+  const rightPriority = right.priority ?? 0
+
+  if (leftPriority !== 0 && rightPriority !== 0) {
+    if (leftPriority !== rightPriority) {
+      return leftPriority - rightPriority
+    }
+  } else if (leftPriority === 0 && rightPriority !== 0) {
+    return 1
+  } else if (leftPriority !== 0 && rightPriority === 0) {
+    return -1
+  }
+
+  const sortNameComparison = getSpectrumSortName(left).localeCompare(getSpectrumSortName(right), undefined, {
+    sensitivity: 'base',
+  })
+
+  if (sortNameComparison !== 0) {
+    return sortNameComparison
+  }
+
+  return left.id - right.id
+}
+
 export function AdditionalSpectraPopup({ spectra }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState(0)
@@ -20,8 +49,9 @@ export function AdditionalSpectraPopup({ spectra }: Props) {
 
   if (spectra.length === 0) return null
 
-  const safeTab = Math.min(activeTab, spectra.length - 1)
-  const active = spectra[safeTab]
+  const sortedSpectra = [...spectra].sort(compareSpectra)
+  const safeTab = Math.min(activeTab, sortedSpectra.length - 1)
+  const active = sortedSpectra[safeTab]
 
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.2, 10))
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.2, 1))
@@ -92,7 +122,7 @@ export function AdditionalSpectraPopup({ spectra }: Props) {
               }}
             >
               {/* Tabs */}
-              {spectra.map((s, i) => (
+              {sortedSpectra.map((s, i) => (
                 <button
                   key={s.id}
                   type="button"

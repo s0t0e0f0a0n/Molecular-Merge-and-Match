@@ -1,6 +1,6 @@
 {
   "name": "molecular-merge-and-match",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "description": "Molecular Bookkeeping for Structural Analysis",
   "main": "main.js",
   "devDependencies": {
@@ -8,12 +8,16 @@
     "electron-builder": "^26.15.3"
   },
   "scripts": {
+    "clean:win": "if exist dist-electron rmdir /s /q dist-electron && if exist frontend\\dist rmdir /s /q frontend\\dist",
+    "clean:unix": "rm -rf dist-electron frontend/dist",
+    "clean": "npm run clean:win 2>nul || npm run clean:unix",
     "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac --publish never",
     "postinstall": "electron-builder install-app-deps",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "build": {
-    "appId": "com.ludev.molecularmergeandmatch",
+    "appId": "com.svdv.molecularmergeandmatch",
     "productName": "Molecular Merge and Match",
     "directories": {
       "output": "dist-electron",
@@ -58,18 +62,41 @@
       ],
       "artifactName": "${name}-Setup-${version}.${ext}",
       "icon": "build-assets/icon.icns",
-      "category": "public.app-category.education"
+      "category": "public.app-category.education",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build-assets/entitlements.mac.plist",
+      "entitlementsInherit": "build-assets/entitlements.mac.plist",
+      "extendInfo": {
+        "NSCameraUsageDescription": "Not used",
+        "NSMicrophoneUsageDescription": "Not used"
+      }
     },
     "linux": {
       "target": [
-        "AppImage",
         "deb",
-        "rpm"
+        "flatpak",
+        "rpm",
+        "AppImage"
       ],
+      "executableName": "molecularmergeandmatch",
       "artifactName": "${name}-Setup-${version}.${ext}",
       "icon": "build-assets/icon.icns",
       "category": "Education",
       "description": "An interactive NMR-based structure elucidation tool for university-level organic chemistry students. Students select molecular fragments, match them to peaks in 1H-NMR and 13C-NMR spectra, combine fragments into a complete molecule, and validate their answer against a teacher-defined solution."
+    },
+    "flatpak": {
+      "runtime": "org.freedesktop.Platform",
+      "runtimeVersion": "23.08",
+      "sdk": "org.freedesktop.Sdk",
+      "finishArgs": [
+        "--share=network",
+        "--share=ipc",
+        "--socket=x11",
+        "--socket=wayland",
+        "--socket=pulseaudio",
+        "--filesystem=host"
+      ]
     },
     "publish": {
       "provider": "github",
@@ -78,15 +105,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ludev-nl/2026-18-Molecular_Bookkeeping_for_structural_analysis.git"
+    "url": "git+https://github.com/s0t0e0f0a0n/Molecular-Merge-and-Match.git"
   },
   "keywords": [],
-  "author": "LUDev <ludev@liacs.leidenuniv.nl>",
+  "author": "S. van der Vorm & LUDev <s.van.der.vorm@chem.leidenuniv.nl>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/ludev-nl/2026-18-Molecular_Bookkeeping_for_structural_analysis/issues"
+    "url": "https://github.com/s0t0e0f0a0n/Molecular-Merge-and-Match"
   },
-  "homepage": "https://github.com/ludev-nl/2026-18-Molecular_Bookkeeping_for_structural_analysis#readme",
+  "homepage": "https://github.com/s0t0e0f0a0n/Molecular-Merge-and-Match#readme",
   "type": "commonjs",
   "dependencies": {
     "abbrev": "^4.0.0",

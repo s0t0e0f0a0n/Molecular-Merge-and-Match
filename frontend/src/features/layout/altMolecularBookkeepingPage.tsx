@@ -21,11 +21,14 @@ import { ExerciseZipImport } from '../exercises/ExerciseZipImport';
 import {
   fetchExerciseStatistics,
   fetchExerciseSummaries,
+  pauseExerciseTimer,
+  resumeExerciseTimer,
   resetExercise,
   validateExerciseCasAnswer,
   fetchExerciseDbe,
   saveExerciseDbe,
   deleteExercise,
+  type ExerciseStatistics,
   type ExerciseSummary,
 } from '../../api/exercises';
 import { useExerciseData } from '../../context/ExerciseDataContext';
@@ -40,11 +43,25 @@ import { FullscreenButton } from '../../components/FullscreenButton';
 import { LoadingExerciseOverlay, PausedExerciseOverlay } from './LoadingExerciseOverlay';
 import { LinkInheritOptionsPopup, type LinkInheritMode } from '../linking/LinkInheritOptionsPopup';
 import { fetchUserSettings, updateUserSettings } from '../../api/settings';
-import {
-  ExerciseTimerDisplay,
-  PauseExerciseButton,
-  useExerciseTimingState,
-} from '../statistics/TimingPanel';
+
+function parseStatisticsTimestamp(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function formatElapsedTime(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
 
 
 export function MolecularBookkeepingPage() {
@@ -74,27 +91,107 @@ export function MolecularBookkeepingPage() {
   const [casAnswerInput, setCasAnswerInput] = useState('');
   const [casAnswerIsCorrect, setCasAnswerIsCorrect] = useState<boolean | null>(null);
   const [validatingCasAnswer, setValidatingCasAnswer] = useState(false);
-
-  const {
-    exercisePaused,
-    resumingExercise,
-    formattedDisplayedTimer,
-    handlePauseExercise,
-    handleResumeExercise,
-    pauseButtonDisabled,
-    pauseButtonTitle,
-  } = useExerciseTimingState({
-    selectedExerciseId,
-    isExerciseCompleted: selectedExercise?.completed === true,
-    selectedExerciseStatistics,
-    setSelectedExerciseStatistics,
-  });
+  const [exercisePaused, setExercisePaused] = useState(false);
+  const [pausingExercise, setPausingExercise] = useState(false);
+  const [resumingExercise, setResumingExercise] = useState(false);
+  const [pauseButtonHovered, setPauseButtonHovered] = useState(false);
+  const [timerNow, setTimerNow] = useState(() => Date.now());
 
   useEffect(() => {
     setCasAnswerInput('');
     setCasAnswerIsCorrect(null);
     setValidatingCasAnswer(false);
+    setExercisePaused(false);
+    setPausingExercise(false);
+    setResumingExercise(false);
+    setTimerNow(Date.now());
   }, [selectedExerciseId]);
+
+  useEffect(() => {
+    const startCountingMs = parseStatisticsTimestamp(selectedExerciseStatistics?.start_counting);
+    const stopCountingMs = parseStatisticsTimestamp(selectedExerciseStatistics?.stop_counting);
+    const completedAtMs = parseStatisticsTimestamp(selectedExerciseStatistics?.completed_at);
+
+    if (startCountingMs === null || stopCountingMs !== null || completedAtMs !== null) {
+      return;
+    }
+
+    setTimerNow(Date.now());
+
+    const intervalId = window.setInterval(() => {
+      setTimerNow(Date.now());
+    }, 250);
+
+    return () => window.clearInterval(intervalId);
+  }, [
+    selectedExerciseStatistics?.completed_at,
+    selectedExerciseStatistics?.start_counting,
+    selectedExerciseStatistics?.stop_counting,
+  ]);
+
+  const displayedTimerTotalSeconds = useMemo(() => {
+    const statistics = selectedExerciseStatistics;
+    if (!statistics) {
+      return 0;
+    }
+
+    const startCountingMs = parseStatisticsTimestamp(statistics.start_counting);
+    const stopCountingMs = parseStatisticsTimestamp(statistics.stop_counting);
+    const completedAtMs = parseStatisticsTimestamp(statistics.completed_at);
+    let totalSeconds = statistics.timer_total ?? 0;
+
+    if (startCountingMs !== null && stopCountingMs === null && completedAtMs === null) {
+      totalSeconds += Math.max(0, Math.floor((timerNow - startCountingMs) / 1000));
+    }
+
+    return totalSeconds;
+  }, [selectedExerciseStatistics, timerNow]);
+
+  const formattedDisplayedTimer = useMemo(
+    () => formatElapsedTime(displayedTimerTotalSeconds),
+    [displayedTimerTotalSeconds],
+  );
+
+  const handlePauseExercise = useCallback(async () => {
+    if (selectedExerciseId === null) return;
+    if (exercisePaused || pausingExercise || resumingExercise) return;
+
+    if (selectedExercise?.completed === true) {
+      setExercisePaused(true);
+      return;
+    }
+
+    setPausingExercise(true);
+    try {
+      const statistics = await pauseExerciseTimer(selectedExerciseId);
+      setSelectedExerciseStatistics(statistics);
+      setExercisePaused(true);
+    } catch (err) {
+      console.error('pause failed', err);
+    } finally {
+      setPausingExercise(false);
+    }
+  }, [exercisePaused, pausingExercise, resumingExercise, selectedExercise?.completed, selectedExerciseId, setSelectedExerciseStatistics]);
+
+  const handleResumeExercise = useCallback(async () => {
+    if (selectedExerciseId === null) return;
+    if (selectedExercise?.completed === true) {
+      setExercisePaused(false);
+      return;
+    }
+    if (!exercisePaused || resumingExercise) return;
+
+    setResumingExercise(true);
+    try {
+      const statistics = await resumeExerciseTimer(selectedExerciseId);
+      setSelectedExerciseStatistics(statistics);
+      setExercisePaused(false);
+    } catch (err) {
+      console.error('resume failed', err);
+    } finally {
+      setResumingExercise(false);
+    }
+  }, [exercisePaused, resumingExercise, selectedExercise?.completed, selectedExerciseId, setSelectedExerciseStatistics]);
 
   useLayoutEffect(() => {
     if (loadingSelectedExercise || selectedExerciseId === null) {
@@ -1281,7 +1378,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
               style={{
                 color: '#111',
                 width: 200,
-                borderRadius: 12,
+                borderRadius: 6,
                 height: 36,
                 border: '1px solid #111',
                 background: 'white',
@@ -1291,7 +1388,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                padding: '0px 12px',
+                padding: '6px 12px',
                 whiteSpace: 'nowrap',
                 boxShadow: exerciseMenuOpen ? '0 4px 14px rgba(0,0,0,0.08)' : 'none',
               }}
@@ -1312,27 +1409,20 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
               </span>
               <span style={{ fontSize: 12 }}>{exerciseMenuOpen ? '▲' : '▼'}</span>
             </button>
-
-            {/* The button to reset the exercise */}
-            <button
-              type="button"
-              onClick={() => void handleResetExercise()}
-              title="Reset this exercise"
+            
+            <span
+              data-testid="exercise-timer-display"
+              title="Total time spent on this exercise"
               style={{
-                background: 'none',
-                border: 'none',
-                padding: '1px 3px',
-                cursor: 'pointer',
+                minWidth: 44,
+                textAlign: 'center',
+                fontVariantNumeric: 'tabular-nums',
                 fontSize: 14,
-                color: '#b33',
-                lineHeight: 1,
-                borderRadius: 4,
+                color: '#222',
               }}
             >
-              {'\u21BA'}
-            </button>
-
-            <ExerciseTimerDisplay formattedDisplayedTimer={formattedDisplayedTimer} />
+              {formattedDisplayedTimer}
+            </span>
 
             <div
               onMouseEnter={cancelExerciseMenuClose}
@@ -1718,13 +1808,48 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
             </div>
           </div>
 
-          <PauseExerciseButton
-            onPause={() => {
+          <button
+            type="button"
+            onClick={() => {
               void handlePauseExercise();
             }}
-            disabled={pauseButtonDisabled}
-            title={pauseButtonTitle}
-          />
+            onMouseEnter={() => setPauseButtonHovered(true)}
+            onMouseLeave={() => setPauseButtonHovered(false)}
+            disabled={
+              selectedExerciseId === null ||
+              exercisePaused ||
+              pausingExercise ||
+              resumingExercise
+            }
+            title={exercisePaused ? 'Exercise is paused' : (selectedExercise?.completed === true ? 'Pause view' : 'Pause exercise')}
+            data-testid="pause-exercise-button"
+            style={{
+              width: 28,
+              height: 28,
+              padding: 0,
+              borderRadius: 6,
+              border: '1px solid #ccc',
+              background: pauseButtonHovered ? '#ff6b6b' : 'white',
+              color: pauseButtonHovered ? '#fff' : '#111',
+              cursor: 'pointer',
+              lineHeight: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <svg
+              aria-hidden="true"
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="currentColor"
+            >
+              <rect x="3" y="2" width="3" height="10" rx="1" />
+              <rect x="8" y="2" width="3" height="10" rx="1" />
+            </svg>
+          </button>
 
 
 
@@ -1957,6 +2082,24 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
                   type="button"
                 >
                   Clear links
+                </button>
+
+                {/* The button to reset the exercise */}
+                <button
+                  type="button"
+                  onClick={() => void handleResetExercise()}
+                  title="Reset this exercise"
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    border: '1px solid #ccc',
+                    background: 'white',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    
+                  }}
+                > Reset&nbsp;&nbsp;
+                  <span style={{lineHeight: 1, color: '#b33'}}>{'\u21BA'}</span>
                 </button>
               </div>
             }

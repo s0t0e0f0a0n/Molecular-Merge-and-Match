@@ -3,6 +3,7 @@ export type ExerciseSummary = {
   name: string | null;
   exercise_set: string | null;
   tags: string[];
+  completed?: boolean | null;
 };
 
 export type ApiH1Peak = {
@@ -25,6 +26,7 @@ export type ApiAdditionalSpectrum = {
   id: number;
   file_path: string;
   label: string | null;
+  priority: number;
 };
 
 export type ExerciseDetail = {
@@ -33,6 +35,7 @@ export type ExerciseDetail = {
   molecular_formula: string | null;
   exercise_set: string | null;
   tags: string[];
+  completed?: boolean | null;
 
   h1_svg_path: string;
   h1_svg_url: string;
@@ -66,6 +69,16 @@ export type CasAnswerValidationResponse = {
 
 export type SolutionValidationResponse = {
   is_correct: boolean;
+};
+
+export type ExerciseStatistics = {
+  exercise_id: string;
+  incorrect_count: number;
+  start_counting: string | null;
+  stop_counting: string | null;
+  timer_total: number;
+  started_at: string | null;
+  completed_at: string | null;
 };
 
 // This fetches the exercise names, which is used to list the exercises, for the user to choose one from.
@@ -201,6 +214,42 @@ export async function saveExerciseDbe(
     body: JSON.stringify({ dbe }),
   });
   if (!r.ok) throw new Error('Failed to save DBE');
+}
+
+export async function fetchExerciseStatistics(
+  exerciseId: number,
+): Promise<ExerciseStatistics> {
+  const response = await fetch(
+    `/api/v1/statistics/?exercise_id=${encodeURIComponent(String(exerciseId))}`,
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to load exercise statistics (${response.status})`);
+  }
+  return (await response.json()) as ExerciseStatistics;
+}
+
+export async function stopExerciseTimer(exerciseId: number): Promise<ExerciseStatistics> {
+  const r = await fetch(`/api/v1/statistics/stop?exercise_id=${encodeURIComponent(String(exerciseId))}`, {
+    method: 'POST',
+  });
+  if (!r.ok) throw new Error('Failed to stop exercise timer');
+  return (await r.json()) as ExerciseStatistics;
+}
+
+export async function pauseExerciseTimer(exerciseId: number): Promise<ExerciseStatistics> {
+  const r = await fetch(`/api/v1/statistics/pause?exercise_id=${encodeURIComponent(String(exerciseId))}`, {
+    method: 'POST',
+  });
+  if (!r.ok) throw new Error('Failed to pause exercise timer');
+  return (await r.json()) as ExerciseStatistics;
+}
+
+export async function resumeExerciseTimer(exerciseId: number): Promise<ExerciseStatistics> {
+  const r = await fetch(`/api/v1/statistics/resume?exercise_id=${encodeURIComponent(String(exerciseId))}`, {
+    method: 'POST',
+  });
+  if (!r.ok) throw new Error('Failed to resume exercise timer');
+  return (await r.json()) as ExerciseStatistics;
 }
 
 export async function deleteExercise(exerciseId: number): Promise<void> {

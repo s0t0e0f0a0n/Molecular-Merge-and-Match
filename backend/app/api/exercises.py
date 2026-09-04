@@ -14,6 +14,11 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.orm import selectinload
 
+from app.api.statistics import (
+    increment_incorrect_count,
+    mark_exercise_completed,
+    mark_exercise_selected,
+)
 from app.core.config import settings
 from app.db.models import (
     Exercise,
@@ -159,6 +164,8 @@ class ExerciseCreate(BaseModel):
     molecular_formula: str | None = Field(default=None, max_length=100)
     solution_inchi: str | None = Field(default=None)
     solution_cas_number: str | None = Field(default=None, max_length=100)
+    alt1_cas_number: str | None = Field(default=None, max_length=100)
+    alt2_cas_number: str | None = Field(default=None, max_length=100)
 
     name: str | None = Field(default=None, max_length=255)
     exercise_set: str | None = Field(default=None, max_length=255)
@@ -228,6 +235,7 @@ class ExerciseOut(BaseModel):
     molecular_formula: str | None
     exercise_set: str | None
     tags: list[str]
+    completed: bool | None = None
 
     h1_svg_path: str
     h1_svg_url: str   #A relative path is needed to actually use the svg
@@ -257,6 +265,7 @@ class ExerciseSummaryOut(BaseModel):
     name: str | None
     exercise_set: str | None
     tags: list[str]
+    completed: bool | None = None
 
     model_config = {"from_attributes": True}
 
@@ -528,6 +537,7 @@ def _to_response(row: Exercise) -> ExerciseOut:
         c13_frequency_mhz=row.c13_frequency_mhz,
         c13_solvent=row.c13_solvent,
         c13_apt=row.c13_apt,
+        completed=row.completed,
         c13_peaks=[C13PeakOut.model_validate(p) for p in row.c13_peaks],
         additional_spectra=[
             AdditionalSpectrumOut(
@@ -551,6 +561,7 @@ def _to_summary_response(row: Exercise) -> ExerciseSummaryOut:
         name=row.name,
         exercise_set=row.exercise_set,
         tags=tags,
+        completed=row.completed,
     )
 
 #Here a list of all exercises is fetched from the database and send using HTTP
@@ -583,6 +594,7 @@ def get_exercise(exercise_id: int) -> ExerciseOut:
         if not row:
             raise HTTPException(status_code=404, detail="Exercise not found.")
 
+        mark_exercise_selected(exercise_id)
         return _to_response(row)
 
 @router.get("/", response_model=list[ExerciseOut])
@@ -607,6 +619,7 @@ def validate_cas_answer(
 ) -> CasAnswerValidationOut:
     input_hash = _normalize_or_hash_solution_cas(body.cas_number)
     if input_hash is None:
+        increment_incorrect_count(exercise_id)
         return CasAnswerValidationOut(is_correct=False)
 
     with get_db() as db:
@@ -614,12 +627,33 @@ def validate_cas_answer(
         if not row:
             raise HTTPException(status_code=404, detail="Exercise not found.")
 
-        if row.solution_cas_hash is None:
+        candidate_hashes = [
+            value
+            for value in (
+                row.solution_cas_hash,
+                row.alt1_cas_hash,
+                row.alt2_cas_hash,
+            )
+            if value is not None
+        ]
+        if not candidate_hashes:
+            increment_incorrect_count(exercise_id)
             return CasAnswerValidationOut(is_correct=False)
 
-        return CasAnswerValidationOut(
-            is_correct=hmac.compare_digest(row.solution_cas_hash, input_hash)
+        is_correct = any(
+            hmac.compare_digest(candidate_hash, input_hash)
+            for candidate_hash in candidate_hashes
         )
+        if is_correct:
+            was_completed = row.completed is True
+            row.completed = True
+            db.commit()
+            if not was_completed:
+                mark_exercise_completed(exercise_id)
+        else:
+            increment_incorrect_count(exercise_id)
+
+        return CasAnswerValidationOut(is_correct=is_correct)
 
 
 @router.post("/{exercise_id}/validate-solution", response_model=SolutionValidationOut)
@@ -628,6 +662,7 @@ def validate_solution_answer(
 ) -> SolutionValidationOut:
     input_hash = _normalize_solution_hash(body.solution_hash)
     if input_hash is None:
+        increment_incorrect_count(exercise_id)
         return SolutionValidationOut(is_correct=False)
 
     with get_db() as db:
@@ -636,11 +671,20 @@ def validate_solution_answer(
             raise HTTPException(status_code=404, detail="Exercise not found.")
 
         if row.solution_inchi_hash is None:
+            increment_incorrect_count(exercise_id)
             return SolutionValidationOut(is_correct=False)
 
-        return SolutionValidationOut(
-            is_correct=hmac.compare_digest(row.solution_inchi_hash, input_hash)
-        )
+        is_correct = hmac.compare_digest(row.solution_inchi_hash, input_hash)
+        if is_correct:
+            was_completed = row.completed is True
+            row.completed = True
+            db.commit()
+            if not was_completed:
+                mark_exercise_completed(exercise_id)
+        else:
+            increment_incorrect_count(exercise_id)
+
+        return SolutionValidationOut(is_correct=is_correct)
 
 @router.get("/{exercise_id}/dbe", response_model=DbeOut)
 def get_exercise_dbe(exercise_id: int) -> DbeOut:
@@ -727,6 +771,8 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
 
     solution_inchi_hash = _normalize_solution_hash(body.solution_inchi)
     solution_cas_hash = _prepare_solution_cas_fields(body.solution_cas_number)
+    alt1_cas_hash = _prepare_solution_cas_fields(body.alt1_cas_number)
+    alt2_cas_hash = _prepare_solution_cas_fields(body.alt2_cas_number)
 
     created_file_paths: list[str] = []
 
@@ -786,6 +832,8 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
                 c13_apt=body.c13_apt,
                 solution_inchi_hash=solution_inchi_hash,
                 solution_cas_hash=solution_cas_hash,
+                alt1_cas_hash=alt1_cas_hash,
+                alt2_cas_hash=alt2_cas_hash,
             )
 
             db.add(exercise)

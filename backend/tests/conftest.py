@@ -9,6 +9,7 @@ from app.db.models import (
     Fragment,
     LogbookState,
     PredefinedFragment,
+    Statistics,
     WorkingSolution,
 )
 from app.db.session import SessionLocal, init_db
@@ -29,6 +30,7 @@ def _ensure_tables_and_clean():
         db.query(WorkingSolution).delete()
         db.query(LogbookState).delete()
         db.query(PredefinedFragment).delete()
+        db.query(Statistics).delete()
         db.commit()
     finally:
         db.close()
