@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-from contextlib import contextmanager
 from collections.abc import Iterator
+from contextlib import contextmanager
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -14,17 +14,16 @@ from app.db.base import Base
 from app.db.models import (
     Exercise,
     ExerciseAdditionalSpectrum,
+    ExerciseC13Coupling,
     ExerciseC13Peak,
     ExerciseH1Peak,
-    ExerciseC13Coupling,
-    SolventsUsed,
-    TagsUsed,
     Fragment,
     PredefinedFragment,
+    SolventsUsed,
+    TagsUsed,
     UserSettings,
     WorkingSolution,
 )
-
 
 _USER_SETTINGS_PRESETS: tuple[dict[str, object], ...] = (
     {
@@ -273,7 +272,7 @@ def _seed_exercises() -> None:
                     j_values_hz_csv=c.get("j_values_hz_csv"),
                     extra_info=c.get("extra_info"),
                     atom_tag=c.get("atom_tag"),
-                    
+
                 ))
 
             for s in example.get("additional_spectra", []):

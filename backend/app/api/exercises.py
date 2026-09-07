@@ -8,8 +8,8 @@ import logging
 import math
 import re
 from pathlib import Path
-from uuid import uuid4
 from typing import NamedTuple
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -30,14 +30,17 @@ from app.core.solvent_tokens import (
     resolve_solvent_tokens,
 )
 from app.core.tag_tokens import (
+    apply_tag_count_delta as apply_tag_count_delta,
+)
+from app.core.tag_tokens import (
     encode_tags_list,
     resolve_tag_tokens,
+)
+from app.core.tag_tokens import (
     extract_tag_ids as extract_tag_ids,
-    apply_tag_count_delta as apply_tag_count_delta,
 )
 from app.db.models import (
     Exercise,
-    Statistics,
     ExerciseAdditionalNuclei,
     ExerciseAdditionalSpectrum,
     ExerciseC13Coupling,
@@ -45,8 +48,8 @@ from app.db.models import (
     ExerciseH1Peak,
     Fragment,
     LogbookState,
-    WorkingSolution,
     TagsUsed,
+    WorkingSolution,
 )
 from app.db.session import get_db
 
@@ -482,7 +485,7 @@ class NMRHeader(NamedTuple):
 
 def _extract_nmr_header(text: str, nucleus_pattern: str, expected_format: str) -> NMRHeader:
     """
-    Validates any real NMR ACS string format globally, supports empty peak data 
+    Validates any real NMR ACS string format globally, supports empty peak data
     blocks gracefully using lazy matching, and extracts structural metadata.
     """
     full_pattern = rf"^\s*({nucleus_pattern})\s*-\s*NMR\s*\(\s*(.+?)\s*,\s*([0-9]+(?:\.[0-9]+)?)\s*MHz\s*\)\s*:\s*(.*?)\s*;\s*$"
@@ -1020,10 +1023,13 @@ def delete_exercise(exercise_id: int) -> None:
         ).delete(synchronize_session=False)
 
         file_paths = []
-        if exercise.h1_svg_path: file_paths.append(exercise.h1_svg_path)
-        if exercise.c13_svg_path: file_paths.append(exercise.c13_svg_path)
+        if exercise.h1_svg_path:
+            file_paths.append(exercise.h1_svg_path)
+        if exercise.c13_svg_path:
+            file_paths.append(exercise.c13_svg_path)
         for spec in exercise.additional_spectra:
-            if spec.file_path: file_paths.append(spec.file_path)
+            if spec.file_path:
+                file_paths.append(spec.file_path)
 
         used_solvent_ids = extract_solvent_ids(exercise.h1_solvent) | extract_solvent_ids(exercise.c13_solvent)
         apply_solvent_count_delta(db, used_solvent_ids, -1)
@@ -1035,7 +1041,8 @@ def delete_exercise(exercise_id: int) -> None:
             pass
         apply_tag_count_delta(db, tag_ids, -1)
 
-        db.delete(exercise); db.commit()
+        db.delete(exercise)
+        db.commit()
         sqlite_root = Path(settings.sqlite_path).resolve().parent
         for path in file_paths:
             try:

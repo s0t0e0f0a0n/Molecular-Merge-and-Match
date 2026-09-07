@@ -2,8 +2,11 @@ import os
 import sys
 import threading
 import time
+
 import uvicorn
-from app.main import app
+
+from app.main import app  # noqa: F401
+
 
 def watch_parent():
     """Check if parent process is still alive; exit if not."""

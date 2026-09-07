@@ -56,26 +56,29 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "${productName}-Setup-${version}-localbuild-${arch}.${ext}"
+      "artifactName": "${name}-Setup-${version}-localbuild-${arch}.${ext}"
     },
 
     "portable": {
-      "artifactName": "${productName}-Portable-${version}-localbuild-${arch}.${ext}"
+      "artifactName": "${name}-Portable-${version}-localbuild-${arch}.${ext}"
     },
     "mac": {
       "target": [
         "dmg"
       ],
-      "artifactName": "${productName}-Setup-${version}-localbuild-${arch}.${ext}",
+      "artifactName": "${name}-Setup-${version}-localbuild-${arch}.${ext}",
       "icon": "build-assets/icon.icns",
       "category": "public.app-category.education"
     },
     "linux": {
       "target": [
-        "deb"
+        "deb",
+        "rpm",
+        "AppImage",
+        "pacman"
       ],
       "executableName": "molecularmergeandmatch",
-      "artifactName": "${productName}-Setup-${version}-localbuild-${arch}.${ext}",
+      "artifactName": "${name}-Setup-${version}-localbuild-${arch}.${ext}",
       "icon": "build-assets/icon.icns",
       "category": "Education",
       "synopsis": "Molecular Bookkeeping for Structural Analysis",

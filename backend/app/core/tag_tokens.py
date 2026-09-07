@@ -6,7 +6,6 @@ from typing import Iterable, List, Tuple
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.core.solvent_tokens import split_escaped_names
 from app.db.models import TagsUsed
 
 TAG_TOKEN_RE = re.compile(r"%tag\{(\d+)\}")

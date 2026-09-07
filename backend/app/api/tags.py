@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import desc
-from datetime import datetime
 
 from app.db.models import TagsUsed
 from app.db.session import get_db

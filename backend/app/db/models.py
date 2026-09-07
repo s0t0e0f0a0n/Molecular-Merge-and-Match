@@ -230,7 +230,7 @@ class SolventsUsed(Base):
     display: Mapped[str] = mapped_column(String(100), nullable=False, default="solvent")
     preference: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     count: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
-    
+
 
 class PredefinedFragment(Base):
     """Predefined fragment library - shared list among exercises"""

@@ -20,7 +20,7 @@ if not exist node_modules (
 :: 3. Clean old builds
 echo [1/4] Cleaning previous distribution files...
 call npm run clean
-if exist resources\bin\molecular-backend rmdir /s /q resources\bin\molecular-backend
+if exist resources\bin rmdir /s /q resources\bin
 
 :: 4. Compile Python Backend
 echo [2/4] Initializing Python Virtual Environment and PyInstaller...
@@ -45,7 +45,7 @@ cd ..
 :: Stage backend folder structure
 echo Staging backend folder structure...
 if not exist resources\bin mkdir resources\bin
-xcopy /E /I /Y /R /K backend\dist\molecular-backend resources\bin\molecular-backend
+xcopy /E /I /Y /R /K backend\dist\molecular-backend\* resources\bin\
 
 :: 5. Step inside /frontend to restore packages and build React assets
 echo [3/4] Compiling React Frontend...

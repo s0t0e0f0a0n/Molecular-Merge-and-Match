@@ -64,7 +64,7 @@ function setupUserData() {
         try {
             const copyFolderSync = (src, dest) => {
                 if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-                try { fs.chmodSync(dest, 511); } catch (e) {} // Ensure dir is writable //SvdV : might need to make this "511" for compatability
+                try { fs.chmodSync(dest, 511); } catch (e) {} // Ensure dir is writable //SvdV : Was 0o755, Safe for Flatpak/macOS sandboxes
                 
                 for (const file of fs.readdirSync(src)) {
                     const srcPath = path.join(src, file);
@@ -73,7 +73,7 @@ function setupUserData() {
                         copyFolderSync(srcPath, destPath);
                     } else {
                         fs.copyFileSync(srcPath, destPath);
-                        try { fs.chmodSync(destPath, 438); } catch (e) {} //SvdV : might need to make this "438" for compatability
+                        try { fs.chmodSync(destPath, 438); } catch (e) {} //Was 0o666
                     }
                 }
             };
@@ -116,8 +116,8 @@ function startBackend() {
     const exeName = process.platform === 'win32' ? 'molecular-backend.exe' : 'molecular-backend';
 
     const backendPath = app.isPackaged 
-        ? path.join(process.resourcesPath, 'bin', 'molecular-backend', exeName) 
-        : path.join(__dirname, 'resources', 'bin', 'molecular-backend', exeName);
+        ? path.join(process.resourcesPath, 'bin', exeName) 
+        : path.join(__dirname, 'resources', 'bin', exeName);
 
     console.log(`Starting backend at: ${backendPath} on port ${backendPort}`);
 
@@ -173,7 +173,8 @@ function startBackend() {
 async function fetchWithRetry(url, options, retries = 30) {
     for (let i = 0; i < retries; i++) {
         try {
-            return await net.fetch(url, options); //SvdV added 'net.' supposedly is safer for sandboxed (flatpak, macOS)
+            // Use net.fetch instead of (global) fetch for sandboxing support
+            return await net.fetch(url, options);
         } catch (err) {
             if (i === retries - 1) throw err;
             console.log(`[Proxy] Backend not ready, retrying in 1s... (${i + 1}/${retries})`);
@@ -279,10 +280,10 @@ app.on('will-quit', () => {
 });
 
 process.on('SIGINT', () => {
-    console.log("Received SIGINT, shutting down gracefully...");
-    app.quit();
+  console.log("Received SIGINT, shutting down gracefully...");
+  app.quit();
 });
 
 process.on('SIGTERM', () => {
-    app.quit();
+  app.quit();
 });

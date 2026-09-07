@@ -35,9 +35,8 @@ call venv\Scripts\activate
 if not exist venv\Lib\site-packages\fastapi (
     echo Installing dependencies...
     python -m pip install -r requirements.txt
-::	python -m pip install -r requirements-dev.txt
-	python -m pip install tzdata pyinstaller 
-::	python -m pip install fonttools brotli
+	python -m pip install -r requirements-dev.txt
+	python -m pip install tzdata pyinstaller fonttools brotli
 )
 echo 
 

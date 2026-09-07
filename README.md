@@ -1,5 +1,79 @@
 # Molecular Merge and Match: Molecular Bookkeeping for Structural Analysis
 
+
+## Install / uninstall instructions
+
+### Linux
+Command Line (un)install is recommended for all package formats since the app is not listed as an 'official' repository application.  
+Choose whichever format is suitable to your liking, your distribution and package manager, or choose a containerized format.
+
+System packages: After install the application is available in the application viewer or by typing `molecular-merge-and-match` in the shell.
+AppImage: a self-contained file, requires no installation, but does depend on host libraries.
+Flatpak: self-contained sandboxed installer. (cross distribution)
+Snap: semi-self-contained sandboxed installer (Ubuntu).
+
+Go to the folder where the package is located, for example "Downloads": `cd ~/Downloads`
+```bash
+# .deb: Debian / Ubuntu based distribtions using APT package manager
+sudo apt install ./molecular-merge-and-match-Setup-<version>.deb
+# uninstall (sudo apt purge can also be used)
+sudo apt remove molecular-merge-and-match
+
+# .rpm: Fedora / Red Hat based distribtions using DNF package manager
+sudo dnf install ./molecular-merge-and-match-Setup-<version>.rpm
+# uninstall
+sudo dnf remove molecular-merge-and-match
+# .rpm: openSUSE using Zypper package manager
+sudo zypper install ./molecular-merge-and-match-Setup-<version>.rpm
+# uninstall
+sudo zypper remove molecular-merge-and-match
+
+# .pacman is used, but is binary identical to .pkg.tar.zst the latter can be confused with an repository or general archive.
+# .pacman: Arch-based distributions using Pacman package manager
+sudo pacman -U ./molecular-merge-and-match-Setup-<version>.pacman
+# uninstall
+sudo pacman -R molecular-merge-and-match
+
+# .apk: Alpine Linux using the Alpine Package Keeper (same extension as Android packages, but they are completely different packages!)
+sudo apk add --allow-untrusted ./molecular-merge-and-match.apk
+# uninstall
+sudo apk del molecular-merge-and-match
+
+# .AppImage open: you can double click the file when this is applied in the file's permissions or run
+chmod +x ./molecular-merge-and-match-Setup-<version>.AppImage
+./molecular-merge-and-match-Setup-<version>.AppImage
+
+# Install flatpak (do not double click)
+flatpak install ./molecular-merge-and-match-Setup-<version>.flatpak
+# Flatpaks are available in the application viewer after install or run
+flatpak com.ludev.molecularmergeandmatch
+# uninstall
+flatpak uninstall com.ludev.molecularmergeandmatch
+
+# Install snap package (do not double click)
+sudo snap install ./molecular-merge-and-match-Setup-<version>.snap --dangerous
+# Snap packages are available in the application viewer after install or run
+snap run molecularmergeandmatch
+# uninstall
+snap remove molecularmergeandmatch
+
+```
+Flatpak (self-contained container), Snap (partial container), and AppImage (self-contained file)
+
+
+
+
+
+
+
+sudo dnf install ./molecular-merge-and-match-Setup-1.0.0.rpm
+sudo dnf remove molecular-merge-and-match
+
+
+
+
+
+
 An interactive NMR-based structure elucidation tool for university-level organic chemistry students. Students select molecular fragments, match them to peaks in 1H-NMR and 13C-NMR spectra, combine fragments into a complete molecule, and validate their answer against a teacher-defined solution.
 
 Built for the Software Engineering course at Leiden University (2026).

@@ -23,7 +23,7 @@ fi
 # 3. Clean old builds
 echo "[1/4] Cleaning previous distribution files..."
 npm run clean
-rm -rf resources/bin/molecular-backend
+rm -rf resources/bin
 
 # 4. Compile Python Backend
 echo "[2/4] Initializing Python Virtual Environment and PyInstaller..."
@@ -48,7 +48,7 @@ cd ..
 # Stage backend folder structure using preservation copy flags
 echo "Staging backend folder structure..."
 mkdir -p resources/bin
-cp -a backend/dist/molecular-backend resources/bin/
+cp -a backend/dist/molecular-backend/. resources/bin/
 
 # 5. Step inside /frontend to restore packages and build React assets
 echo "[3/4] Compiling React Frontend..."

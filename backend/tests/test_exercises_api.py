@@ -1,10 +1,9 @@
 import base64
 import hashlib
-from datetime import datetime, timedelta
 from pathlib import Path
 
 from app.core.config import settings
-from app.db.models import Exercise, ExerciseAdditionalSpectrum, Statistics
+from app.db.models import Exercise, ExerciseAdditionalSpectrum
 from app.db.session import SessionLocal
 
 INCHI_CCO = "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3"
@@ -283,10 +282,10 @@ def test_create_exercise_keeps_alt_cas_fields_optional(client):
         assert row.alt2_cas_hash is None
     finally:
         db.close()
-        
+
 def test_create_exercise_with_empty_peak_segments(client):
     """
-    Verifies that the lazy quantifier (.*?) successfully matches 1H and 13C 
+    Verifies that the lazy quantifier (.*?) successfully matches 1H and 13C
     headers even when they contain absolutely no data blocks between ':' and ';'.
     """
     payload = _exercise_payload()
@@ -295,7 +294,7 @@ def test_create_exercise_with_empty_peak_segments(client):
 
     response = client.post("/api/v1/exercises/", json=payload)
     assert response.status_code == 201
-    
+
     created = response.json()
     assert created["h1_peaks"] == []
     assert created["c13_peaks"] == []
@@ -303,17 +302,17 @@ def test_create_exercise_with_empty_peak_segments(client):
 
 def test_create_exercise_with_blank_optional_text_fields(client):
     """
-    Verifies that when optional text fields are explicitly passed as spaces, 
-    tabs, or empty strings, the upfront string guard strips them out safely 
+    Verifies that when optional text fields are explicitly passed as spaces,
+    tabs, or empty strings, the upfront string guard strips them out safely
     and skips engine extraction without throwing a 422 exception.
     """
     payload = _exercise_payload()
     payload["c13_alt_text"] = "   "  # Whitespace padding
     payload["alt_nuc_text"] = ""     # Empty string string
-    
+
     response = client.post("/api/v1/exercises/", json=payload)
     assert response.status_code == 201
-    
+
     created = response.json()
     assert created["c13_couplings"] == []
     assert created["alt_nuclei"] == []
@@ -321,7 +320,7 @@ def test_create_exercise_with_blank_optional_text_fields(client):
 
 def test_create_exercise_with_populated_optional_text_fields(client):
     """
-    Validates that when the optional fields are provided with data, they are 
+    Validates that when the optional fields are provided with data, they are
     correctly processed by the underlying loops and saved to the response structure.
     """
     payload = _exercise_payload()
@@ -330,12 +329,12 @@ def test_create_exercise_with_populated_optional_text_fields(client):
 
     response = client.post("/api/v1/exercises/", json=payload)
     assert response.status_code == 201
-    
+
     created = response.json()
     assert len(created["c13_couplings"]) == 1
     assert created["c13_couplings"][0]["ppm"] == 125.1
     assert created["c13_couplings"][0]["atom_tag"] == 2
-    
+
     assert len(created["alt_nuclei"]) == 1
     assert created["alt_nuclei"][0]["nucleus"] == "31P"
     assert created["alt_nuclei"][0]["ppm"] == -14.2

@@ -40,14 +40,20 @@ jobs:
       - name: Move Backend Binary to Resources
         shell: bash
         run: |
-          rm -rf resources/bin/molecular-backend
           mkdir -p resources/bin
-          cp -a backend/dist/molecular-backend resources/bin/
+          mv backend/dist/molecular-backend/* resources/bin/
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+
+      - name: Install RPM and PACMAN dependencies and tools
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt update
+          sudo apt install -y rpm zstd libarchive-tools build-essential libfuse2
 
       - name: Build Frontend
         shell: bash
@@ -72,9 +78,7 @@ jobs:
 
       - name: Build and Publish with electron-builder
         env:
-          # This token is automatically provided by GitHub Actions
- #SvdV         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
-        # The -p always flag tells electron-builder to publish the artifacts to GitHub Releases
- #SvdV       run: npm run dist -- -p always
- 		run: npm run dist -- --publish never
+        # Passing --${{ matrix.arch }} forces electron-builder to strictly compile for the matrix host's architecture
+        run: npm run dist -- -p always
