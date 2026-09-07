@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ApiAdditionalSpectrum } from '../../api/exercises'
-import { forceSvgFontFamily, isLikelyIrSpectrum, isSvgPath } from './svgFontOverride'
+import { forceSvgFontFamily, isSvgPath } from './svgFontOverride'
 
 type ViewMode = 'fit' | 'scroll'
 
@@ -55,9 +55,7 @@ export function AdditionalSpectraPopup({ spectra }: Props) {
   const active = hasSpectra ? sortedSpectra[safeTab] : null
   const activeFilePath = active?.file_path ?? ''
   const activeIsSvg = isSvgPath(activeFilePath)
-  const activeIsIr = isLikelyIrSpectrum(active?.label, activeFilePath)
-  const useInlineSvg = activeIsSvg && !activeIsIr
-
+  const useInlineSvg = activeIsSvg;
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.2, 10))
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.2, 1))
 
@@ -79,7 +77,7 @@ export function AdditionalSpectraPopup({ spectra }: Props) {
       .then((text) => {
         if (cancelled) return
 
-        const processed = forceSvgFontFamily(text, '--font-spectrum', { forceFill: true })
+        const processed = forceSvgFontFamily(text, { forceFill: true })
           .replace(/<title[\s\S]*?<\/title>/gi, '')
           .replace(/<desc[\s\S]*?<\/desc>/gi, '')
           .replace(/<metadata[\s\S]*?<\/metadata>/gi, '')

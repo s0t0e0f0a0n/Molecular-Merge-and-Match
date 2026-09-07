@@ -111,6 +111,94 @@ def test_create_exercise_stores_additional_spectrum_priority_from_filename(clien
         db.close()
 
 
+def test_import_update_stores_explicit_additional_spectrum_priority(client):
+    response = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_HASH_CCO),
+    )
+    assert response.status_code == 201
+    exercise_id = response.json()["id"]
+
+    response = client.post(
+        "/api/v1/exercises/import-update",
+        json={
+            "match": {"inchi_hash": INCHI_HASH_CCO},
+            "append": [
+                {
+                    "filename": "custom-spectrum.svg",
+                    "file_base64": base64.b64encode(b"spectrum").decode("ascii"),
+                    "label": "IR",
+                    "priority": 42,
+                }
+            ],
+        },
+    )
+    assert response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        spectrum = db.query(ExerciseAdditionalSpectrum).one()
+        assert spectrum.exercise_id == exercise_id
+        assert spectrum.priority == 42
+    finally:
+        db.close()
+
+
+def test_import_update_replaces_additional_spectrum_row_and_file(client):
+    payload = _exercise_payload(solution_inchi=INCHI_HASH_CCO)
+    payload["additional_spectra"] = [
+        {
+            "filename": "1_IR.svg",
+            "file_base64": base64.b64encode(b"old spectrum").decode("ascii"),
+            "label": "IR",
+        }
+    ]
+    created_response = client.post("/api/v1/exercises/", json=payload)
+    assert created_response.status_code == 201
+    exercise_id = created_response.json()["id"]
+
+    db = SessionLocal()
+    try:
+        spectrum = (
+            db.query(ExerciseAdditionalSpectrum)
+            .filter(ExerciseAdditionalSpectrum.exercise_id == exercise_id)
+            .one()
+        )
+        old_path = spectrum.file_path
+        old_file = _upload_url_to_file_path(old_path)
+        assert old_file.exists()
+        spectrum_id = spectrum.id
+    finally:
+        db.close()
+
+    response = client.post(
+        "/api/v1/exercises/import-update",
+        json={
+            "match": {"inchi_hash": INCHI_HASH_CCO},
+            "replace_additional": {
+                "ir": {
+                    "filename": "1_IR.svg",
+                    "file_base64": base64.b64encode(b"new spectrum").decode("ascii"),
+                    "label": "IR",
+                }
+            },
+        },
+    )
+    assert response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        replacement = db.query(ExerciseAdditionalSpectrum).filter(
+            ExerciseAdditionalSpectrum.id == spectrum_id,
+        ).one()
+        assert replacement.exercise_id == exercise_id
+        assert replacement.file_path != old_path
+        assert _upload_url_to_file_path(replacement.file_path).read_bytes() == b"new spectrum"
+        assert not old_file.exists()
+    finally:
+        db.close()
+
+
 def test_create_exercise_parses_solvent_with_parentheses(client):
     payload = _exercise_payload()
     payload["h1_nmr_text"] = (
@@ -195,3 +283,60 @@ def test_create_exercise_keeps_alt_cas_fields_optional(client):
         assert row.alt2_cas_hash is None
     finally:
         db.close()
+        
+def test_create_exercise_with_empty_peak_segments(client):
+    """
+    Verifies that the lazy quantifier (.*?) successfully matches 1H and 13C 
+    headers even when they contain absolutely no data blocks between ':' and ';'.
+    """
+    payload = _exercise_payload()
+    payload["h1_nmr_text"] = "1H-NMR (CDCl3, 400 MHz):;"
+    payload["c13_nmr_text"] = "13C-NMR (CDCl3, 100 MHz):;"
+
+    response = client.post("/api/v1/exercises/", json=payload)
+    assert response.status_code == 201
+    
+    created = response.json()
+    assert created["h1_peaks"] == []
+    assert created["c13_peaks"] == []
+
+
+def test_create_exercise_with_blank_optional_text_fields(client):
+    """
+    Verifies that when optional text fields are explicitly passed as spaces, 
+    tabs, or empty strings, the upfront string guard strips them out safely 
+    and skips engine extraction without throwing a 422 exception.
+    """
+    payload = _exercise_payload()
+    payload["c13_alt_text"] = "   "  # Whitespace padding
+    payload["alt_nuc_text"] = ""     # Empty string string
+    
+    response = client.post("/api/v1/exercises/", json=payload)
+    assert response.status_code == 201
+    
+    created = response.json()
+    assert created["c13_couplings"] == []
+    assert created["alt_nuclei"] == []
+
+
+def test_create_exercise_with_populated_optional_text_fields(client):
+    """
+    Validates that when the optional fields are provided with data, they are 
+    correctly processed by the underlying loops and saved to the response structure.
+    """
+    payload = _exercise_payload()
+    payload["c13_alt_text"] = "13C-NMR (CDCl3, 100 MHz): 125.1 (d, J = 5.5 Hz, 2);"
+    payload["alt_nuc_text"] = "31P-NMR (CDCl3, 162 MHz): -14.2 (s);"
+
+    response = client.post("/api/v1/exercises/", json=payload)
+    assert response.status_code == 201
+    
+    created = response.json()
+    assert len(created["c13_couplings"]) == 1
+    assert created["c13_couplings"][0]["ppm"] == 125.1
+    assert created["c13_couplings"][0]["atom_tag"] == 2
+    
+    assert len(created["alt_nuclei"]) == 1
+    assert created["alt_nuclei"][0]["nucleus"] == "31P"
+    assert created["alt_nuclei"][0]["ppm"] == -14.2
+

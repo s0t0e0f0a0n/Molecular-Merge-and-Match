@@ -8,7 +8,9 @@ import {
   buildPayloadFromCsvRow,
   parseCsv,
   postExercise,
+  postExerciseImportUpdate,
 } from "./exerciseImportUtils";
+import type { AdditionalSpectrum, ExerciseImportUpdateRequest, UploadedSvgPayload } from "./exerciseImportUtils";
 
 interface ExerciseZipImportProps {
   onImported?: () => void | Promise<void>;
@@ -63,6 +65,93 @@ function getAllCsvEntries(zip: JSZip): JSZipObject[] {
   return Object.values(zip.files)
     .filter((entry): entry is JSZipObject => !entry.dir && entry.name.toLowerCase().endsWith(".csv"))
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+}
+
+function getJsonEntry(zip: JSZip): JSZipObject | null {
+  return Object.values(zip.files).find((entry) => !entry.dir && entry.name.toLowerCase().endsWith(".json")) ?? null;
+}
+
+function findZipEntry(zip: JSZip, path: string): JSZipObject | null {
+  const normalizedPath = path.replace(/\\/g, "/").replace(/^\.\//, "").toLowerCase();
+  return Object.values(zip.files).find((entry) => !entry.dir && entry.name.replace(/\\/g, "/").toLowerCase() === normalizedPath) ?? null;
+}
+
+async function readSvgPayload(zip: JSZip, path: string): Promise<UploadedSvgPayload> {
+  const entry = findZipEntry(zip, path);
+  if (!entry) throw new Error(`Referenced SVG file not found: ${path}`);
+  return { filename: getFileName(entry.name), svg_text: await entry.async("text") };
+}
+
+async function readAdditionalSpectrum(zip: JSZip, spectrum: { file: string; label?: string | null; key?: string; priority?: number }): Promise<AdditionalSpectrum> {
+  const entry = findZipEntry(zip, spectrum.file);
+  if (!entry) throw new Error(`Referenced spectrum file not found: ${spectrum.file}`);
+  return {
+    filename: getFileName(entry.name),
+    file_base64: await entry.async("base64"),
+    label: spectrum.label ?? spectrum.key ?? null,
+    priority: spectrum.priority,
+  };
+}
+
+async function processJsonImport(zip: JSZip, jsonEntry: JSZipObject): Promise<{ updatedCount: number; failures: string[] }> {
+  const manifest = JSON.parse(await jsonEntry.async("text")) as {
+    schema_version?: number;
+    operation?: string;
+    changes?: Array<{
+      match?: { inchi_hash?: string; cas_hash?: string };
+      update?: Record<string, unknown>;
+      spectra?: {
+        replace?: {
+          h1?: string;
+          c13?: string;
+          additional?: Record<string, { file: string; label?: string | null; key?: string; priority?: number }>;
+        };
+        add?: Array<{ file: string; label?: string | null; key?: string; priority?: number }>;
+      };
+    }>;
+  };
+  if (manifest.schema_version !== 1 || manifest.operation !== "update" || !Array.isArray(manifest.changes)) {
+    throw new Error("JSON import requires schema_version 1, operation 'update', and a changes array.");
+  }
+
+  let updatedCount = 0;
+  const failures: string[] = [];
+  for (let index = 0; index < manifest.changes.length; index += 1) {
+    const change = manifest.changes[index];
+    try {
+      if (!change.match?.inchi_hash && !change.match?.cas_hash) throw new Error("Missing InChI/CAS match identifier.");
+      const update = { ...(change.update ?? {}) };
+      if ("inchi_hash" in update) {
+        update.solution_inchi_hash = update.inchi_hash;
+        delete update.inchi_hash;
+      }
+      if ("cas_hash" in update) {
+        update.solution_cas_hash = update.cas_hash;
+        delete update.cas_hash;
+      }
+      const replace: { h1?: UploadedSvgPayload; c13?: UploadedSvgPayload } = {};
+      if (change.spectra?.replace?.h1) replace.h1 = await readSvgPayload(zip, change.spectra.replace.h1);
+      if (change.spectra?.replace?.c13) replace.c13 = await readSvgPayload(zip, change.spectra.replace.c13);
+      const append = await Promise.all((change.spectra?.add ?? []).map((spectrum) => readAdditionalSpectrum(zip, spectrum)));
+      const replaceAdditional: Record<string, AdditionalSpectrum> = {};
+      for (const [key, spectrum] of Object.entries(change.spectra?.replace?.additional ?? {})) {
+        replaceAdditional[key] = await readAdditionalSpectrum(zip, spectrum);
+      }
+      const request: ExerciseImportUpdateRequest = {
+        match: change.match,
+        update,
+        replace,
+        replace_additional: replaceAdditional,
+        append,
+      };
+      const result = await postExerciseImportUpdate(request);
+      if (!result.ok) throw new Error(result.detail ?? "Failed to update exercise.");
+      updatedCount += 1;
+    } catch (error) {
+      failures.push(`Change ${index + 1}: ${error instanceof Error ? error.message : "Failed to update exercise."}`);
+    }
+  }
+  return { updatedCount, failures };
 }
 
 function getFilesInDirectory(zip: JSZip, directoryPath: string): JSZipObject[] {
@@ -126,6 +215,21 @@ export function ExerciseZipImport({ onImported, onImportingChange }: ExerciseZip
     try {
       const zip = await JSZip.loadAsync(file);
       const allCsvEntries = getAllCsvEntries(zip);
+      const jsonEntry = getJsonEntry(zip);
+      if (jsonEntry) {
+        if (allCsvEntries.length > 0) {
+          throw new Error("ZIP cannot contain both JSON and CSV import files.");
+        }
+        const { updatedCount, failures } = await processJsonImport(zip, jsonEntry);
+        if (failures.length === 0) {
+          setSuccessText(`JSON import complete: ${updatedCount} exercises updated.`);
+        } else {
+          setErrorText(`JSON import finished: ${updatedCount} updated, ${failures.length} failed. ${failures.slice(0, 8).join(" | ")}`);
+          if (updatedCount > 0) setSuccessText(`JSON import partial success: ${updatedCount} exercises updated.`);
+        }
+        if (updatedCount > 0) await onImported?.();
+        return;
+      }
       if (allCsvEntries.length === 0) {
         setErrorText("ZIP must contain at least one .csv file.");
         return;

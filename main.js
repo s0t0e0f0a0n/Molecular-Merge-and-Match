@@ -19,6 +19,13 @@ ipcMain.on('toggle-fullscreen', (event) => {
     }
 });
 
+// Controleer of de app binnen een Snap-omgeving draait
+if (process.platform === 'linux' && process.env.SNAP) {
+    app.commandLine.appendSwitch('no-sandbox');
+    app.commandLine.appendSwitch('disable-dev-shm-usage');
+}
+
+
 function getFreePort() {
     return new Promise((resolve, reject) => {
         const server = nodeNet.createServer();
@@ -116,9 +123,14 @@ function startBackend() {
 
     try {
         if (process.platform !== 'win32' && fs.existsSync(backendPath)) {
-            try { fs.chmodSync(backendPath, 511); //Also here might need "511"
-                console.log("Successfully set 755 execution permissions on backend binary.");
-
+            try {
+                // Sla chmod over als we in een Snap-omgeving zitten (altijd read-only)
+                if (process.env.SNAP) {
+                    console.log("Running inside Snap, skipping chmod (read-only filesystem).");
+                } else {
+                    fs.chmodSync(backendPath, 511); // Veilig decimaal 511 voor Flatpak/macOS
+                    console.log("Successfully set 755 execution permissions on backend binary.");
+                }
             }
             catch (e) {
                 console.warn("Failed to set execute permissions:", e);
@@ -130,7 +142,7 @@ function startBackend() {
         const backendCwd = app.isPackaged
             ? app.getPath('userData')
             : path.join(__dirname, 'backend');
-            console.log(`Setting backend CWD context to: ${backendCwd}`);
+        console.log(`Setting backend CWD context to: ${backendCwd}`);
 
         backendProcess = spawn(backendPath, [backendPort.toString()], {
             detached: true,

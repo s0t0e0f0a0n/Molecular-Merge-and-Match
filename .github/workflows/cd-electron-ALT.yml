@@ -1,0 +1,93 @@
+name: CD — Build alternate installers
+
+on:
+  push:
+    tags:
+      - '*-alt'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-11-arm, macos-15-intel, ubuntu-24.04-arm]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build Python Backend (Sidecar) for macOS (Intel)
+        if: runner.os == 'macOS'
+        run: |
+          cd backend
+          pip install fastapi==0.115.6 uvicorn==0.30.6 pydantic-settings==2.6.1 python-multipart==0.0.12 SQLAlchemy==2.0.36 rdkit==2025.9.3
+          pip install pyinstaller
+          pyinstaller --noconsole --collect-all rdkit --collect-all fastapi --collect-all uvicorn --name molecular-backend main_electron.py
+
+      - name: Build Python Backend (Sidecar) for Windows and Linux (arm)
+        if: runner.os != 'macOS'
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install pyinstaller
+          pyinstaller --noconsole --collect-all rdkit --collect-all fastapi --collect-all uvicorn --name molecular-backend main_electron.py
+
+      - name: Move Backend Binary to Resources
+        shell: bash
+        run: |
+          mkdir -p resources/bin
+          mv backend/dist/molecular-backend/* resources/bin/
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install RPM and PACMAN dependencies and tools
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt update
+          sudo apt install -y rpm zstd libarchive-tools build-essential libfuse2
+
+      - name: Build Frontend
+        shell: bash
+        env:
+          VITE_BASE_PATH: './'
+        run: |
+          cd frontend
+          npm install
+          mkdir -p public
+          npm run postinstall
+          npm run build
+
+      - name: Install Root Dependencies
+        run: npm install
+
+      - name: Set App Version from Tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          npm version $VERSION --allow-same-version --no-git-tag-version
+
+      - name: Build and Publish with electron-builder
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        # Passing --${{ matrix.arch }} forces electron-builder to strictly compile for the matrix host's architecture
+        run: npm run dist -- -p always

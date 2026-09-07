@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 
-export const DEFAULT_CHEATS = '0000000000';
+export const DEFAULT_CHEATS = '000000000000';
 
 export function normalizeCheatBits(raw: unknown): string {
   const bits = String(raw ?? '')
@@ -39,6 +39,7 @@ export function useCheating(rawCheats: unknown) {
   const showH1JValues = useMemo(() => isEnabled(6), [isEnabled]);
   const showAtomCount = useMemo(() => isEnabled(7), [isEnabled]);
   const showAltNucleiTables = useMemo(() => isEnabled(8), [isEnabled]);
+  const showSecretTags = useMemo(() => isEnabled(9), [isEnabled]);
   const showSpectrumDataSources = useMemo(() => isEnabled(10), [isEnabled]);
 
   return {
@@ -51,6 +52,7 @@ export function useCheating(rawCheats: unknown) {
     showH1JValues,
     showAtomCount,
     showAltNucleiTables,
+    showSecretTags,
     showSpectrumDataSources,
   };
 }

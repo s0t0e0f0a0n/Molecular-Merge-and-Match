@@ -10,6 +10,7 @@ venv/
 # Node
 node_modules/
 dist/
+nul
 
 # Frontend public assets (copied by postinstall from node_modules)
 frontend/public/RDKit_minimal.js

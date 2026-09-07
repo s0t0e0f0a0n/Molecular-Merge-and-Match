@@ -30,6 +30,7 @@ export const mockExercise1: ExerciseDetail = {
     '1H NMR (300 MHz, CDCl3) δ 2.46 (q, J = 7.3 Hz, 1H), 2.14 (s, 2H), 1.06 (t, J = 7.3 Hz, 2H).',
   h1_frequency_mhz: 300,
   h1_solvent: 'CDCl3',
+  h1_data_source: null,
   h1_peaks: [
     {
       id: 1,
@@ -63,17 +64,21 @@ export const mockExercise1: ExerciseDetail = {
   c13_axis_end: -2,
   c13_nmr_text:
     '13C NMR (75 MHz, CDCl3) δ 209.58, 77.58, 77.16, 76.74, 36.90, 29.49, 7.87.',
+  c13_alt_text: null,
   c13_frequency_mhz: 75,
   c13_solvent: 'CDCl3',
+  c13_data_source: null,
   c13_peaks: [
-    { id: 1, ppm: 209.58, atom_count: 1, extra_info: null },
-    { id: 2, ppm: 77.58, atom_count: 1, extra_info: null },
-    { id: 3, ppm: 77.16, atom_count: 1, extra_info: null },
-    { id: 4, ppm: 76.74, atom_count: 1, extra_info: null },
-    { id: 5, ppm: 36.9, atom_count: 1, extra_info: null },
-    { id: 6, ppm: 29.49, atom_count: 1, extra_info: null },
-    { id: 7, ppm: 7.87, atom_count: 1, extra_info: null },
+    { id: 1, ppm: 209.58, atom_tag: null, atom_count: 1, extra_info: null },
+    { id: 2, ppm: 77.58, atom_tag: null, atom_count: 1, extra_info: null },
+    { id: 3, ppm: 77.16, atom_tag: null, atom_count: 1, extra_info: null },
+    { id: 4, ppm: 76.74, atom_tag: null, atom_count: 1, extra_info: null },
+    { id: 5, ppm: 36.9, atom_tag: null, atom_count: 1, extra_info: null },
+    { id: 6, ppm: 29.49, atom_tag: null, atom_count: 1, extra_info: null },
+    { id: 7, ppm: 7.87, atom_tag: null, atom_count: 1, extra_info: null },
   ],
+  c13_couplings: [],
+  alt_nuclei: [],
 
   additional_spectra: [],
 };
@@ -93,6 +98,7 @@ export const mockExercise2: ExerciseDetail = {
     '1H NMR (300 MHz, CDCl3) δ 4.14 – 3.80 (m, 1H), 2.58 (d, J = 2.1 Hz, 1H), 1.20 (d, J = 6.2 Hz, 6H).',
   h1_frequency_mhz: 300,
   h1_solvent: 'CDCl3',
+  h1_data_source: null,
   h1_peaks: [
     {
       id: 4,
@@ -126,15 +132,19 @@ export const mockExercise2: ExerciseDetail = {
   c13_axis_end: -2,
   c13_nmr_text:
     '13C NMR (75 MHz, CDCl3) δ 77.58, 77.16, 76.73, 64.18, 25.27.',
+  c13_alt_text: null,
   c13_frequency_mhz: 75,
   c13_solvent: 'CDCl3',
+  c13_data_source: null,
   c13_peaks: [
-    { id: 8, ppm: 77.58, atom_count: 1, extra_info: null },
-    { id: 9, ppm: 77.16, atom_count: 1, extra_info: null },
-    { id: 10, ppm: 76.73, atom_count: 1, extra_info: null },
-    { id: 11, ppm: 64.18, atom_count: 1, extra_info: null },
-    { id: 12, ppm: 25.27, atom_count: 1, extra_info: null },
+    { id: 8, ppm: 77.58, atom_tag: null, atom_count: 1, extra_info: null },
+    { id: 9, ppm: 77.16, atom_tag: null, atom_count: 1, extra_info: null },
+    { id: 10, ppm: 76.73, atom_tag: null, atom_count: 1, extra_info: null },
+    { id: 11, ppm: 64.18, atom_tag: null, atom_count: 1, extra_info: null },
+    { id: 12, ppm: 25.27, atom_tag: null, atom_count: 1, extra_info: null },
   ],
+  c13_couplings: [],
+  alt_nuclei: [],
 
   additional_spectra: [],
 };

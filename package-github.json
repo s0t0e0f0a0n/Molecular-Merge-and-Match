@@ -11,7 +11,7 @@
     "clean:win": "if exist dist-electron rmdir /s /q dist-electron && if exist frontend\\dist rmdir /s /q frontend\\dist",
     "clean:unix": "rm -rf dist-electron frontend/dist",
     "clean": "npm run clean:win 2>nul || npm run clean:unix",
-    "dist": "electron-builder --publish never",
+    "dist": "electron-builder",
     "postinstall": "electron-builder install-app-deps",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -48,34 +48,37 @@
     "win": {
       "target": [
         "nsis",
-        "portable"
-      ],
+        "portable"        
+      ],      
       "icon": "build-assets/icon.png"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "${productName}-Setup-${version}-localbuild-${arch}.${ext}"
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
     },
 
     "portable": {
-      "artifactName": "${productName}-Portable-${version}-localbuild-${arch}.${ext}"
+      "artifactName": "${productName}-Portable-${version}-${arch}.${ext}"
     },
     "mac": {
       "target": [
         "dmg"
       ],
-      "artifactName": "${productName}-Setup-${version}-localbuild-${arch}.${ext}",
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
       "icon": "build-assets/icon.icns",
       "category": "public.app-category.education"
     },
     "linux": {
       "target": [
-        "deb"
+        "AppImage",
+        "pacman",
+        "deb",
+        "rpm"
       ],
       "executableName": "molecularmergeandmatch",
-      "artifactName": "${productName}-Setup-${version}-localbuild-${arch}.${ext}",
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
       "icon": "build-assets/icon.icns",
       "category": "Education",
       "synopsis": "Molecular Bookkeeping for Structural Analysis",

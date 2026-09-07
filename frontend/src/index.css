@@ -1,94 +1,97 @@
+/* ==========================================================================
+   1. Global Resets & Base Variables
+   ========================================================================== */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
-
-@font-face {
-  font-family: 'Ubuntu Sans';
-  src: url("./fonts/ubuntu_sans/UbuntuSans-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Ubuntu Sans';
-  src: url("./fonts/ubuntu_sans/UbuntuSans-Italic.ttf") format("truetype");
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Ubuntu Sans';
-  src: url("./fonts/ubuntu_sans/UbuntuSans-SemiBold.ttf") format("truetype");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Ubuntu Sans';
-  src: url("./fonts/ubuntu_sans/UbuntuSans-SemiBoldItalic.ttf") format("truetype");
-  font-weight: 600;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Ubuntu Sans';
-  src: url("./fonts/ubuntu_sans/UbuntuSans-Bold.ttf") format("truetype");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Ubuntu Sans';
-  src: url("./fonts/ubuntu_sans/UbuntuSans-ExtraBold.ttf") format("truetype");
-  font-weight: 800;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Ubuntu Sans';
-  src: url("./fonts/ubuntu_sans/UbuntuSans-ExtraBoldItalic.ttf") format("truetype");
-  font-weight: 800;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Ubuntu Sans';
-  src: url("./fonts/ubuntu_sans/UbuntuSans-BoldItalic.ttf") format("truetype");
-  font-weight: 700;
-  font-style: italic;
-  font-display: swap;
-}
-
+/* also testing dark and light mode */
 :root {
   --font-ui: 'Ubuntu Sans', system-ui, sans-serif;
-  --font-spectrum: Aptos, Calibri, 'Ubuntu Sans', system-ui, sans-serif;
+  --font-spectrum: Aptos, 'Ubuntu Sans', system-ui, sans-serif;
+  --font-mono: 'Noto Sans Mono', 'JetBrains Mono', Consolas, SFMono-Regular, Menlo, Monaco, 'Courier New', ui-monospace, monospace; 
+
 }
 
+/* ==========================================================================
+   2. Font Face Declarations (Modernized Formats)
+   ========================================================================== */
+/* Main Variable Font File (Handles all normal weights 100-800) */
+@font-face {
+  font-family: 'Ubuntu Sans';
+  src: url("./fonts/UbuntuSans-VarFont.woff2") format("woff2"),
+       url("./fonts/UbuntuSans-VarFont_wdth_wght.ttf") format("truetype");
+  font-weight: 100 800;
+  font-stretch: 75% 100%;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Italic Variable Font File (Handles all italic weights 100-800) */
+@font-face {
+  font-family: 'Ubuntu Sans';
+  src: url("./fonts/UbuntuSans-Italic-VarFont.woff2") format("woff2"),
+       url("./fonts/UbuntuSans-Italic-VarFont_wdth_wght.ttf") format("truetype");
+  font-weight: 100 800;
+  font-stretch: 75% 100%;
+  font-style: italic;
+  font-display: swap;
+}
+/* Monospaced Variable Font File (Handles all normal weights 100-800) */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url("./fonts/JetBrainsMono[wght].woff2") format("woff2"),
+       url("./fonts/JetBrainsMono[wght].ttf") format("truetype");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Monospaced Variable Font File (Handles all italic weights 100-800) */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url("./fonts/JetBrainsMono-Italic[wght].woff2") format("woff2"),
+       url("./fonts/JetBrainsMono-Italic[wght].ttf") format("truetype");
+  font-weight: 100 800;
+  font-style: italic;
+  font-display: swap;
+}
+/* Another test Monospace font */
+@font-face {
+  font-family: 'Noto Sans Mono';
+  src: url("./fonts/NotoSansMono-VariableFont_wdth,wght.woff2") format("woff2"),
+       url("./fonts/NotoSansMono-VariableFont_wdth,wght.ttf") format("truetype");
+  font-weight: 100 800;
+  font-stretch: 62.5% 100%;
+  font-style: normal italic oblique;
+  font-display: swap;
+}
+/* ==========================================================================
+   3. Layout & Global Element Rules (Fully Merged & Cleaned)
+   ========================================================================== */
 html,
 body,
 #root {
   font-family: var(--font-ui);
+  height: 100%;
 }
 
 html,
 body {
   margin: 0;
   padding: 0;
-  height: 100%;
   overflow: hidden;
+  
+  /* Forces crisp text rendering on 1080p display panels */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-#root {
-  height: 100%;
+body {
+  font-size: 16px; /* Base size adapts cleanly across 1080p and 720p */
+  line-height: 1.5; /* Prevents text crowding at 125% zoom */
 }
 
 button,
@@ -96,4 +99,169 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+/* Use a media query to target the 720p minimum constraint globally */
+@media (max-width: 1280px) or (max-height: 720px) {
+  body {
+    /* Slightly narrow the font width to squeeze 20-30% more data 
+       horizontally onto the smaller 720p canvas without changing font size */
+    font-stretch: 90%; 
+  }
+}
+
+/* ==========================================================================
+   4. Component & Markdown Layouts
+   ========================================================================== */
+/* Wrapper for markdown content */
+.markdown-body {
+  font-family: var(--font-ui), -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #24292f;
+  padding: 16px;
+}
+
+/* Titles */
+.markdown-body h1, 
+.markdown-body h2, 
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5 {
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+/* Specific fontsize for headers, especially Margin-top is important for use within */
+.markdown-body h1 {
+  font-size: 2.0rem;
+  border-bottom: 1px solid #d8dee4;
+  padding-bottom: 0.3em;
+  margin-top: 0px;
+}
+
+.markdown-body h2 {
+  font-size: 1.75rem; /* ~28px */
+  border-bottom: 1px solid #d8dee4;
+  padding-bottom: 0.3em;
+  margin-top: 0px;
+}
+
+.markdown-body h3 {
+  font-size: 1.5rem;   /* ~24px */
+  border-bottom: 1px solid #d8dee4;
+  padding-bottom: 0.3em;
+  margin-top: 18px;
+}
+
+.markdown-body h4 {
+  font-size: 1.25rem; /* ~20px */
+  margin-top: 18px;
+}
+.markdown-body h5 {
+  font-size: 1.0rem;
+  margin-top: 18px;
+}
+
+/* Inline code */
+.markdown-body code:not(pre code) {
+  padding: .2em .4em;
+  font-family: var(--font-mono);
+  margin: 0;
+  font-size: 85%;
+  background-color: rgba(175, 184, 193, 0.2); 
+  border-radius: 6px;
+}
+
+/* Codeblocks (tabbed or ``` ) */
+.markdown-body pre {
+  padding: 16px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: #f6f8fa; 
+  border-radius: 6px;
+}
+.markdown-body blockquote {
+  padding: 2px 8px;
+  margin: 0px 12px;
+  overflow: auto;
+  background-color: #f6f8fa; 
+  border-radius: 6px;
+}
+
+.markdown-body pre code {
+  font-family: var(--font-mono);
+  background: transparent;
+  padding: 0;
+}
+/* Styling voor de cellen in de tabel */
+.markdown-body table th,
+.markdown-body table td {
+  /* Eerste getal is boven/onder, tweede getal is links/rechts */
+  padding: 12px 16px; 
+  border: 1px solid #d0d7de;
+}
+
+
+/* THE INDEPENDENT CONTAINER STYLING */
+.dedicated-ascii-terminal {
+  display: block !important;
+  white-space: pre !important;       /* CRUCIAL: Forces the browser to respect \n line breaks */
+  font-family: var(--font-mono), monospace !important;
+  font-size: 6px !important;
+  line-height: 1.25 !important;
+  overflow-x: auto !important;
+  padding: 12px !important;
+  background-color: rgba(48, 48, 48, 0.97) !important;
+  border-radius: 8px !important;
+  margin: 20px 0 !important;
+
+  /* DISABLE VARIABLE SYMBOL SCALE WRAPPING */
+  font-variant-ligatures: none !important;
+  font-feature-settings: "liga" 0, "calt" 0, "clig" 0, "dlig" 0 !important;
+  letter-spacing: 0px !important;
+  word-spacing: 0px !important;
+}
+
+/* VARIABLE COLOR MAPPINGS */
+.dedicated-ascii-terminal .x0 { color: #D3D7CF; font-weight: bold; }
+.dedicated-ascii-terminal .y0 { 
+  color: white; 
+  font-size: 11px !important;
+  font-weight: bold;
+  margin-top: 1px;
+}
+.dedicated-ascii-terminal .z0 { 
+  color: #D3D7CF; 
+  font-size: 11px !important;
+}
+.dedicated-ascii-terminal .c0 { color: white; font-weight: bold; }
+.dedicated-ascii-terminal .c1 { color: #00A4EF; font-weight: bold; }
+.dedicated-ascii-terminal .c2 { color: #DD682A; font-weight: bold; }
+.dedicated-ascii-terminal .c3 { color: #FAC705; font-weight: bold; }
+.dedicated-ascii-terminal .c4 { color: #66C557; font-weight: bold; }
+.dedicated-ascii-terminal .c5 { color: #963D97; font-weight: bold; }
+.dedicated-ascii-terminal .c6 { color: #555753; font-weight: bold; }
+.dedicated-ascii-terminal .c7 { color: #E03A3E; font-weight: bold; }
+.dedicated-ascii-terminal .c8 { color: cyan; font-weight: bold; }
+.dedicated-ascii-terminal .c9 { color: #00ff00; font-weight: bold; }
+
+
+
+
+
+/* ==========================================================================
+   5. Future implements
+   ========================================================================== */
+
+/* Light mode standard text */
+body.light-theme {
+  font-weight: 400;
+}
+/* Dark mode text - dropped slightly to 370 to prevent 
+   the letters from looking too blurry or bold on the 1080p screen */
+body.dark-theme {
+  font-weight: 370; 
 }

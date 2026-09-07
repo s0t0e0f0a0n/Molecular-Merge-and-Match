@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import InfoMD from '../../INFO.md?raw';
 import ChangelogMD from '../../CHANGELOG.md?raw';
+import AboutMD from '../../ABOUT.md?raw';
 import { DEFAULT_CHEATS, normalizeCheatBits } from '../../hooks/useCheating';
 import type { SolventPreference } from '../../api/solvents';
 import type { LinkInheritMode } from '../linking/LinkInheritOptionsPopup';
@@ -68,15 +72,38 @@ type SelectRowProps = {
   title?: string;
 };
 
-const TABS: Array<{ id: SettingsTabId; label: string }> = [
-  { id: 'settingstab', label: 'Settings' },
-  { id: 'solventstab', label: 'Solvents' },
-  { id: 'tagstab', label: 'Tags' },
-  { id: 'cheatstab', label: 'Cheats' },
-  { id: 'informationtab', label: 'Information' },
-  { id: 'changelogtab', label: 'Changelog' },
-  { id: 'abouttab', label: 'About' },
+const TABS: Array<{ id: SettingsTabId; label: React.ReactNode }> = [
+  { id: 'settingstab', label: <>
+  		<svg style={{ verticalAlign: 'middle' }} width="18px" height="18px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g stroke-width="0"></g><g stroke-linecap="round" stroke-linejoin="round"></g><g> <path d="M3 8L15 8M15 8C15 9.65686 16.3431 11 18 11C19.6569 11 21 9.65685 21 8C21 6.34315 19.6569 5 18 5C16.3431 5 15 6.34315 15 8ZM9 16L21 16M9 16C9 17.6569 7.65685 19 6 19C4.34315 19 3 17.6569 3 16C3 14.3431 4.34315 13 6 13C7.65685 13 9 14.3431 9 16Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path> </g>
+  		</svg>&nbsp;<span>Settings</span></> },
+  { id: 'solventstab', label: <>
+		{/* @ts-expect-error legacy SVG uses an SVG namespace attribute spelling */}
+  		<svg fill="currentColor" style={{ verticalAlign: 'middle' }} width="18px" height="18px"  id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 507.967 507.967" xml:space="preserve"><g stroke-width="0"></g><g stroke-linecap="round" stroke-linejoin="round"></g><g> <g> <g> <path d="M471.9,281.393l-233.3-233.3c3.5-5.4,2.9-12.8-1.8-17.6c-5.5-5.5-14.4-5.5-19.9,0l-160,160c-5.5,5.5-5.5,14.4,0,19.9 c4.9,4.9,11.3,5.7,17.6,1.8l233.3,233.3c34.9,34.9,104.3,59.8,164.1,0C532.3,385.093,505.9,315.393,471.9,281.393z M94.6,192.493 L219,68.193l166.1,166.1H136.4L94.6,192.493z M452.1,425.593c-42.9,42.9-100.2,24.2-124.3,0l-163.3-163.2h248.7l38.9,38.9 C477.2,326.393,495.6,382.093,452.1,425.593z"></path> </g> </g> <g> <g> <path d="M77.7,307.193c-2.8-3.4-6.9-5.4-11.2-5.4c-4.4,0-8.5,2-11.1,5.5c-9.3,12-55.4,73.6-55.4,105.7c0,36.6,29.8,66.5,66.5,66.5 c36.6,0,66.5-29.8,66.5-66.5C133,380.893,86.9,319.293,77.7,307.193z M66.5,451.393c-21.1,0-38.3-17.2-38.3-38.3 c0-13.8,19.9-47.2,38.4-73.4c18.5,26.3,38.3,59.6,38.3,73.4C104.8,434.193,87.6,451.393,66.5,451.393z"></path> </g> </g> </g>
+  		</svg>&nbsp;<span>Solvents</span></> },
+  { id: 'tagstab', label: <>
+		{/* @ts-expect-error legacy SVG uses an HTML class attribute spelling */}
+  		<svg fill="currentColor" style={{ verticalAlign: 'middle' }} width="18px" height="18px" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" class="icon"><g stroke-width="0"></g><g stroke-linecap="round" stroke-linejoin="round"></g><g> <path d="M483.2 790.3L861.4 412c1.7-1.7 2.5-4 2.3-6.3l-25.5-301.4c-.7-7.8-6.8-13.9-14.6-14.6L522.2 64.3c-2.3-.2-4.7.6-6.3 2.3L137.7 444.8a8.03 8.03 0 0 0 0 11.3l334.2 334.2c3.1 3.2 8.2 3.2 11.3 0zm62.6-651.7l224.6 19 19 224.6L477.5 694 233.9 450.5l311.9-311.9zm60.16 186.23a48 48 0 1 0 67.88-67.89 48 48 0 1 0-67.88 67.89zM889.7 539.8l-39.6-39.5a8.03 8.03 0 0 0-11.3 0l-362 361.3-237.6-237a8.03 8.03 0 0 0-11.3 0l-39.6 39.5a8.03 8.03 0 0 0 0 11.3l243.2 242.8 39.6 39.5c3.1 3.1 8.2 3.1 11.3 0l407.3-406.6c3.1-3.1 3.1-8.2 0-11.3z"></path> </g>
+  		</svg>&nbsp;<span>Tags</span></> },
+  { id: 'cheatstab', label: <>
+  		<svg fill="currentColor" style={{ verticalAlign: 'middle' }} width="18px" height="18px" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><g stroke-width="0"></g><g stroke-linecap="round" stroke-linejoin="round"></g><g><path fill-rule="evenodd" d="M253.617407,12.4967773 L434.398258,193.277628 C451.060628,209.939998 451.060628,236.955037 434.398258,253.617407 L253.617407,434.398258 C236.955037,451.060628 209.939998,451.060628 193.277628,434.398258 L12.4967773,253.617407 C-4.16559245,236.955037 -4.16559245,209.939998 12.4967773,193.277628 L193.277628,12.4967773 C209.939998,-4.16559245 236.955037,-4.16559245 253.617407,12.4967773 Z M223.447518,282.114184 C208.209422,282.114184 196.780851,293.378184 196.780851,308.396851 C196.780851,324.098184 207.863102,335.362184 223.447518,335.362184 C238.685613,335.362184 250.114184,324.098184 250.114184,308.738184 C250.114184,293.378184 238.685613,282.114184 223.447518,282.114184 Z M244.780851,116.780851 L202.114184,116.780851 L202.114184,244.780851 L244.780851,244.780851 L244.780851,116.780851 Z" transform="translate(32.552 32.552)"></path></g>
+  		</svg>&nbsp;<span>Cheats</span></> },
+  { id: 'informationtab', label: <>
+  		<svg style={{ verticalAlign: 'middle' }} width="18px" height="18px" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M3.214 1.072C4.813.752 6.916.71 8.354 2.146A.5.5 0 0 1 8.5 2.5v11a.5.5 0 0 1-.854.354c-.843-.844-2.115-1.059-3.47-.92-1.344.14-2.66.617-3.452 1.013A.5.5 0 0 1 0 13.5v-11a.5.5 0 0 1 .276-.447L.5 2.5l-.224-.447.002-.001.004-.002.013-.006a5.017 5.017 0 0 1 .22-.103 12.958 12.958 0 0 1 2.7-.869zM1 2.82v9.908c.846-.343 1.944-.672 3.074-.788 1.143-.118 2.387-.023 3.426.56V2.718c-1.063-.929-2.631-.956-4.09-.664A11.958 11.958 0 0 0 1 2.82z"/><path fill-rule="evenodd" d="M12.786 1.072C11.188.752 9.084.71 7.646 2.146A.5.5 0 0 0 7.5 2.5v11a.5.5 0 0 0 .854.354c.843-.844 2.115-1.059 3.47-.92 1.344.14 2.66.617 3.452 1.013A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.276-.447L15.5 2.5l.224-.447-.002-.001-.004-.002-.013-.006-.047-.023a12.582 12.582 0 0 0-.799-.34 12.96 12.96 0 0 0-2.073-.609zM15 2.82v9.908c-.846-.343-1.944-.672-3.074-.788-1.143-.118-2.387-.023-3.426.56V2.718c1.063-.929 2.631-.956 4.09-.664A11.956 11.956 0 0 1 15 2.82z"/>
+  		</svg>&nbsp;<span>Information</span></> },
+  { id: 'changelogtab', label: <>
+  		<svg style={{ verticalAlign: 'middle' }} width="18px" height="18px" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><g stroke-width="0"></g><g stroke-linecap="round" stroke-linejoin="round"></g><g><path d="M550.208 960H209.28A81.792 81.792 0 0 1 128 877.76V146.24A81.92 81.92 0 0 1 209.344 64h613.632a81.92 81.92 0 0 1 81.28 82.432v405.76a29.824 29.824 0 1 1-59.584 0V146.56a22.272 22.272 0 0 0-21.76-22.656H209.408a22.08 22.08 0 0 0-21.696 22.528v731.52a21.76 21.76 0 0 0 21.44 22.464h341.056a29.824 29.824 0 0 1 0.064 59.584z m196.352-600.96H285.824a29.824 29.824 0 1 1 0-59.712h460.8a29.824 29.824 0 1 1 0 59.712z m-204.8 156.8H285.824a29.824 29.824 0 1 1 0-59.712h255.936a29.824 29.824 0 1 1 0 59.648z m179.2 391.936c-101.12 0-183.424-83.84-183.424-186.624a29.824 29.824 0 1 1 59.712 0c0 70.016 55.552 126.976 123.584 126.976 17.408 0 34.24-3.712 50.048-10.88a29.888 29.888 0 0 1 24.768 54.336c-23.552 10.688-48.64 16.192-74.688 16.192z m153.6-156.8a29.824 29.824 0 0 1-29.824-29.824c0-70.016-55.552-126.976-123.648-126.976-16.32 0-32.384 3.2-47.36 9.6a29.888 29.888 0 0 1-23.424-54.912 180.224 180.224 0 0 1 70.784-14.336c101.12 0 183.424 83.84 183.424 186.624a30.016 30.016 0 0 1-29.952 29.824z m-204.8-104.576h-51.264a29.76 29.76 0 0 1-25.28-14.08 30.144 30.144 0 0 1-1.536-28.928l25.6-52.352a29.696 29.696 0 0 1 53.632 0l25.6 52.352a29.696 29.696 0 0 1-1.472 28.928 29.504 29.504 0 0 1-25.28 14.08z m127.552 269.568h-1.024a29.696 29.696 0 0 1-24.896-14.848l-25.6-44.288a29.888 29.888 0 0 1 23.808-44.672l58.048-4.032c11.392-0.704 22.144 5.12 27.904 14.848a30.016 30.016 0 0 1-1.024 31.616l-32.448 48.256a29.824 29.824 0 0 1-24.768 13.12z" fill="currentColor"></path></g>
+  		</svg>&nbsp;<span>Changelog</span></> },
+  { id: 'abouttab', label: <>
+		{/* @ts-expect-error legacy SVG uses an SVG namespace attribute spelling */}
+  		<svg style={{ verticalAlign: 'middle' }} fill="currentColor" height="18px" width="18px" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 511.936 511.936" xml:space="preserve"><g stroke-width="0"></g><g stroke-linecap="round" stroke-linejoin="round"></g><g> <g> <g> <g> <path d="M255.959,128c11.776,0,21.333-9.557,21.333-21.333s-9.557-21.333-21.333-21.333s-21.333,9.557-21.333,21.333 S244.183,128,255.959,128z"></path> <path d="M383.968,0h-256C80.907,0,42.635,38.272,42.635,85.333v213.333c0,47.061,38.272,85.333,85.333,85.333h64l0.085,92.075 c0,14.571,8.683,27.584,22.165,33.173c4.331,1.792,8.875,2.688,13.397,2.688c9.557,0,19.157-3.968,27.051-11.968L350.475,384 h33.493c47.061,0,85.333-38.272,85.333-85.333V85.333C469.301,38.272,431.029,0,383.968,0z M426.635,298.667 c0,23.531-19.157,42.667-42.667,42.667h-36.629c-9.621,0-18.645,3.755-26.752,12.011l-85.888,103.979l-0.064-80.085 c0-19.797-16.107-35.904-35.904-35.904h-70.763c-23.531,0-42.667-19.136-42.667-42.667V85.333 c0-23.531,19.136-42.667,42.667-42.667h256c23.509,0,42.667,19.136,42.667,42.667V298.667z"></path> <path d="M298.626,256h-21.333v-85.333c0-11.776-9.536-21.333-21.333-21.333h-21.333c-11.797,0-21.333,9.557-21.333,21.333 S222.829,192,234.626,192v64h-21.333c-11.797,0-21.333,9.557-21.333,21.333s9.536,21.333,21.333,21.333h85.333 c11.797,0,21.333-9.557,21.333-21.333S310.423,256,298.626,256z"></path> </g> </g> </g> </g>
+  		</svg>&nbsp;<span>About</span></> },
 ];
+
+
+/* fill="currentColor" style={{ verticalAlign: 'middle' }} width="18px" height="18px" */
+
+
+
 
 const LINK_INHERIT_OPTIONS: SelectOption[] = [
   {
@@ -95,6 +122,7 @@ const LINK_INHERIT_OPTIONS: SelectOption[] = [
     title: 'Fragments keep their links, merged also inherits links. This can make it easier to see which fragment was linked to which peak. Warnings from the working fragments are turned off because the same peaks and atoms can be counted multiple times in this mode. The warnings for the working solution are still active.',
   },
 ];
+
 
 function readCheatBit(bits: string, oneBasedPosition: number): boolean {
   const normalized = normalizeCheatBits(bits);
@@ -297,7 +325,6 @@ export function SettingsPanel({
   onTagsUpdated,
 }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<SettingsTabId>('settingstab');
-
   const normalizedCheatBits = useMemo(
     () => normalizeCheatBits(cheatBits).padEnd(DEFAULT_CHEATS.length, '0').slice(0, DEFAULT_CHEATS.length),
     [cheatBits],
@@ -353,7 +380,7 @@ export function SettingsPanel({
             ))}
           </div>
           <button type="button" className="settings-panel-close" onClick={onClose}>
-            Close
+            ✕ Close
           </button>
         </div>
 
@@ -424,14 +451,14 @@ export function SettingsPanel({
                 onChange={(value) => onLinkInheritModeChange(value as LinkInheritMode)}
                 title="Choose what should happen with fragment links after merging two fragments."
               />
-              <SelectRow
+				{/* <SelectRow
                 id="setting-theme-select"
                 label="Select theme (NOT WORKING)"
                 value={selectedTheme}
                 options={availableThemes.map((theme) => ({ value: theme, label: theme }))}
                 onChange={onThemeChange}
                 title="Currently, only a light theme is available."
-              />
+              />  */}
               <SelectRow
                 id="setting-preset-select"
                 label="Presets"
@@ -550,7 +577,7 @@ export function SettingsPanel({
               />
               <ToggleRow
                 id="setting-cheat-tags"
-                label="Show cheat tags (NOT WORKING)"
+                label="Show cheat tags"
                 checked={readCheatBit(normalizedCheatBits, 9)}
                 onChange={(checked) => setCheat(9, checked)}
                 title="Include tags marked as cheats in the Tags tab so they can be hidden or deleted like regular tags."
@@ -567,8 +594,12 @@ export function SettingsPanel({
 
           {activeTab === 'informationtab' && (
             <div className="settings-tab-content" id="informationtab">
-              <h2 className="settings-tab-title">Information</h2>
-              <p className="settings-placeholder-text">Information content will be added here.</p>
+			  <div className="markdown-body">
+				<ReactMarkdown
+				  remarkPlugins={[remarkGfm]} 
+          		  rehypePlugins={[rehypeRaw]}
+          >{InfoMD}</ReactMarkdown>
+			  </div>
             </div>
           )}
 		  {activeTab === 'changelogtab' && (
@@ -579,10 +610,48 @@ export function SettingsPanel({
             </div>
           )}
 		  {activeTab === 'abouttab' && (
-            <div className="settings-tab-content" id="abouttab">
-              <h2 className="settings-tab-title">Information</h2>
-              <p className="settings-placeholder-text">Credits etc. will be added here.</p>
-            </div>
+		  	
+		  	
+      <div className="settings-tab-content" id="abouttab">
+      <div className="markdown-body">
+        <ReactMarkdown 
+          remarkPlugins={[remarkGfm]} 
+          rehypePlugins={[rehypeRaw]}
+          components={{
+            // Directly targets <ascii> inside your markdown file
+            'ascii': ({ children }: { children?: React.ReactNode }) => {
+              const rawText = String(children);
+              
+              // Perform your exact string substitutions cleanly
+              let formattedText = `<span class="c1">${rawText}</span>`
+                    .replace(/\$y/g, '</span><span class="y0">')
+      .replace(/\$x/g, '</span><span class="x0">')
+      .replace(/\$z/g, '</span><span class="z0">')
+      .replace(/\$9/g, '</span><span class="c9">')
+      .replace(/\$8/g, '</span><span class="c8">')
+      .replace(/\$7/g, '</span><span class="c7">')
+      .replace(/\$6/g, '</span><span class="c6">')
+      .replace(/\$5/g, '</span><span class="c5">')
+      .replace(/\$4/g, '</span><span class="c4">')
+      .replace(/\$3/g, '</span><span class="c3">')
+      .replace(/\$2/g, '</span><span class="c2">')
+      .replace(/\$1/g, '</span><span class="c1">')
+      .replace(/\$0/g, '</span><span class="c0">');
+
+              return (
+                <div 
+                  className="dedicated-ascii-terminal"
+                  dangerouslySetInnerHTML={{ __html: formattedText }} 
+                />
+              );
+            }
+          } as never}
+        >
+          {AboutMD}
+        </ReactMarkdown>
+      </div>
+    </div>
+          
           )}
         </div>
       </div>

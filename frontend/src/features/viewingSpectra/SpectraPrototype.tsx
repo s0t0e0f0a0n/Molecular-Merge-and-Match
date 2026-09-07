@@ -406,16 +406,18 @@ function SpectrumCanvas({
           <div
             style={{
               position: 'absolute',
+              fontFamily: 'var(--font-mono)',
               left: 6,
               bottom: 6,
               maxWidth: '50%',
+              minWidth: 'max-content',
               padding: '4px 6px',
               borderRadius: 6,
               background: 'rgba(0, 0, 0, 0.4)',
               color: 'white',
               fontSize: 10,
-              fontStyle: 'italic',
-              lineHeight: 0.6,
+              lineHeight: 0.9,              
+			  
               pointerEvents: 'none',
               whiteSpace: 'pre-wrap',
               overflowWrap: 'break-word',
@@ -449,7 +451,7 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
     .then((text) => {
       const processed = forceSvgFontFamily(
         applySvgTextVisibility(text, type, showSolventText, showExchangeText),
-        '--font-spectrum',
+        {},
       )
         .replace(/<title[\s\S]*?<\/title>/gi, '')
         .replace(/<desc[\s\S]*?<\/desc>/gi, '')

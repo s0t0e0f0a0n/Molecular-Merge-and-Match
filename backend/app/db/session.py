@@ -175,6 +175,7 @@ def _seed_tags() -> None:
                 description=tag["description"],
                 is_persistent=tag.get("is_persistent", False),
                 is_hidden=tag.get("is_hidden", False),
+                is_cheat=tag.get("is_cheat", False),
                 tag_count=tag.get("tag_count", 0),
                 user_tag=tag.get("user_tag", False),
             ))
@@ -555,20 +556,6 @@ def _purge_soft_deleted_fragments() -> None:
         db.close()
 
 
-def _purge_soft_deleted_tags() -> None:
-    """Hard-delete any tag rows still flagged as soft-deleted from a
-    previous backend session. Soft-deleted tags should not survive restart."""
-
-    db = SessionLocal()
-    try:
-        db.query(TagsUsed).filter(TagsUsed.deleted_at.isnot(None)).delete(
-            synchronize_session=False
-        )
-        db.commit()
-    finally:
-        db.close()
-
-
 def init_db() -> None:
     """
     Create tables and seed predefined fragments.
@@ -582,7 +569,6 @@ def init_db() -> None:
     _migrate_add_missing_columns()
     _seed_user_settings_presets()
     _purge_soft_deleted_fragments()
-    _purge_soft_deleted_tags()
     _seed_predefined_fragments()
     _seed_solvents()
     _seed_tags()

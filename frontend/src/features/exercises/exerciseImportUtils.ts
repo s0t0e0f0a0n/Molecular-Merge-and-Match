@@ -2,6 +2,7 @@ export type AdditionalSpectrum = {
   filename: string;
   file_base64: string;
   label: string | null;
+  priority?: number;
 };
 
 export type UploadedSvgPayload = {
@@ -35,6 +36,17 @@ export type ExerciseCreatePayload = {
 
 type CreatedExerciseResponse = {
   id: number;
+};
+
+export type ExerciseImportUpdateRequest = {
+  match: { inchi_hash?: string; cas_hash?: string };
+  update?: Record<string, unknown>;
+  replace?: {
+    h1?: UploadedSvgPayload;
+    c13?: UploadedSvgPayload;
+  };
+  replace_additional?: Record<string, AdditionalSpectrum>;
+  append?: AdditionalSpectrum[];
 };
 
 export const DEFAULT_AXIS_BEGIN = "10.1";
@@ -417,4 +429,23 @@ export async function postExercise(payload: ExerciseCreatePayload): Promise<{
 
   const created = maybeJson as CreatedExerciseResponse;
   return { ok: true, id: created.id };
+}
+
+export async function postExerciseImportUpdate(payload: ExerciseImportUpdateRequest): Promise<{
+  ok: boolean;
+  detail?: string;
+}> {
+  const response = await fetch("/api/v1/exercises/import-update", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const maybeJson = (await response.json().catch(() => null)) as { detail?: string } | null;
+  if (!response.ok) {
+    return {
+      ok: false,
+      detail: maybeJson?.detail ?? "Failed to update exercise.",
+    };
+  }
+  return { ok: true };
 }

@@ -68,11 +68,10 @@ def encode_tags_list(db: Session, tags: List[str]) -> Tuple[str | None, set[int]
         if not name:
             continue
 
-        # Find existing tag case-insensitively and not soft-deleted
+        # Reuse and restore an existing tag, including soft-deleted rows.
         existing = (
             db.query(TagsUsed)
             .filter(func.lower(TagsUsed.tag_name) == name.lower())
-            .filter(TagsUsed.deleted_at.is_(None))
             .first()
         )
         if existing is None:
@@ -87,6 +86,7 @@ def encode_tags_list(db: Session, tags: List[str]) -> Tuple[str | None, set[int]
             db.flush()
             ids.append(created.id)
         else:
+            existing.deleted_at = None
             ids.append(existing.id)
 
     encoded_parts = [f"%tag{{{i}}}" for i in ids]

@@ -9,6 +9,7 @@ import math
 import re
 from pathlib import Path
 from uuid import uuid4
+from typing import NamedTuple
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -94,20 +95,13 @@ _ADDITIONAL_SPECTRUM_PRIORITY_BY_NAME = {
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/exercises", tags=["exercises"])
 
-
 def _priority_for_additional_spectrum_filename(filename: str) -> int:
     stem = Path(filename).stem
     if not stem:
         return 0
-
     parts = stem.split("_")
-    if len(parts) > 1:
-        token = "_".join(parts[1:]).strip()
-    else:
-        token = stem.strip()
-
-    normalized_token = token.lower().replace(" ", "")
-    return _ADDITIONAL_SPECTRUM_PRIORITY_BY_NAME.get(normalized_token, 0)
+    token = "_".join(parts[1:]).strip() if len(parts) > 1 else stem.strip()
+    return _ADDITIONAL_SPECTRUM_PRIORITY_BY_NAME.get(token.lower().replace(" ", ""), 0)
 
 
 class AxisScale(BaseModel):
@@ -147,8 +141,7 @@ class UploadedSvgPayload(BaseModel):
     def validate_svg_content(cls, value: str) -> str:
         value = _SVG_SCRIPT_RE.sub("", value)
         value = _SVG_EVENT_ATTR_RE.sub("", value)
-        lowered = value.lower()
-        if "<svg" not in lowered or "</svg>" not in lowered:
+        if "<svg" not in value.lower() or "</svg>" not in value.lower():
             raise ValueError("Provided content is not a valid SVG document.")
         return value
 
@@ -157,6 +150,7 @@ class AdditionalSpectrumPayload(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
     file_base64: str = Field(min_length=1)
     label: str | None = Field(default=None, max_length=255)
+    priority: int | None = Field(default=None, ge=0)
 
     @field_validator("filename")
     @classmethod
@@ -164,9 +158,7 @@ class AdditionalSpectrumPayload(BaseModel):
         file_name = Path(value).name
         if file_name != value:
             raise ValueError("Filename must not contain path segments.")
-        allowed = {".svg", ".png", ".jpg", ".jpeg"}
-        suffix = Path(file_name).suffix.lower()
-        if suffix not in allowed:
+        if Path(file_name).suffix.lower() not in {".svg", ".png", ".jpg", ".jpeg"}:
             raise ValueError("Additional spectra must be SVG, PNG, JPG, or JPEG.")
         return file_name
 
@@ -175,7 +167,6 @@ class ExerciseCreate(BaseModel):
     h1_spectrum_svg: UploadedSvgPayload
     h1_axis_scale: AxisScale
     h1_nmr_text: str = Field(min_length=1)
-
     c13_spectrum_svg: UploadedSvgPayload
     c13_axis_scale: AxisScale
     c13_nmr_text: str = Field(min_length=1)
@@ -189,12 +180,10 @@ class ExerciseCreate(BaseModel):
     alt2_cas_number: str | None = Field(default=None, max_length=100)
     h1_data_source: str | None = Field(default=None, max_length=255)
     c13_data_source: str | None = Field(default=None, max_length=255)
-
     name: str | None = Field(default=None, max_length=255)
     exercise_set: str | None = Field(default=None, max_length=255)
     tags: list[str] = Field(default_factory=list)
     additional_spectra: list[AdditionalSpectrumPayload] = Field(default_factory=list)
-
     solvent: str | None = Field(default=None, max_length=100)
     h1_solvent: str | None = Field(default=None, max_length=100)
     c13_solvent: str | None = Field(default=None, max_length=100)
@@ -233,7 +222,6 @@ class H1PeakOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
-
 class C13PeakOut(BaseModel):
     id: int
     ppm: float
@@ -241,7 +229,6 @@ class C13PeakOut(BaseModel):
     atom_count: int
 
     model_config = {"from_attributes": True}
-
 
 class C13CouplingOut(BaseModel):
     id: int
@@ -253,7 +240,6 @@ class C13CouplingOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
-
 class AdditionalSpectrumOut(BaseModel):
     id: int
     file_path: str
@@ -261,7 +247,6 @@ class AdditionalSpectrumOut(BaseModel):
     priority: int
 
     model_config = {"from_attributes": True}
-
 
 class AdditionalNucleusOut(BaseModel):
     id: int
@@ -310,7 +295,6 @@ class ExerciseOut(BaseModel):
     alt_nuclei: list[AdditionalNucleusOut]
 
     additional_spectra: list[AdditionalSpectrumOut]
-
     model_config = {"from_attributes": True}
 
 class ExerciseSummaryOut(BaseModel):
@@ -344,6 +328,51 @@ class DbeUpdate(BaseModel):
 class DbeOut(BaseModel):
     dbe: float | None
 
+
+class ExerciseUpdateFields(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    name: str | None = None
+    molecular_formula: str | None = None
+    exercise_set: str | None = None
+    tags: list[str] | None = None
+    solution_inchi_hash: str | None = None
+    solution_cas_hash: str | None = None
+    alt1_cas_hash: str | None = None
+    alt2_cas_hash: str | None = None
+    h1_nmr_text: str | None = None
+    c13_nmr_text: str | None = None
+    c13_alt_text: str | None = None
+    alt_nuc_text: str | None = None
+    c13_apt: bool | None = None
+    h1_data_source: str | None = None
+    c13_data_source: str | None = None
+    solvent: str | None = None
+    h1_solvent: str | None = None
+    c13_solvent: str | None = None
+    h1_axis_start: float | None = None
+    h1_axis_end: float | None = None
+    c13_axis_start: float | None = None
+    c13_axis_end: float | None = None
+
+
+class ExerciseUpdateMatch(BaseModel):
+    inchi_hash: str | None = None
+    cas_hash: str | None = None
+
+
+class ExerciseReplaceSpectrum(BaseModel):
+    h1: UploadedSvgPayload | None = None
+    c13: UploadedSvgPayload | None = None
+
+
+class ExerciseUpdateRequest(BaseModel):
+    match: ExerciseUpdateMatch
+    update: ExerciseUpdateFields = Field(default_factory=ExerciseUpdateFields)
+    replace: ExerciseReplaceSpectrum = Field(default_factory=ExerciseReplaceSpectrum)
+    append: list[AdditionalSpectrumPayload] = Field(default_factory=list)
+    replace_additional: dict[str, AdditionalSpectrumPayload] = Field(default_factory=dict)
+
 def _uploads_root() -> Path:
     sqlite_parent = Path(settings.sqlite_path).resolve().parent
     root = sqlite_parent / "uploads" / "exercises"
@@ -362,34 +391,26 @@ def _abs_path_to_url(path: str) -> str:
     # Already a public URL
     if path.startswith("/uploads/") or path.startswith("/examples/") or path.startswith("/references/"):
         return path
-
     uploads_dir = Path(settings.sqlite_path).resolve().parent / "uploads"
-
     try:
         rel = Path(path).resolve().relative_to(uploads_dir)
         return "/uploads/" + rel.as_posix()
     except Exception:
         return path
 
-
 def _write_text_file(content: str, original_filename: str, folder: str) -> str:
     root = _uploads_root() / folder
     root.mkdir(parents=True, exist_ok=True)
     suffix = Path(original_filename).suffix.lower() or ".txt"
-    target_name = f"{uuid4().hex}{suffix}"
-    target_path = root / target_name
+    target_path = root / f"{uuid4().hex}{suffix}"
     target_path.write_text(content, encoding="utf-8")
     return str(target_path)
-
 
 def _write_base64_file(content_base64: str, original_filename: str, folder: str) -> str:
     root = _uploads_root() / folder
     root.mkdir(parents=True, exist_ok=True)
-
     suffix = Path(original_filename).suffix.lower() or ".bin"
-    target_name = f"{uuid4().hex}{suffix}"
-    target_path = root / target_name
-
+    target_path = root / f"{uuid4().hex}{suffix}"
     try:
         raw = base64.b64decode(content_base64, validate=True)
     except (binascii.Error, ValueError) as exc:
@@ -399,7 +420,6 @@ def _write_base64_file(content_base64: str, original_filename: str, folder: str)
 
     target_path.write_bytes(raw)
     return str(target_path)
-
 
 def _normalize_j_values_to_csv(raw: str) -> str | None:
     values: list[str] = []
@@ -411,41 +431,31 @@ def _normalize_j_values_to_csv(raw: str) -> str | None:
             values.append(str(float(token)))
         except ValueError:
             continue
-    if not values:
-        return None
-    return ",".join(values)
-
+    return ",".join(values) if values else None
 
 def _split_peak_entries(peaks_part: str) -> list[str]:
     entries: list[str] = []
     current: list[str] = []
     depth = 0
-
     for ch in peaks_part:
         if ch == "(":
             depth += 1
         elif ch == ")" and depth > 0:
             depth -= 1
-
         if ch == "," and depth == 0:
             entry = "".join(current).strip()
             if entry:
                 entries.append(entry)
             current = []
             continue
-
         current.append(ch)
-
     tail = "".join(current).strip()
     if tail:
         entries.append(tail)
-
     return entries
-
 
 def _parse_peak_descriptor_tokens(descriptor: str) -> list[str]:
     return [token.strip() for token in descriptor.split(",") if token.strip()]
-
 
 def _extract_multiplicity(tokens: list[str]) -> str | None:
     return next(
@@ -460,23 +470,53 @@ def _extract_multiplicity(tokens: list[str]) -> str | None:
     )
 
 
-def _parse_h1_nmr_text(text: str) -> tuple[float | None, str | None, list[dict]]:
-    h1_re = re.compile(
-        r"^\s*1H\s*-\s*NMR\s*\(\s*(.+?)\s*,\s*([0-9]+(?:\.[0-9]+)?)\s*MHz\s*\)\s*:\s*(.+?)\s*;\s*$",
-        flags=re.IGNORECASE,
-    )
-    m = h1_re.match(text.strip())
+# =====================================================================
+# DRY CORE ENGINES
+# =====================================================================
+
+class NMRHeader(NamedTuple):
+    nucleus: str
+    frequency_mhz: float
+    solvent: str
+    peaks_part: str
+
+def _extract_nmr_header(text: str, nucleus_pattern: str, expected_format: str) -> NMRHeader:
+    """
+    Validates any real NMR ACS string format globally, supports empty peak data 
+    blocks gracefully using lazy matching, and extracts structural metadata.
+    """
+    full_pattern = rf"^\s*({nucleus_pattern})\s*-\s*NMR\s*\(\s*(.+?)\s*,\s*([0-9]+(?:\.[0-9]+)?)\s*MHz\s*\)\s*:\s*(.*?)\s*;\s*$"
+    m = re.match(full_pattern, text.strip(), flags=re.IGNORECASE)
     if not m:
         raise HTTPException(
             status_code=422,
-            detail="Invalid 1H ACS string format. Expected: 1H-NMR (solvent, x MHz): ...;",
+            detail=f"Invalid {nucleus_pattern} ACS string format. Expected: {expected_format}",
         )
+    return NMRHeader(
+        nucleus=m.group(1).strip(),
+        solvent=m.group(2).strip(),
+        frequency_mhz=float(m.group(3)),
+        peaks_part=m.group(4).strip()
+    )
 
-    solvent = m.group(1).strip()
-    frequency_mhz = float(m.group(2))
-    peaks_part = m.group(3).strip()
+def _parse_peak_entry_base(entry: str, error_detail: str) -> tuple[float, str]:
+    """Validates single nested text tokens inside 13C and alternative spectrum lists."""
+    match = re.match(r"^\s*(-?[0-9]+(?:\.[0-9]+)?)\s*(?:\(([^)]*)\))?\s*\.?\s*$", entry)
+    if not match:
+        raise HTTPException(status_code=422, detail=error_detail)
+    return float(match.group(1)), (match.group(2) or "").strip()
 
-    peak_matches = re.findall(r"([0-9]+(?:\.[0-9]+)?)\s*\(([^)]*)\)", peaks_part)
+
+# =====================================================================
+# INDIVIDUAL PARSERS
+# =====================================================================
+
+def _parse_h1_nmr_text(text: str) -> tuple[float | None, str | None, list[dict]]:
+    header = _extract_nmr_header(text, "1H", "1H-NMR (solvent, x MHz): ...;")
+    if not header.peaks_part:
+        return header.frequency_mhz, header.solvent, []
+
+    peak_matches = re.findall(r"([0-9]+(?:\.[0-9]+)?)\s*\(([^)]*)\)", header.peaks_part)
     if not peak_matches:
         raise HTTPException(
             status_code=422, detail="No valid 1H peaks found in ACS string."
@@ -486,12 +526,10 @@ def _parse_h1_nmr_text(text: str) -> tuple[float | None, str | None, list[dict]]
     for ppm_str, descriptor in peak_matches:
         ppm = float(ppm_str)
         desc = descriptor.strip()
-
         tokens = [t.strip() for t in desc.split(",") if t.strip()]
         multiplicity = next(
             (
-                token
-                for token in tokens
+                token for token in tokens
                 if not re.fullmatch(r"\d+\s*H\b", token, flags=re.IGNORECASE)
                 and not re.match(r"J\s*=", token, flags=re.IGNORECASE)
                 and not re.fullmatch(
@@ -500,172 +538,76 @@ def _parse_h1_nmr_text(text: str) -> tuple[float | None, str | None, list[dict]]
             ),
             None,
         )
-
         j_match = re.search(r"J\s*=\s*([0-9.,;\s]+)\s*Hz", desc, flags=re.IGNORECASE)
         j_csv = _normalize_j_values_to_csv(j_match.group(1)) if j_match else None
-
         proton_match = re.search(r"(\d+)\s*H\b", desc, flags=re.IGNORECASE)
         proton_count = int(proton_match.group(1)) if proton_match else None
 
-        peaks.append(
-            {
-                "ppm": ppm,
-                "multiplicity": multiplicity,
-                "j_values_hz_csv": j_csv,
-                "proton_count": proton_count,
-                "extra_info": desc,
-            }
-        )
-
-    return frequency_mhz, solvent, peaks
+        peaks.append({
+            "ppm": ppm, "multiplicity": multiplicity, "j_values_hz_csv": j_csv,
+            "proton_count": proton_count, "extra_info": desc,
+        })
+    return header.frequency_mhz, header.solvent, peaks
 
 
 def _parse_c13_nmr_text(text: str) -> tuple[float | None, str | None, list[dict]]:
-    c13_re = re.compile(
-        r"^\s*13C\s*-\s*NMR\s*\(\s*(.+?)\s*,\s*([0-9]+(?:\.[0-9]+)?)\s*MHz\s*\)\s*:\s*(.+?)\s*;\s*$",
-        flags=re.IGNORECASE,
-    )
-    m = c13_re.match(text.strip())
-    if not m:
-        raise HTTPException(
-            status_code=422,
-            detail="Invalid 13C ACS string format. Expected: 13C-NMR (solvent, x MHz): ...;",
-        )
+    header = _extract_nmr_header(text, "13C", "13C-NMR (solvent, x MHz): ...;")
+    if not header.peaks_part:
+        return header.frequency_mhz, header.solvent, []
 
-    solvent = m.group(1).strip()
-    frequency_mhz = float(m.group(2))
-    peaks_part = m.group(3).strip()
-
-    entries = _split_peak_entries(peaks_part)
+    entries = _split_peak_entries(header.peaks_part)
     if not entries:
-        raise HTTPException(
-            status_code=422, detail="No valid 13C peaks found in ACS string."
-        )
+        raise HTTPException(status_code=422, detail="No valid 13C peaks found in ACS string.")
 
     peaks: list[dict] = []
     for entry in entries:
-        match = re.match(
-            r"^\s*(-?[0-9]+(?:\.[0-9]+)?)\s*(?:\(([^)]*)\))?\s*\.?\s*$",
-            entry,
-        )
-        if not match:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Invalid 13C peak entry: '{entry}'.",
-            )
-
-        ppm = float(match.group(1))
-        descriptor = (match.group(2) or "").strip()
-
+        ppm, descriptor = _parse_peak_entry_base(entry, f"Invalid 13C peak entry: '{entry}'.")
         atom_count = 1
         atom_tag = None
         if descriptor:
             for token in _parse_peak_descriptor_tokens(descriptor):
-                atom_count_match = re.fullmatch(
-                    r"(\d+)\s*C",
-                    token,
-                    flags=re.IGNORECASE,
-                )
+                atom_count_match = re.fullmatch(r"(\d+)\s*C", token, flags=re.IGNORECASE)
                 if atom_count_match:
                     atom_count = int(atom_count_match.group(1))
                     continue
-
-                atom_tag_match = re.fullmatch(r"(\d+)", token)
-                if atom_tag_match:
-                    atom_tag = int(atom_tag_match.group(1))
-
-        peaks.append(
-            {
-                "ppm": ppm,
-                "atom_count": atom_count,
-                "atom_tag": atom_tag,
-            }
-        )
-
-    return frequency_mhz, solvent, peaks
+                if re.fullmatch(r"(\d+)", token):
+                    atom_tag = int(token)
+        peaks.append({"ppm": ppm, "atom_count": atom_count, "atom_tag": atom_tag})
+    return header.frequency_mhz, header.solvent, peaks
 
 
 def _parse_c13_couplings_text(text: str) -> tuple[float | None, str | None, list[dict]]:
-    c13_re = re.compile(
-        r"^\s*13C\s*-\s*NMR\s*\(\s*(.+?)\s*,\s*([0-9]+(?:\.[0-9]+)?)\s*MHz\s*\)\s*:\s*(.+?)\s*;\s*$",
-        flags=re.IGNORECASE,
-    )
-    m = c13_re.match(text.strip())
-    if not m:
-        raise HTTPException(
-            status_code=422,
-            detail="Invalid alternative 13C ACS string format. Expected: 13C-NMR (solvent, x MHz): ...;",
-        )
+    header = _extract_nmr_header(text, "13C", "13C-NMR (solvent, x MHz): ...;")
+    if not header.peaks_part:
+        return header.frequency_mhz, header.solvent, []
 
-    solvent = m.group(1).strip()
-    frequency_mhz = float(m.group(2))
-    peaks_part = m.group(3).strip()
-
-    entries = _split_peak_entries(peaks_part)
+    entries = _split_peak_entries(header.peaks_part)
     if not entries:
-        raise HTTPException(
-            status_code=422,
-            detail="No valid alternative 13C couplings found in ACS string.",
-        )
+        raise HTTPException(status_code=422, detail="No valid alternative 13C couplings found in ACS string.")
 
     couplings: list[dict] = []
     for entry in entries:
-        match = re.match(
-            r"^\s*(-?[0-9]+(?:\.[0-9]+)?)\s*(?:\(([^)]*)\))?\s*\.?\s*$",
-            entry,
-        )
-        if not match:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Invalid alternative 13C coupling entry: '{entry}'.",
-            )
-
-        ppm = float(match.group(1))
-        descriptor = (match.group(2) or "").strip()
+        ppm, descriptor = _parse_peak_entry_base(entry, f"Invalid alternative 13C coupling entry: '{entry}'.")
         tokens = _parse_peak_descriptor_tokens(descriptor)
 
         multiplicity = _extract_multiplicity(tokens)
         j_match = re.search(r"J\s*=\s*([0-9.,;\s]+)\s*Hz", descriptor, flags=re.IGNORECASE)
         j_csv = _normalize_j_values_to_csv(j_match.group(1)) if j_match else None
+        atom_tag = next((int(t) for t in tokens if re.fullmatch(r"(\d+)", t)), None)
 
-        atom_tag = None
-        for token in tokens:
-            atom_tag_match = re.fullmatch(r"(\d+)", token)
-            if atom_tag_match:
-                atom_tag = int(atom_tag_match.group(1))
-                break
-
-        couplings.append(
-            {
-                "ppm": ppm,
-                "multiplicity": multiplicity,
-                "j_values_hz_csv": j_csv,
-                "atom_tag": atom_tag,
-                "extra_info": descriptor or None,
-            }
-        )
-
-    return frequency_mhz, solvent, couplings
+        couplings.append({
+            "ppm": ppm, "multiplicity": multiplicity, "j_values_hz_csv": j_csv,
+            "atom_tag": atom_tag, "extra_info": descriptor or None,
+        })
+    return header.frequency_mhz, header.solvent, couplings
 
 
 def _parse_alt_nuclei_text(text: str) -> tuple[str, float | None, str | None, list[dict]]:
-    alt_re = re.compile(
-        r"^\s*([0-9]+[A-Za-z]+)\s*-\s*NMR\s*\(\s*(.+?)\s*,\s*([0-9]+(?:\.[0-9]+)?)\s*MHz\s*\)\s*:\s*(.+?)\s*;\s*$",
-        flags=re.IGNORECASE,
-    )
-    m = alt_re.match(text.strip())
-    if not m:
-        raise HTTPException(
-            status_code=422,
-            detail="Invalid alternative nuclei ACS string format. Expected: 31P-NMR (solvent, x MHz): ...;",
-        )
+    header = _extract_nmr_header(text, r"[0-9]+[A-Za-z]+", "31P-NMR (solvent, x MHz): ...;")
+    if not header.peaks_part:
+        return header.nucleus, header.frequency_mhz, header.solvent, []
 
-    nucleus = m.group(1).strip()
-    solvent = m.group(2).strip()
-    frequency_mhz = float(m.group(3))
-    peaks_part = m.group(4).strip()
-
-    entries = _split_peak_entries(peaks_part)
+    entries = _split_peak_entries(header.peaks_part)
     if not entries:
         raise HTTPException(
             status_code=422,
@@ -674,46 +616,26 @@ def _parse_alt_nuclei_text(text: str) -> tuple[str, float | None, str | None, li
 
     peaks: list[dict] = []
     for entry in entries:
-        match = re.match(
-            r"^\s*(-?[0-9]+(?:\.[0-9]+)?)\s*(?:\(([^)]*)\))?\s*\.?\s*$",
-            entry,
-        )
-        if not match:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Invalid alternative nuclei entry: '{entry}'.",
-            )
-
-        ppm = float(match.group(1))
-        descriptor = (match.group(2) or "").strip()
+        ppm, descriptor = _parse_peak_entry_base(entry, f"Invalid alternative nuclei entry: '{entry}'.")
         tokens = _parse_peak_descriptor_tokens(descriptor)
 
         multiplicity = _extract_multiplicity(tokens)
         j_match = re.search(r"J\s*=\s*([0-9.,;\s]+)\s*Hz", descriptor, flags=re.IGNORECASE)
         j_csv = _normalize_j_values_to_csv(j_match.group(1)) if j_match else None
 
-        peaks.append(
-            {
-                "ppm": ppm,
-                "multiplicity": multiplicity,
-                "j_values_hz_csv": j_csv,
-                "extra_info": descriptor or None,
-            }
-        )
+        peaks.append({
+            "ppm": ppm, "multiplicity": multiplicity, "j_values_hz_csv": j_csv,
+            "extra_info": descriptor or None,
+        })
+    return header.nucleus, header.frequency_mhz, header.solvent, peaks
 
-    return nucleus, frequency_mhz, solvent, peaks
 
 
 def _normalize_hashed_value(raw_value: str | None) -> str | None:
     if raw_value is None:
         return None
-
     normalized = raw_value.strip()
-    if not normalized:
-        return None
-
-    return normalized
-
+    return normalized if normalized else None
 
 def _normalize_optional_text(raw_value: str | None) -> str | None:
     if raw_value is None:
@@ -721,107 +643,67 @@ def _normalize_optional_text(raw_value: str | None) -> str | None:
     normalized = raw_value.strip()
     return normalized or None
 
-
 def _normalize_solution_hash(raw_hash: str | None) -> str | None:
     normalized = _normalize_hashed_value(raw_hash)
     if normalized is None:
         return None
-    if re.fullmatch(r"[0-9a-fA-F]{64}", normalized):
-        return normalized.lower()
-    return normalized
-
+    return normalized.lower() if re.fullmatch(r"[0-9a-fA-F]{64}", normalized) else normalized
 
 def _normalize_solution_cas_number(raw_cas_number: str | None) -> str | None:
     if raw_cas_number is None:
         return None
-
     normalized = re.sub(r"\s+", "", raw_cas_number.strip())
-    if not normalized:
-        return None
-
-    return normalized
-
+    return normalized if normalized else None
 
 def _hash_solution_cas_number(normalized_cas_number: str) -> str:
     return hashlib.sha256(normalized_cas_number.encode("utf-8")).hexdigest()
-
 
 def _normalize_or_hash_solution_cas(raw_cas_number: str | None) -> str | None:
     normalized = _normalize_solution_cas_number(raw_cas_number)
     if normalized is None:
         return None
-
-    if re.fullmatch(r"[0-9a-fA-F]{64}", normalized):
-        return normalized.lower()
-
-    return _hash_solution_cas_number(normalized)
-
+    return normalized.lower() if re.fullmatch(r"[0-9a-fA-F]{64}", normalized) else _hash_solution_cas_number(normalized)
 
 def _prepare_solution_cas_fields(raw_cas_number: str | None) -> str | None:
     return _normalize_or_hash_solution_cas(raw_cas_number)
 
 
+# =====================================================================
+# API RESPONSE CONVERTERS
+# =====================================================================
+
 def _to_response(row: Exercise, db) -> ExerciseOut:
-    # Aggregate tags from tags_csv. Resolve any %tag{ID} tokens.
     tags = []
     parts: list[str] = []
     if row.tags_csv:
         resolved = resolve_tag_tokens(db, row.tags_csv)
         parts.extend([p.strip() for p in (resolved or "").split(",") if p and p.strip()])
-
-    # Preserve order but unique
     seen = set()
     for p in parts:
-        if p in seen:
-            continue
-        seen.add(p)
-        tags.append(p)
+        if p not in seen:
+            seen.add(p)
+            tags.append(p)
 
     return ExerciseOut(
-        id=row.id,
-        name=row.name,
-        molecular_formula=row.molecular_formula,
-        dbe=row.dbe,
-        exercise_set=row.exercise_set,
-        tags=tags,
-        h1_svg_path=row.h1_svg_path,
-        h1_svg_url=row.h1_svg_path,
-        h1_axis_start=row.h1_axis_start,
-        h1_axis_end=row.h1_axis_end,
-        h1_nmr_text=row.h1_nmr_text,
-        h1_frequency_mhz=row.h1_frequency_mhz,
-        h1_solvent=resolve_solvent_tokens(db, row.h1_solvent),
-        h1_data_source=row.h1_data_source,
-        h1_peaks=[H1PeakOut.model_validate(p) for p in row.h1_peaks],
-
-        c13_svg_path=row.c13_svg_path,
-        c13_svg_url=row.c13_svg_path,
-        c13_axis_start=row.c13_axis_start,
-        c13_axis_end=row.c13_axis_end,
-        c13_nmr_text=row.c13_nmr_text,
-        c13_alt_text=row.c13_alt_text,
-        c13_frequency_mhz=row.c13_frequency_mhz,
-        c13_solvent=resolve_solvent_tokens(db, row.c13_solvent),
-        c13_data_source=row.c13_data_source,
-        c13_apt=row.c13_apt,
-        completed=row.completed,
+        id=row.id, name=row.name, molecular_formula=row.molecular_formula, dbe=row.dbe,
+        exercise_set=row.exercise_set, tags=tags, h1_svg_path=row.h1_svg_path, h1_svg_url=row.h1_svg_path,
+        h1_axis_start=row.h1_axis_start, h1_axis_end=row.h1_axis_end, h1_nmr_text=row.h1_nmr_text,
+        h1_frequency_mhz=row.h1_frequency_mhz, h1_solvent=resolve_solvent_tokens(db, row.h1_solvent),
+        h1_data_source=row.h1_data_source, h1_peaks=[H1PeakOut.model_validate(p) for p in row.h1_peaks],
+        c13_svg_path=row.c13_svg_path, c13_svg_url=row.c13_svg_path, c13_axis_start=row.c13_axis_start,
+        c13_axis_end=row.c13_axis_end, c13_nmr_text=row.c13_nmr_text, c13_alt_text=row.c13_alt_text,
+        c13_frequency_mhz=row.c13_frequency_mhz, c13_solvent=resolve_solvent_tokens(db, row.c13_solvent),
+        c13_data_source=row.c13_data_source, c13_apt=row.c13_apt, completed=row.completed,
         c13_peaks=[C13PeakOut.model_validate(p) for p in row.c13_peaks],
         c13_couplings=[C13CouplingOut.model_validate(c) for c in row.c13_couplings],
         alt_nuclei=[AdditionalNucleusOut.model_validate(n) for n in row.alt_nuclei],
         additional_spectra=[
-            AdditionalSpectrumOut(
-                id=s.id,
-                file_path=s.file_path,
-                label=s.label,
-                priority=s.priority,
-            )
+            AdditionalSpectrumOut(id=s.id, file_path=s.file_path, label=s.label, priority=s.priority)
             for s in row.additional_spectra
         ],
     )
 
-#The tags are separated to use in the exercise list and only the wanted data for the list is returned.
 def _to_summary_response(row: Exercise) -> ExerciseSummaryOut:
-    # Aggregate tags from tags_csv for summary.
     tags = []
     parts: list[str] = []
     hidden_names: set[str] = set()
@@ -830,72 +712,199 @@ def _to_summary_response(row: Exercise) -> ExerciseSummaryOut:
             if row.tags_csv:
                 resolved = resolve_tag_tokens(_db, row.tags_csv, omit_hidden=True)
                 parts.extend([p.strip() for p in (resolved or "").split(",") if p and p.strip()])
-
             if parts:
                 normalized_names = {p.lower() for p in parts if p}
                 hidden_names = {
-                    hidden.tag_name.lower()
-                    for hidden in (
+                    hidden.tag_name.lower() for hidden in (
                         _db.query(TagsUsed)
                         .filter(func.lower(TagsUsed.tag_name).in_(normalized_names))
-                        .filter(TagsUsed.is_hidden.is_(True))
-                        .all()
+                        .filter(TagsUsed.is_hidden.is_(True)).all()
                     )
                 }
     except Exception:
-        # Fallback: plain split of tags_csv only
         if row.tags_csv:
             parts = [p.strip() for p in row.tags_csv.split(",") if p and p.strip()]
 
     seen = set()
     for p in parts:
-        if not p or p.lower() in hidden_names:
-            continue
-        if p in seen:
-            continue
-        seen.add(p)
-        tags.append(p)
+        if p and p.lower() not in hidden_names and p not in seen:
+            seen.add(p)
+            tags.append(p)
 
-    return ExerciseSummaryOut(
-        id=row.id,
-        name=row.name,
-        exercise_set=row.exercise_set,
-        tags=tags,
-        completed=row.completed,
-    )
+    return ExerciseSummaryOut(id=row.id, name=row.name, exercise_set=row.exercise_set, tags=tags, completed=row.completed)
 
-#Here a list of all exercises is fetched from the database and send using HTTP
+
+# =====================================================================
+# ROUTER ENDPOINTS
+# =====================================================================
+
 @router.get("/summaries", response_model=list[ExerciseSummaryOut])
 def list_exercise_summaries() -> list[ExerciseSummaryOut]:
     with get_db() as db:
-        rows = (
-            db.query(Exercise)
-            .order_by(Exercise.id.desc())
-            .all()
-        )
+        rows = db.query(Exercise).order_by(Exercise.id.desc()).all()
         return [_to_summary_response(row) for row in rows]
 
 
-#Here the data of a single exercise is fetched from the database and send using HTTP
+@router.post("/import-update", response_model=ExerciseOut)
+def update_exercise_from_import(body: ExerciseUpdateRequest) -> ExerciseOut:
+    match_inchi = _normalize_solution_hash(body.match.inchi_hash)
+    match_cas = _prepare_solution_cas_fields(body.match.cas_hash)
+    if match_inchi is None and match_cas is None:
+        raise HTTPException(status_code=422, detail="At least one match identifier is required.")
+
+    created_file_paths: list[str] = []
+    old_file_paths: list[str] = []
+    try:
+        with get_db() as db:
+            inchi_row = (
+                db.query(Exercise).filter(Exercise.solution_inchi_hash == match_inchi).first()
+                if match_inchi else None
+            )
+            cas_row = (
+                db.query(Exercise).filter(Exercise.solution_cas_hash == match_cas).first()
+                if match_cas else None
+            )
+            if inchi_row and cas_row and inchi_row.id != cas_row.id:
+                raise HTTPException(status_code=409, detail="InChI and CAS identifiers match different exercises.")
+            exercise = inchi_row or cas_row
+            if not exercise:
+                raise HTTPException(status_code=404, detail="No exercise matched the supplied identifiers.")
+
+            fields = body.update
+            if "solution_inchi_hash" in fields.model_fields_set:
+                exercise.solution_inchi_hash = _normalize_solution_hash(fields.solution_inchi_hash)
+            if "solution_cas_hash" in fields.model_fields_set:
+                exercise.solution_cas_hash = _prepare_solution_cas_fields(fields.solution_cas_hash)
+            for field_name in (
+                "name", "exercise_set", "c13_alt_text", "alt_nuc_text", "h1_data_source",
+                "c13_data_source", "h1_axis_start", "h1_axis_end", "c13_axis_start", "c13_axis_end",
+                "c13_apt", "alt1_cas_hash", "alt2_cas_hash",
+            ):
+                if field_name in fields.model_fields_set:
+                    value = getattr(fields, field_name)
+                    if field_name in {"alt1_cas_hash", "alt2_cas_hash"}:
+                        value = _prepare_solution_cas_fields(value)
+                    elif isinstance(value, str):
+                        value = value.strip() or None
+                    setattr(exercise, field_name, value)
+
+            if "molecular_formula" in fields.model_fields_set:
+                formula = fields.molecular_formula.strip() if fields.molecular_formula else None
+                exercise.molecular_formula = formula
+                exercise.dbe = calculate_dbe(parse_formula(formula)) if formula else 0.0
+
+            if "tags" in fields.model_fields_set:
+                old_tag_ids = extract_tag_ids(exercise.tags_csv)
+                apply_tag_count_delta(db, old_tag_ids, -1)
+                encoded_tags, tag_ids = encode_tags_list(db, fields.tags or [])
+                exercise.tags_csv = encoded_tags
+                apply_tag_count_delta(db, tag_ids, +1)
+
+            nmr_updates = {}
+            if "h1_nmr_text" in fields.model_fields_set:
+                exercise.h1_nmr_text = (fields.h1_nmr_text or "").strip()
+                frequency, solvent, peaks = _parse_h1_nmr_text(exercise.h1_nmr_text)
+                exercise.h1_frequency_mhz, nmr_updates["h1_solvent"] = frequency, solvent
+                db.query(ExerciseH1Peak).filter(ExerciseH1Peak.exercise_id == exercise.id).delete(synchronize_session=False)
+                for peak in peaks:
+                    db.add(ExerciseH1Peak(exercise_id=exercise.id, **peak))
+            if "c13_nmr_text" in fields.model_fields_set:
+                exercise.c13_nmr_text = (fields.c13_nmr_text or "").strip()
+                frequency, solvent, peaks = _parse_c13_nmr_text(exercise.c13_nmr_text)
+                exercise.c13_frequency_mhz, nmr_updates["c13_solvent"] = frequency, solvent
+                db.query(ExerciseC13Peak).filter(ExerciseC13Peak.exercise_id == exercise.id).delete(synchronize_session=False)
+                for peak in peaks:
+                    db.add(ExerciseC13Peak(exercise_id=exercise.id, **peak))
+
+            solvent_override = fields.solvent if "solvent" in fields.model_fields_set else None
+            if solvent_override is not None or "h1_solvent" in fields.model_fields_set or "c13_solvent" in fields.model_fields_set:
+                h1_solvent = fields.h1_solvent if "h1_solvent" in fields.model_fields_set else nmr_updates.get("h1_solvent", exercise.h1_solvent)
+                c13_solvent = fields.c13_solvent if "c13_solvent" in fields.model_fields_set else nmr_updates.get("c13_solvent", exercise.c13_solvent)
+                if solvent_override is not None:
+                    h1_solvent = c13_solvent = solvent_override
+                old_solvent_ids = extract_solvent_ids(exercise.h1_solvent) | extract_solvent_ids(exercise.c13_solvent)
+                apply_solvent_count_delta(db, old_solvent_ids, -1)
+                exercise.h1_solvent, _ = encode_solvent_text(db, h1_solvent)
+                exercise.c13_solvent, _ = encode_solvent_text(db, c13_solvent)
+                apply_solvent_count_delta(db, extract_solvent_ids(exercise.h1_solvent) | extract_solvent_ids(exercise.c13_solvent), +1)
+
+            for spectrum_name, spectrum in (("h1", body.replace.h1), ("c13", body.replace.c13)):
+                if spectrum is not None:
+                    old_path = getattr(exercise, f"{spectrum_name}_svg_path")
+                    new_path = _write_text_file(spectrum.svg_text, spectrum.filename, spectrum_name)
+                    created_file_paths.append(new_path)
+                    setattr(exercise, f"{spectrum_name}_svg_path", _upload_file_path_to_url(new_path))
+                    old_file_paths.append(old_path)
+
+            for spectrum in body.append:
+                file_path = _write_base64_file(spectrum.file_base64, spectrum.filename, "additional")
+                created_file_paths.append(file_path)
+                db.add(ExerciseAdditionalSpectrum(
+                    exercise_id=exercise.id,
+                    file_path=_upload_file_path_to_url(file_path),
+                    label=spectrum.label,
+                    priority=(
+                        spectrum.priority
+                        if spectrum.priority is not None
+                        else _priority_for_additional_spectrum_filename(spectrum.filename)
+                    ),
+                ))
+
+            for key, spectrum in body.replace_additional.items():
+                existing = next(
+                    (item for item in exercise.additional_spectra if (item.label or "").strip().lower() in {key.strip().lower(), (spectrum.label or "").strip().lower()}),
+                    None,
+                )
+                if existing is None:
+                    raise HTTPException(status_code=404, detail=f"Additional spectrum '{key}' not found.")
+                file_path = _write_base64_file(spectrum.file_base64, spectrum.filename, "additional")
+                created_file_paths.append(file_path)
+                old_file_paths.append(existing.file_path)
+                existing.file_path = _upload_file_path_to_url(file_path)
+                if spectrum.label:
+                    existing.label = spectrum.label
+
+            db.commit()
+            refreshed = db.query(Exercise).options(
+                selectinload(Exercise.h1_peaks), selectinload(Exercise.c13_peaks),
+                selectinload(Exercise.c13_couplings), selectinload(Exercise.alt_nuclei),
+                selectinload(Exercise.additional_spectra),
+            ).filter(Exercise.id == exercise.id).first()
+            if not refreshed:
+                raise HTTPException(status_code=500, detail="Failed to load updated exercise.")
+
+            response = _to_response(refreshed, db)
+        sqlite_root = Path(settings.sqlite_path).resolve().parent
+        for path in old_file_paths:
+            try:
+                disk_path = (sqlite_root / path.lstrip("/")).resolve()
+                if disk_path.is_relative_to(sqlite_root):
+                    disk_path.unlink(missing_ok=True)
+            except Exception as exc:
+                logger.warning("Failed to delete replaced file %s: %s", path, exc)
+        return response
+    except Exception:
+        for file_path in created_file_paths:
+            try:
+                Path(file_path).unlink(missing_ok=True)
+            except Exception:
+                pass
+        raise
+
 @router.get("/{exercise_id}", response_model=ExerciseOut)
 def get_exercise(exercise_id: int) -> ExerciseOut:
     with get_db() as db:
         row = (
             db.query(Exercise)
             .options(
-                selectinload(Exercise.h1_peaks),
-                selectinload(Exercise.c13_peaks),
-                selectinload(Exercise.c13_couplings),
-                selectinload(Exercise.alt_nuclei),
+                selectinload(Exercise.h1_peaks), selectinload(Exercise.c13_peaks),
+                selectinload(Exercise.c13_couplings), selectinload(Exercise.alt_nuclei),
                 selectinload(Exercise.additional_spectra),
             )
-            .filter(Exercise.id == exercise_id)
-            .first()
+            .filter(Exercise.id == exercise_id).first()
         )
-
         if not row:
             raise HTTPException(status_code=404, detail="Exercise not found.")
-
         mark_exercise_selected(exercise_id)
         return _to_response(row, db)
 
@@ -905,16 +914,12 @@ def list_exercises() -> list[ExerciseOut]:
         rows = (
             db.query(Exercise)
             .options(
-                selectinload(Exercise.h1_peaks),
-                selectinload(Exercise.c13_peaks),
-                selectinload(Exercise.c13_couplings),
-                selectinload(Exercise.additional_spectra),
+                selectinload(Exercise.h1_peaks), selectinload(Exercise.c13_peaks),
+                selectinload(Exercise.c13_couplings), selectinload(Exercise.additional_spectra),
             )
-            .order_by(Exercise.id.desc())
-            .all()
+            .order_by(Exercise.id.desc()).all()
         )
         return [_to_response(row, db) for row in rows]
-
 
 @router.post("/{exercise_id}/validate-cas", response_model=CasAnswerValidationOut)
 def validate_cas_answer(
@@ -930,23 +935,12 @@ def validate_cas_answer(
         if not row:
             raise HTTPException(status_code=404, detail="Exercise not found.")
 
-        candidate_hashes = [
-            value
-            for value in (
-                row.solution_cas_hash,
-                row.alt1_cas_hash,
-                row.alt2_cas_hash,
-            )
-            if value is not None
-        ]
+        candidate_hashes = [v for v in (row.solution_cas_hash, row.alt1_cas_hash, row.alt2_cas_hash) if v is not None]
         if not candidate_hashes:
             increment_incorrect_count(exercise_id)
             return CasAnswerValidationOut(is_correct=False)
 
-        is_correct = any(
-            hmac.compare_digest(candidate_hash, input_hash)
-            for candidate_hash in candidate_hashes
-        )
+        is_correct = any(hmac.compare_digest(c_hash, input_hash) for c_hash in candidate_hashes)
         if is_correct:
             was_completed = row.completed is True
             row.completed = True
@@ -955,9 +949,7 @@ def validate_cas_answer(
                 mark_exercise_completed(exercise_id)
         else:
             increment_incorrect_count(exercise_id)
-
         return CasAnswerValidationOut(is_correct=is_correct)
-
 
 @router.post("/{exercise_id}/validate-solution", response_model=SolutionValidationOut)
 def validate_solution_answer(
@@ -972,7 +964,6 @@ def validate_solution_answer(
         row = db.query(Exercise).filter(Exercise.id == exercise_id).first()
         if not row:
             raise HTTPException(status_code=404, detail="Exercise not found.")
-
         if row.solution_inchi_hash is None:
             increment_incorrect_count(exercise_id)
             return SolutionValidationOut(is_correct=False)
@@ -986,14 +977,12 @@ def validate_solution_answer(
                 mark_exercise_completed(exercise_id)
         else:
             increment_incorrect_count(exercise_id)
-
         return SolutionValidationOut(is_correct=is_correct)
 
 @router.get("/{exercise_id}/dbe", response_model=DbeOut)
 def get_exercise_dbe(exercise_id: int) -> DbeOut:
     with get_db() as db:
-        storage_key = f"exercise-{exercise_id}"
-        ws = db.query(WorkingSolution).filter_by(exercise_id=storage_key).first()
+        ws = db.query(WorkingSolution).filter_by(exercise_id=f"exercise-{exercise_id}").first()
         return DbeOut(dbe=ws.dbe if ws else None)
 
 @router.put("/{exercise_id}/dbe", response_model=DbeOut)
@@ -1001,7 +990,6 @@ def update_exercise_dbe(exercise_id: int, payload: DbeUpdate) -> DbeOut:
     with get_db() as db:
         storage_key = f"exercise-{exercise_id}"
         ws = db.query(WorkingSolution).filter_by(exercise_id=storage_key).first()
-
         if not ws:
             ws = WorkingSolution(exercise_id=storage_key, dbe=payload.dbe)
             db.add(ws)
@@ -1032,18 +1020,14 @@ def delete_exercise(exercise_id: int) -> None:
         ).delete(synchronize_session=False)
 
         file_paths = []
-        if exercise.h1_svg_path:
-            file_paths.append(exercise.h1_svg_path)
-        if exercise.c13_svg_path:
-            file_paths.append(exercise.c13_svg_path)
-        for spectrum in exercise.additional_spectra:
-            if spectrum.file_path:
-                file_paths.append(spectrum.file_path)
+        if exercise.h1_svg_path: file_paths.append(exercise.h1_svg_path)
+        if exercise.c13_svg_path: file_paths.append(exercise.c13_svg_path)
+        for spec in exercise.additional_spectra:
+            if spec.file_path: file_paths.append(spec.file_path)
 
         used_solvent_ids = extract_solvent_ids(exercise.h1_solvent) | extract_solvent_ids(exercise.c13_solvent)
         apply_solvent_count_delta(db, used_solvent_ids, -1)
 
-        # Decrement tag counts for any tags referenced by this exercise
         tag_ids = set()
         try:
             tag_ids |= extract_tag_ids(exercise.tags_csv)
@@ -1051,20 +1035,20 @@ def delete_exercise(exercise_id: int) -> None:
             pass
         apply_tag_count_delta(db, tag_ids, -1)
 
-        db.delete(exercise)
-        db.commit()
-
+        db.delete(exercise); db.commit()
         sqlite_root = Path(settings.sqlite_path).resolve().parent
-        for file_path in file_paths:
+        for path in file_paths:
             try:
-                disk_path = sqlite_root / file_path.lstrip("/")
-                resolved_path = disk_path.resolve()
-                if not resolved_path.is_relative_to(sqlite_root):
-                    logger.warning(f"Attempted to delete file outside uploads directory: {file_path}")
-                    continue
-                resolved_path.unlink(missing_ok=True)
+                disk_path = (sqlite_root / path.lstrip("/")).resolve()
+                if disk_path.is_relative_to(sqlite_root):
+                    disk_path.unlink(missing_ok=True)
             except Exception as e:
-                logger.warning(f"Failed to delete file {file_path}: {e}")
+                logger.warning(f"Failed to delete file {path}: {e}")
+
+
+# =====================================================================
+# THE EXERCISE CREATION ROUTE (SAFEGUARDED & RESOLVED)
+# =====================================================================
 
 @router.post("/", response_model=ExerciseOut, status_code=201)
 def create_exercise(body: ExerciseCreate) -> ExerciseOut:
@@ -1075,16 +1059,14 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
     alt_nuc_text = _normalize_optional_text(body.alt_nuc_text)
 
     c13_couplings: list[dict] = []
-    if c13_alt_text:
+    if c13_alt_text and c13_alt_text.strip():
         _, _, c13_couplings = _parse_c13_couplings_text(c13_alt_text)
 
     alt_nucleus = None
     alt_nucleus_frequency = None
     alt_nuclei_peaks: list[dict] = []
-    if alt_nuc_text:
-        alt_nucleus, alt_nucleus_frequency, _, alt_nuclei_peaks = _parse_alt_nuclei_text(
-            alt_nuc_text
-        )
+    if alt_nuc_text and alt_nuc_text.strip():
+        alt_nucleus, alt_nucleus_frequency, _, alt_nuclei_peaks = _parse_alt_nuclei_text(alt_nuc_text)
 
     solvent_override = _normalize_optional_text(body.solvent)
     h1_solvent_override = _normalize_optional_text(body.h1_solvent)
@@ -1126,36 +1108,15 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
     try:
         with get_db() as db:
             if solution_inchi_hash is not None:
-                existing = (
-                    db.query(Exercise)
-                    .filter(Exercise.solution_inchi_hash == solution_inchi_hash)
-                    .first()
-                )
-                if existing:
-                    raise HTTPException(
-                        status_code=409,
-                        detail="Exercise with the same solution InChI already exists.",
-                    )
+                if db.query(Exercise).filter(Exercise.solution_inchi_hash == solution_inchi_hash).first():
+                    raise HTTPException(status_code=409, detail="Exercise with the same solution InChI already exists.")
 
-            h1_path = _write_text_file(
-                content=body.h1_spectrum_svg.svg_text,
-                original_filename=body.h1_spectrum_svg.filename,
-                folder="h1",
-            )
+            h1_path = _write_text_file(body.h1_spectrum_svg.svg_text, body.h1_spectrum_svg.filename, "h1")
             created_file_paths.append(h1_path)
-
-            c13_path = _write_text_file(
-                content=body.c13_spectrum_svg.svg_text,
-                original_filename=body.c13_spectrum_svg.filename,
-                folder="c13",
-            )
+            c13_path = _write_text_file(body.c13_spectrum_svg.svg_text, body.c13_spectrum_svg.filename, "c13")
             created_file_paths.append(c13_path)
 
-            display_name = body.name.strip() if body.name else None
-            if not display_name:
-                display_name = (
-                    body.molecular_formula.strip() if body.molecular_formula else None
-                )
+            display_name = body.name.strip() if body.name else (body.molecular_formula.strip() if body.molecular_formula else None)
 
             exercise = Exercise(
                 name=display_name,
@@ -1211,7 +1172,7 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
                         multiplicity=peak["multiplicity"],
                         j_values_hz_csv=peak["j_values_hz_csv"],
                         proton_count=peak["proton_count"],
-                        extra_info=peak["extra_info"],
+                        extra_info=peak["extra_info"]
                     )
                 )
 
@@ -1221,7 +1182,7 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
                         exercise_id=exercise.id,
                         ppm=peak["ppm"],
                         atom_tag=peak["atom_tag"],
-                        atom_count=peak["atom_count"],
+                        atom_count=peak["atom_count"]
                     )
                 )
 
@@ -1233,7 +1194,7 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
                         multiplicity=coupling["multiplicity"],
                         j_values_hz_csv=coupling["j_values_hz_csv"],
                         atom_tag=coupling["atom_tag"],
-                        extra_info=coupling["extra_info"],
+                        extra_info=coupling["extra_info"]
                     )
                 )
 
@@ -1246,7 +1207,7 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
                         ppm=alt_peak["ppm"],
                         multiplicity=alt_peak["multiplicity"],
                         j_values_hz_csv=alt_peak["j_values_hz_csv"],
-                        extra_info=alt_peak["extra_info"],
+                        extra_info=alt_peak["extra_info"]
                     )
                 )
 
@@ -1254,7 +1215,7 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
                 file_path = _write_base64_file(
                     content_base64=spectrum.file_base64,
                     original_filename=spectrum.filename,
-                    folder="additional",
+                    folder="additional"
                 )
                 created_file_paths.append(file_path)
                 db.add(
@@ -1262,8 +1223,10 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
                         exercise_id=exercise.id,
                         file_path=_upload_file_path_to_url(file_path),
                         label=spectrum.label,
-                        priority=_priority_for_additional_spectrum_filename(
-                            spectrum.filename
+                        priority=(
+                            spectrum.priority
+                            if spectrum.priority is not None
+                            else _priority_for_additional_spectrum_filename(spectrum.filename)
                         ),
                     )
                 )
@@ -1275,7 +1238,7 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
                 .options(
                     selectinload(Exercise.h1_peaks),
                     selectinload(Exercise.c13_peaks),
-                    selectinload(Exercise.additional_spectra),
+                    selectinload(Exercise.additional_spectra)
                 )
                 .filter(Exercise.id == exercise.id)
                 .first()
