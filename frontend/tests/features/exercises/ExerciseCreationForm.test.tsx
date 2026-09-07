@@ -47,8 +47,8 @@ describe("ExerciseCreationForm", () => {
       "13C-NMR (CDCl3, 75 MHz): 24.3;",
     );
     await user.type(
-      screen.getByPlaceholderText(/SHA-256 hash \(hex\) of normalized CAS number/i),
-      "7a05a4f3dc259426ffd8be334301a471197bb1f72b72e81dac2aa0cd62adec71",
+      screen.getAllByPlaceholderText(/Any text will be hashed with SHA-256 before submit/i)[1],
+      "50-00-0",
     );
 
     await user.click(screen.getByRole("button", { name: /Create exercise/i }));
@@ -78,7 +78,7 @@ describe("ExerciseCreationForm", () => {
     expect(body.h1_axis_scale).toEqual({ begin: 10.1, end: -0.1 });
     expect(body.c13_axis_scale).toEqual({ begin: 213.0, end: -2.0 });
     expect(body.solution_cas_number).toBe(
-      "7a05a4f3dc259426ffd8be334301a471197bb1f72b72e81dac2aa0cd62adec71",
+      "9e31052c19a370859ddd82c4df5ded836abb5c0c5b4a70a867e5bc035fd8d967",
     );
 
     expect(

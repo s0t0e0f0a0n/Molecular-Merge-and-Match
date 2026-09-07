@@ -118,7 +118,7 @@ async function selectExerciseViaMenu(user: ReturnType<typeof userEvent.setup>, e
 it('renders the top bar with title, current exercise display, and editor button', async () => {
   renderPage();
 
-  expect(await screen.findByAltText('Molecular Bookkeeping')).toBeInTheDocument();
+  expect(await screen.findByAltText('Molecular Merge and Match')).toBeInTheDocument();
   expect(await screen.findByRole('button', { name: /Open molecule editor/ })).toBeInTheDocument();
   expect(await screen.findByTestId('exercise-menu-button')).toBeInTheDocument();
 });
@@ -555,7 +555,7 @@ it('shows incorrect solution feedback when validation fails', async () => {
       expect(await screen.findByText(/No actions yet/)).toBeInTheDocument();
 
       // Click on the title of the page (so outside the panel).
-      await user.click(screen.getByAltText('Molecular Bookkeeping'));
+      await user.click(screen.getByAltText('Molecular Merge and Match'));
 
       await waitFor(() => {
         expect(screen.queryByText(/No actions yet/)).not.toBeInTheDocument();

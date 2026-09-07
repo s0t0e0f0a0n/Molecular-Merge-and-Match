@@ -451,14 +451,14 @@ export function SettingsPanel({
                 onChange={(value) => onLinkInheritModeChange(value as LinkInheritMode)}
                 title="Choose what should happen with fragment links after merging two fragments."
               />
-				{/* <SelectRow
+			  <SelectRow
                 id="setting-theme-select"
                 label="Select theme (NOT WORKING)"
                 value={selectedTheme}
                 options={availableThemes.map((theme) => ({ value: theme, label: theme }))}
                 onChange={onThemeChange}
                 title="Currently, only a light theme is available."
-              />  */}
+              />
               <SelectRow
                 id="setting-preset-select"
                 label="Presets"
@@ -623,7 +623,7 @@ export function SettingsPanel({
               const rawText = String(children);
               
               // Perform your exact string substitutions cleanly
-              let formattedText = `<span class="c1">${rawText}</span>`
+              const formattedText = `<span class="c1">${rawText}</span>`
                     .replace(/\$y/g, '</span><span class="y0">')
       .replace(/\$x/g, '</span><span class="x0">')
       .replace(/\$z/g, '</span><span class="z0">')

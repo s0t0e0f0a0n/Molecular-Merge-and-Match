@@ -938,7 +938,9 @@ useEffect(() => {
 
       try {
         const saved = await updateUserSettings(payload);
-        applyIncomingSettings(saved);
+        if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+          applyIncomingSettings(saved);
+        }
       } catch (err) {
         console.error('failed to save settings', err);
       }

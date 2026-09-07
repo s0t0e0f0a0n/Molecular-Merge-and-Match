@@ -136,10 +136,19 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
 
     fetchLogbook(exerciseKey).then((remote) => {
       if (cancelled) return;
+      const parseArray = <T,>(value: unknown): T[] => {
+        if (typeof value !== 'string') return [];
+        try {
+          const parsed: unknown = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed as T[] : [];
+        } catch {
+          return [];
+        }
+      };
       const next: ExerciseHistory = {
-        entries: JSON.parse(remote.entries_json) as LogbookEntry[],
-        cursor: remote.cursor,
-        links: JSON.parse(remote.links_json) as Link[],
+        entries: parseArray<LogbookEntry>(remote.entries_json),
+        cursor: typeof remote.cursor === 'number' ? remote.cursor : 0,
+        links: parseArray<Link>(remote.links_json),
       };
       loadedRef.current.add(exerciseKey);
 

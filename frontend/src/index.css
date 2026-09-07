@@ -40,25 +40,6 @@
 }
 /* Monospaced Variable Font File (Handles all normal weights 100-800) */
 @font-face {
-  font-family: 'JetBrains Mono';
-  src: url("./fonts/JetBrainsMono[wght].woff2") format("woff2"),
-       url("./fonts/JetBrainsMono[wght].ttf") format("truetype");
-  font-weight: 100 800;
-  font-style: normal;
-  font-display: swap;
-}
-
-/* Monospaced Variable Font File (Handles all italic weights 100-800) */
-@font-face {
-  font-family: 'JetBrains Mono';
-  src: url("./fonts/JetBrainsMono-Italic[wght].woff2") format("woff2"),
-       url("./fonts/JetBrainsMono-Italic[wght].ttf") format("truetype");
-  font-weight: 100 800;
-  font-style: italic;
-  font-display: swap;
-}
-/* Another test Monospace font */
-@font-face {
   font-family: 'Noto Sans Mono';
   src: url("./fonts/NotoSansMono-VariableFont_wdth,wght.woff2") format("woff2"),
        url("./fonts/NotoSansMono-VariableFont_wdth,wght.ttf") format("truetype");
