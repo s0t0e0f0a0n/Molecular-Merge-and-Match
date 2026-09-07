@@ -46,7 +46,6 @@ function setupUserData() {
     const possibleSourcePaths = [
         path.join(process.resourcesPath, 'data'), // Windows/Linux
         path.join(process.resourcesPath, 'resources', 'data'), // macOS (inside .app bundle)
-    //  path.join(process.resourcesPath, 'app.asar.unpacked', 'backend', 'data')  /*this might be needed instead*/
     ];
 
     const sourceDataDir = possibleSourcePaths.find(p => fs.existsSync(p));
@@ -124,9 +123,9 @@ function startBackend() {
     try {
         if (process.platform !== 'win32' && fs.existsSync(backendPath)) {
             try {
-                // Sla chmod over als we in een Snap-omgeving zitten (altijd read-only)
-                if (process.env.SNAP) {
-                    console.log("Running inside Snap, skipping chmod (read-only filesystem).");
+                // Skip chmod for read-only sandboxes (Snap and Flatpak)
+                if (process.env.SNAP || process.env.FLATPAK_ID) {
+                    console.log("Running inside Snap/Flatpak sandbox, skipping chmod (read-only filesystem).");
                 } else {
                     fs.chmodSync(backendPath, 511); // Veilig decimaal 511 voor Flatpak/macOS
                     console.log("Successfully set 755 execution permissions on backend binary.");

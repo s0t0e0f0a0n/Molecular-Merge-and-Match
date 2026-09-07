@@ -11,7 +11,7 @@
     "clean:win": "if exist dist-electron rmdir /s /q dist-electron && if exist frontend\\dist rmdir /s /q frontend\\dist",
     "clean:unix": "rm -rf dist-electron frontend/dist",
     "clean": "npm run clean:win 2>nul || npm run clean:unix",
-    "dist": "electron-builder --publish never",
+    "dist": "electron-builder",
     "postinstall": "electron-builder install-app-deps",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -105,7 +105,9 @@
         "--socket=x11",
         "--socket=wayland",
         "--socket=pulseaudio",
-        "--filesystem=host"
+        "--filesystem=host",
+        "--device=dri",
+        "--socket=system-bus"
       ]
     },
     "publish": {
