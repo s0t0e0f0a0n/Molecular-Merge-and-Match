@@ -5,6 +5,7 @@ from app.api.fragments import router as fragments_router
 from app.api.health import router as health_router
 from app.api.info import router as info_router
 from app.api.logbook import router as logbook_router
+from app.api.nmr_preview import router as nmr_preview_router
 from app.api.predefined_fragments import router as predefined_fragments_router
 from app.api.reset import router as reset_router
 from app.api.settings import router as settings_router
@@ -21,6 +22,7 @@ api_router.include_router(exercises_router)
 api_router.include_router(fragments_router)
 api_router.include_router(working_solution_router)
 api_router.include_router(logbook_router)
+api_router.include_router(nmr_preview_router)
 api_router.include_router(predefined_fragments_router)
 api_router.include_router(reset_router)
 api_router.include_router(statistics_router)

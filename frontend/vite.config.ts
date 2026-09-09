@@ -39,6 +39,12 @@ export default defineConfig(() => ({
       },
     },
     build: {
+      rollupOptions: {
+        input: {
+          main: 'index.html',
+          nmrglueGUI: 'nmrglueGUI.html',
+        },
+      },
       commonjsOptions: {
         // Ketcher's lazy-loaded chunk contains raw require() calls.
         // This tells Rollup's CJS plugin to transform every node_modules
