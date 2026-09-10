@@ -22,6 +22,7 @@ class TagOut(BaseModel):
     is_cheat: bool
     tag_count: int
     user_tag: bool
+    allowed_stats: bool
     progression_use: bool
 
     model_config = {"from_attributes": True}
@@ -41,6 +42,7 @@ def list_tags() -> list[TagOut]:
             is_cheat=bool(r.is_cheat),
             tag_count=int(r.tag_count or 0),
             user_tag=bool(r.user_tag),
+            allowed_stats=bool(r.allowed_stats),
             progression_use=bool(r.progression_use),
         ) for r in rows]
 
@@ -61,6 +63,7 @@ def get_tag(tag_id: int) -> TagOut:
             is_cheat=bool(row.is_cheat),
             tag_count=int(row.tag_count or 0),
             user_tag=bool(row.user_tag),
+            allowed_stats=bool(row.allowed_stats),
             progression_use=bool(row.progression_use),
         )
 
@@ -99,6 +102,35 @@ def set_tag_hidden(tag_id: int, payload: TagHideIn) -> TagOut:
             is_cheat=bool(row.is_cheat),
             tag_count=int(row.tag_count or 0),
             user_tag=bool(row.user_tag),
+            allowed_stats=bool(row.allowed_stats),
+            progression_use=bool(row.progression_use),
+        )
+
+
+class TagStatsIn(BaseModel):
+    progression_use: bool
+
+
+@router.put("/{tag_id}/stats", response_model=TagOut)
+def set_tag_statistics(tag_id: int, payload: TagStatsIn) -> TagOut:
+    with get_db() as db:
+        row = db.query(TagsUsed).filter(TagsUsed.id == tag_id).first()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tag not found")
+        row.progression_use = bool(payload.progression_use)
+        db.commit()
+        db.refresh(row)
+        return TagOut(
+            id=row.id,
+            tag_name=row.tag_name,
+            description=row.description,
+            is_persistent=bool(row.is_persistent),
+            is_hideable=bool(row.is_hideable),
+            is_hidden=bool(row.is_hidden),
+            is_cheat=bool(row.is_cheat),
+            tag_count=int(row.tag_count or 0),
+            user_tag=bool(row.user_tag),
+            allowed_stats=bool(row.allowed_stats),
             progression_use=bool(row.progression_use),
         )
 
@@ -122,5 +154,6 @@ def restore_tag(tag_id: int) -> TagOut:
             is_cheat=bool(row.is_cheat),
             tag_count=int(row.tag_count or 0),
             user_tag=bool(row.user_tag),
+            allowed_stats=bool(row.allowed_stats),
             progression_use=bool(row.progression_use),
         )

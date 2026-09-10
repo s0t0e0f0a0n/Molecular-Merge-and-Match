@@ -61,3 +61,36 @@ def test_encoding_restores_soft_deleted_tag_without_creating_duplicate():
         db.query(TagsUsed).filter(TagsUsed.id == tag_id).delete()
         db.commit()
         db.close()
+
+
+def test_statistics_setting_is_exposed_and_can_be_updated(client):
+    db = SessionLocal()
+    tag = TagsUsed(
+        tag_name="test-statistics-tag",
+        is_persistent=True,
+        tag_count=0,
+        allowed_stats=True,
+        progression_use=False,
+    )
+    db.add(tag)
+    db.commit()
+    tag_id = tag.id
+    db.close()
+
+    try:
+        response = client.get("/api/v1/tags/")
+        listed_tag = next(item for item in response.json() if item["id"] == tag_id)
+        assert listed_tag["allowed_stats"] is True
+        assert listed_tag["progression_use"] is False
+
+        response = client.put(
+            f"/api/v1/tags/{tag_id}/stats",
+            json={"progression_use": True},
+        )
+        assert response.status_code == 200
+        assert response.json()["progression_use"] is True
+    finally:
+        db = SessionLocal()
+        db.query(TagsUsed).filter(TagsUsed.id == tag_id).delete()
+        db.commit()
+        db.close()

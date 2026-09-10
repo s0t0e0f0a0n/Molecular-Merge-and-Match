@@ -9,6 +9,9 @@ export type ExerciseSummary = {
   cheats_used?: string | null;
   started_at?: string | null;
   completed_at?: string | null;
+  fragments_drawn?: number | null;
+  merges_done?: number | null;
+  matches_done?: number | null;
   has_saved_progress?: boolean | null;
 };
 
@@ -108,11 +111,15 @@ export type ExerciseStatistics = {
   exercise_id: string;
   incorrect_count: number;
   cheats_used: string;
+  fragments_drawn: number;
+  merges_done: number;
+  matches_done: number;
   start_counting: string | null;
   stop_counting: string | null;
   timer_total: number;
   started_at: string | null;
   completed_at: string | null;
+  difficulty: string;
 };
 
 // This fetches the exercise names, which is used to list the exercises, for the user to choose one from.
@@ -262,6 +269,22 @@ export async function fetchExerciseStatistics(
   if (!response.ok) {
     throw new Error(`Failed to load exercise statistics (${response.status})`);
   }
+  return (await response.json()) as ExerciseStatistics;
+}
+
+export async function rateExerciseDifficulty(
+  exerciseId: number,
+  rating: 'E' | 'M' | 'D',
+): Promise<ExerciseStatistics> {
+  const response = await fetch(
+    `/api/v1/statistics/difficulty?exercise_id=${encodeURIComponent(String(exerciseId))}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating }),
+    },
+  );
+  if (!response.ok) throw new Error('Failed to save exercise difficulty');
   return (await response.json()) as ExerciseStatistics;
 }
 

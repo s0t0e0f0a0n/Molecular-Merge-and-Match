@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import base64
 import binascii
-from datetime import datetime
 import hashlib
 import hmac
 import logging
 import math
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import NamedTuple
 from uuid import uuid4
@@ -313,6 +313,9 @@ class ExerciseSummaryOut(BaseModel):
     cheats_used: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    fragments_drawn: int | None = None
+    merges_done: int | None = None
+    matches_done: int | None = None
     has_saved_progress: bool = False
 
     model_config = {"from_attributes": True}
@@ -757,6 +760,9 @@ def _to_summary_response(
         cheats_used=statistics.cheats_used if statistics is not None else None,
         started_at=statistics.started_at if statistics is not None else None,
         completed_at=statistics.completed_at if statistics is not None else None,
+        fragments_drawn=statistics.fragments_drawn if statistics is not None else None,
+        merges_done=statistics.merges_done if statistics is not None else None,
+        matches_done=statistics.matches_done if statistics is not None else None,
         has_saved_progress=has_saved_progress,
     )
 
@@ -795,7 +801,7 @@ def list_exercise_summaries() -> list[ExerciseSummaryOut]:
         return [
             _to_summary_response(
                 row,
-                statistics_by_exercise_id.get(str(row.id)),
+                None if (row.exercise_set or "").strip().lower() == "references" else statistics_by_exercise_id.get(str(row.id)),
                 has_saved_progress=f"exercise-{row.id}" in storage_keys_with_progress,
             )
             for row in rows

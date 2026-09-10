@@ -11,7 +11,7 @@ import type { SolventPreference } from '../../api/solvents';
 import type { LinkInheritMode } from '../linking/LinkInheritOptionsPopup';
 import { formatChemistryText } from '../../utils/formatChemistryText';
 import '../../panelStyles.css';
-import { fetchTags, deleteTag, restoreTag, setTagHidden, Tag } from '../../api/tags';
+import { fetchTags, deleteTag, restoreTag, setTagHidden, setTagStatistics, Tag } from '../../api/tags';
 
 type SettingsTabId = 'settingstab' | 'solventstab' | 'tagstab' | 'cheatstab' | 'informationtab' | 'changelogtab' | 'abouttab';
 
@@ -239,6 +239,12 @@ function TagsTab({ onTagsUpdated, showCheatTags }: TagsTabProps) {
     onTagsUpdated?.();
   }
 
+  async function handleStatistics(t: Tag, value: boolean) {
+    await setTagStatistics(t.id, value);
+    setTags((prev) => prev.map((tag) => (tag.id === t.id ? { ...tag, progression_use: value } : tag)));
+    onTagsUpdated?.();
+  }
+
   return (
     <div className="tags-tab-inner">
       <div className="tags-grid" style={{ gridTemplateColumns: '1fr' }}>
@@ -247,6 +253,7 @@ function TagsTab({ onTagsUpdated, showCheatTags }: TagsTabProps) {
             <span>Tag name</span>
             <span>Count</span>
             <span style={{ display: 'block', textAlign: 'center' }}>Hide</span>
+            <span style={{ display: 'block', textAlign: 'center' }}>Statistics</span>
             <span style={{ display: 'block', textAlign: 'center' }}>Delete</span>
             <span>Description</span>
           </div>
@@ -263,6 +270,18 @@ function TagsTab({ onTagsUpdated, showCheatTags }: TagsTabProps) {
                     type="checkbox"
                     checked={t.is_hidden}
                     onChange={(e) => handleHide(t, e.target.checked)}
+                  />
+                ) : (
+                  <span />
+                )}
+              </div>
+
+              <div className="tag-statistics" style={{ textAlign: 'center' }}>
+                {t.allowed_stats ? (
+                  <input
+                    type="checkbox"
+                    checked={t.progression_use}
+                    onChange={(e) => handleStatistics(t, e.target.checked)}
                   />
                 ) : (
                   <span />

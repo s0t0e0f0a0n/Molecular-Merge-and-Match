@@ -8,6 +8,7 @@ import {
 import { parseMolBlock } from '../../utils/molParser';
 import { findHighlightedAtomPositions } from '../../utils/svgMergePointLocator';
 import { ExpandedMoleculeView } from '../../components/ExpandedMoleculeView';
+import { DifficultyRating } from '../../components/DifficultyRating';
 import type { WorkingSolution } from '../../hooks/useWorkingSolution';
 import type { MergeState, MolAtom } from '../../types/molecule';
 import { useWarning, type WarningResponse } from '../../context/WarningContext';
@@ -613,6 +614,9 @@ useEffect(() => {
           >
             {validationResult ? 'Your answer is correct.' : 'Your answer is incorrect.'}
           </div>
+        )}
+        {validationResult && (
+          <DifficultyRating exerciseId={exerciseId} resetKey={`${exerciseId}-${solution.smiles}`} />
         )}
       </div>
 

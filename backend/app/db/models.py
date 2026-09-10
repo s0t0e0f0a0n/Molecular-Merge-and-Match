@@ -278,6 +278,10 @@ class Statistics(Base):
     exercise_id: Mapped[str] = mapped_column(String(50), nullable=False, default="ex1")
     incorrect_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     cheats_used: Mapped[str] = mapped_column(String(15), nullable=False, default="000000000000")
+    merges_done: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
+    matches_done: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
+    fragments_drawn: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
+    difficulty: Mapped[str] = mapped_column(String(10), nullable=False, default="O0")
     start_counting: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True, default=None
     )
@@ -292,6 +296,9 @@ class Statistics(Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True, default=None,
     )
+    eligible_purge_time: Mapped[datetime | None] = mapped_column(
+            DateTime(timezone=False), nullable=True, default=None,
+        )
 
 class UserSettings(Base):
     __tablename__ = "user_settings"
@@ -313,7 +320,7 @@ class UserSettings(Base):
     show_warnings: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     show_creation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     show_timer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    cheats: Mapped[str] = mapped_column(String(15), nullable=False, default=0)
+    cheats: Mapped[str] = mapped_column(String(15), nullable=False, default="000000000000")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,

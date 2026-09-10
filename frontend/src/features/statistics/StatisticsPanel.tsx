@@ -4,7 +4,7 @@ import type { ExerciseSummary } from '../../api/exercises';
 import { fetchTags, type Tag } from '../../api/tags';
 import '../../panelStyles.css';
 
-type StatisticsTabId = '1' | '2';
+type StatisticsTabId = '1' | '2' | '3';
 
 type StatisticsPanelProps = {
   isOpen: boolean;
@@ -15,6 +15,7 @@ type StatisticsPanelProps = {
 const TABS: Array<{ id: StatisticsTabId; label: string }> = [
   { id: '1', label: 'Progression' },
   { id: '2', label: 'Table' },
+  { id: '3', label: 'Reset' },
 ];
 
 const CONTRIBUTION_STATUSES = [
@@ -22,7 +23,7 @@ const CONTRIBUTION_STATUSES = [
   { color: 'red', label: 'Attempted and incorrect' },
   { color: 'yellow', label: 'Completed with cheats activated' },
   { color: 'blue', label: 'Started but incomplete' },
-  { color: 'grey', label: 'Examples or References set' },
+  { color: 'grey', label: 'References set' },
   { color: 'white', label: 'Not attempted' },
 ] as const;
 
@@ -36,6 +37,139 @@ function contributionStatus(exercise: ExerciseSummary): string {
   if (exercise.completed_at) return usedCheats ? 'is-yellow' : 'is-green';
   if ((exercise.timer_total ?? 0) > 0 && !exercise.completed_at) return 'is-blue';
   return 'is-white';
+}
+
+type TimelineStatus = 'is-green' | 'is-yellow' | 'is-red' | 'is-blue';
+
+type TimelineDay = {
+  date: Date;
+  counts: Record<TimelineStatus, number>;
+};
+
+const TIMELINE_STATUSES: Array<{ key: TimelineStatus; label: string }> = [
+  { key: 'is-green', label: 'Completed and correct' },
+  { key: 'is-yellow', label: 'Completed with cheats activated' },
+  { key: 'is-red', label: 'Attempted and incorrect' },
+  { key: 'is-blue', label: 'Started but incomplete' },
+];
+
+function localDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseExerciseDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function addDays(date: Date, amount: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + amount);
+  return result;
+}
+
+function buildTimeline(exerciseSummaries: ExerciseSummary[]): TimelineDay[] {
+  const today = new Date();
+  const dates = exerciseSummaries
+    .map((exercise) => parseExerciseDate(exercise.completed_at ?? exercise.started_at))
+    .filter((date): date is Date => date !== null);
+  const oldestDate = dates.reduce(
+    (oldest, date) => date < oldest ? date : oldest,
+    addDays(today, -6),
+  );
+  const firstDate = new Date(oldestDate.getFullYear(), oldestDate.getMonth(), oldestDate.getDate());
+  const lastDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const days: TimelineDay[] = [];
+
+  for (let date = firstDate; date <= lastDate; date = addDays(date, 1)) {
+    days.push({
+      date,
+      counts: { 'is-green': 0, 'is-yellow': 0, 'is-red': 0, 'is-blue': 0 },
+    });
+  }
+
+  const dayByKey = new Map(days.map((day) => [localDateKey(day.date), day]));
+  exerciseSummaries.forEach((exercise) => {
+    const date = parseExerciseDate(exercise.completed_at ?? exercise.started_at);
+    const status = contributionStatus(exercise) as TimelineStatus;
+    const day = date && dayByKey.get(localDateKey(date));
+    if (day && status in day.counts) day.counts[status] += 1;
+  });
+  return days;
+}
+
+function formatTimelineDate(date: Date): string {
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function timelineTicks(maximumCount: number): number[] {
+  if (maximumCount <= 1) return [1, 0];
+  return [maximumCount, Math.ceil(maximumCount / 2), 0];
+}
+
+function StatisticsTimeline({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
+  const days = buildTimeline(exerciseSummaries);
+  const maximumCount = Math.max(1, ...days.map((day) => Object.values(day.counts).reduce((sum, count) => sum + count, 0)));
+  const ticks = timelineTicks(maximumCount);
+
+  return (
+    <section className="statistics-timeline-section" aria-label="Daily statistics timeline">
+      <div className="statistics-timeline-heading">
+        <h3>Activity over time</h3>
+        <div className="statistics-timeline-legend" aria-label="Timeline legend">
+          {TIMELINE_STATUSES.map((status) => (
+            <span key={status.key} className="statistics-timeline-legend-item">
+              <span className={`statistics-contribution-swatch statistics-contribution-status ${status.key}`} aria-hidden="true" />
+              {status.label}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="statistics-timeline-chart">
+        <div className="statistics-timeline-axis-title">Number of exercises</div>
+        <div aria-hidden="true" />
+        <div className="statistics-timeline-axis" aria-label="Number of exercises">
+          {ticks.map((tick) => (
+            <span key={tick} className="statistics-timeline-axis-label" style={{ bottom: `${(tick / maximumCount) * 100}%` }}>
+              {tick}
+            </span>
+          ))}
+        </div>
+        <div className="statistics-timeline-viewport">
+          <div className="statistics-timeline-plot">
+            <div className="statistics-timeline-guides" aria-hidden="true">
+              {ticks.map((tick) => (
+                <span key={tick} style={{ bottom: `${(tick / maximumCount) * 100}%` }} />
+              ))}
+            </div>
+            <div className="statistics-timeline" style={{ '--timeline-days': days.length } as React.CSSProperties}>
+              {days.map((day) => {
+                const total = Object.values(day.counts).reduce((sum, count) => sum + count, 0);
+                return (
+                  <div key={localDateKey(day.date)} className="statistics-timeline-day" title={`${formatTimelineDate(day.date)}: ${total} exercise${total === 1 ? '' : 's'}`}>
+                    <div className="statistics-timeline-bar" aria-label={`${formatTimelineDate(day.date)}: ${total} exercises`}>
+                      {TIMELINE_STATUSES.map((status) => (
+                        <span
+                          key={status.key}
+                          className={`statistics-timeline-segment ${status.key}`}
+                          style={{ height: `${(day.counts[status.key] / maximumCount) * 100}%` }}
+                        />
+                      ))}
+                    </div>
+                    <span className="statistics-timeline-date">{formatTimelineDate(day.date)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function formatDuration(seconds: number | null | undefined): string {
@@ -86,12 +220,37 @@ function RankedExerciseList({ title, exercises, includeTime = false, includeInco
   );
 }
 
-function isTrackedExerciseSet(exercise: ExerciseSummary): boolean {
-  const exerciseSet = exercise.exercise_set?.trim().toLowerCase();
-  return exerciseSet !== 'examples' && exerciseSet !== 'references';
+function StatisticsSummary({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
+  const completedExerciseCount = exerciseSummaries.filter((exercise) => exercise.completed_at != null).length;
+  const statistics = [
+    { label: 'Fragments', field: 'fragments_drawn' as const, unit: 'fragments' },
+    { label: 'Merges', field: 'merges_done' as const, unit: 'merges' },
+    { label: 'Matches', field: 'matches_done' as const, unit: 'matches' },
+  ];
+
+  return (
+    <section className="statistics-summary" aria-label="Statistics summary">
+      {statistics.map(({ label, field, unit }) => {
+        const total = exerciseSummaries.reduce((sum, exercise) => sum + (exercise[field] ?? 0), 0);
+        const average = completedExerciseCount > 0 ? total / completedExerciseCount : 0;
+        return (
+          <div key={field} className="statistics-summary-item">
+            <h3>{`Number of ${label}`}</h3>
+            <p>total: {total} {unit}</p>
+            <p>average: {average.toFixed(1)} per completed exercise</p>
+          </div>
+        );
+      })}
+    </section>
+  );
 }
 
-function ProgressionBar({ title, exercises, layout = 'stacked' }: { title: string; exercises: ExerciseSummary[]; layout?: 'stacked' | 'row' }) {
+function isTrackedExerciseSet(exercise: ExerciseSummary): boolean {
+  const exerciseSet = exercise.exercise_set?.trim().toLowerCase();
+  return exerciseSet !== 'references';
+}
+
+function ProgressionBar({ title, exercises, layout = 'stacked', rowClassName = '' }: { title: string; exercises: ExerciseSummary[]; layout?: 'stacked' | 'row'; rowClassName?: string }) {
   const total = exercises.length;
   const statuses = exercises.map(contributionStatus);
   const correctNoCheats = statuses.filter((status) => status === 'is-green').length;
@@ -117,7 +276,7 @@ function ProgressionBar({ title, exercises, layout = 'stacked' }: { title: strin
 
   if (layout === 'row') {
     return (
-      <div className="statistics-progression-row">
+      <div className={`statistics-progression-row ${rowClassName}`.trim()}>
         <span className="statistics-progression-row-title">{title}</span>
         <progress className="statistics-progression-bar" value={completed} max={total || 1} />
         {counts}
@@ -138,7 +297,12 @@ function ProgressionStats({ exerciseSummaries }: { exerciseSummaries: ExerciseSu
   const trackedExercises = exerciseSummaries.filter(isTrackedExerciseSet);
   return (
     <div className="statistics-total-progression">
-      <ProgressionBar title="Total progression" exercises={trackedExercises} layout="row" />
+      <ProgressionBar
+        title="Total progression"
+        exercises={trackedExercises}
+        layout="row"
+        rowClassName="statistics-total-progression-row"
+      />
     </div>
   );
 }
@@ -199,7 +363,9 @@ function ProgressionTab({ exerciseSummaries }: { exerciseSummaries: ExerciseSumm
 
   return (
     <div className="statistics-progression-tab">
-      <div className="statistics-progression-tab-box">Placeholder</div>
+      <div className="statistics-progression-tab-box">
+        <StatisticsTimeline exerciseSummaries={exerciseSummaries} />
+      </div>
       <div className="statistics-progression-tab-box">
         <ProgressionStats exerciseSummaries={exerciseSummaries} />
         <div className="statistics-progression-panel">
@@ -258,31 +424,19 @@ function ContributionGrid({ exerciseSummaries }: { exerciseSummaries: ExerciseSu
         <div className="statistics-ranking-lists">
           <RankedExerciseList title="Fastest solved exercises" exercises={fastestExercises} includeTime />
           <RankedExerciseList title="Slowest solved exercises" exercises={slowestExercises} includeTime />
-          <RankedExerciseList title="Most incorrect answers" exercises={mostIncorrectExercises} includeIncorrectCount />
+          <div className="statistics-ranking-list-column">
+            <RankedExerciseList title="Most incorrect answers" exercises={mostIncorrectExercises} includeIncorrectCount />
+            <StatisticsSummary exerciseSummaries={exerciseSummaries} />
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function CsvIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path d="M4 3.5h10l6 6V20.5H4v-17Z" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M14 3.5v6h6M7 13h10M7 16h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 export function StatisticsPanel({ isOpen, onClose, exerciseSummaries }: StatisticsPanelProps) {
   const [activeTab, setActiveTab] = useState<StatisticsTabId>('1');
+  const trackedExerciseSummaries = exerciseSummaries.filter(isTrackedExerciseSet);
 
   if (!isOpen) {
     return null;
@@ -300,9 +454,6 @@ export function StatisticsPanel({ isOpen, onClose, exerciseSummaries }: Statisti
       <div className="settings-panel-surface" role="dialog" aria-modal="true" aria-label="Statistics panel">
         <div className="settings-panel-header">
           <div className="settings-panel-tabs">
-            <span aria-label="CSV" title="CSV">
-              <CsvIcon />
-            </span>
             {TABS.map((tab) => (
               <button
                 key={tab.id}
@@ -321,7 +472,7 @@ export function StatisticsPanel({ isOpen, onClose, exerciseSummaries }: Statisti
 
         <div className="settings-panel-content">
           <div className="settings-tab-content" id={`statisticstab-${activeTab}`}>
-            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : <ContributionGrid exerciseSummaries={exerciseSummaries} />}
+            {activeTab === '1' ? <ProgressionTab exerciseSummaries={trackedExerciseSummaries} /> : <ContributionGrid exerciseSummaries={exerciseSummaries} />}
           </div>
         </div>
       </div>

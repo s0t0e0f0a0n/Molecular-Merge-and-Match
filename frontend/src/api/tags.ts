@@ -10,6 +10,7 @@ export type Tag = {
   is_cheat: boolean;
   tag_count: number;
   user_tag: boolean;
+  allowed_stats: boolean;
   progression_use: boolean;
 };
 
@@ -36,5 +37,15 @@ export async function setTagHidden(id: number, hidden: boolean) {
     body: JSON.stringify({ is_hidden: hidden }),
   });
   if (!res.ok) throw new Error('Failed to set tag hidden');
+  return res.json() as Promise<Tag>;
+}
+
+export async function setTagStatistics(id: number, progressionUse: boolean) {
+  const res = await fetch(`${BASE_URL}${id}/stats`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ progression_use: progressionUse }),
+  });
+  if (!res.ok) throw new Error('Failed to set tag statistics');
   return res.json() as Promise<Tag>;
 }

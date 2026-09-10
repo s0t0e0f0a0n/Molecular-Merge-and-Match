@@ -39,6 +39,7 @@ import type { PeakDef } from '../../types/peak';
 import type { MergeState, NewStereoBond } from '../../types/molecule';
 import WarningPanel from '../warning/WarningPanel'
 import { FullscreenButton } from '../../components/FullscreenButton';
+import { DifficultyRating } from '../../components/DifficultyRating';
 import { LoadingExerciseOverlay, PausedExerciseOverlay } from './LoadingExerciseOverlay';
 import { LinkInheritOptionsPopup, type LinkInheritMode } from '../linking/LinkInheritOptionsPopup';
 import { applySettingsPreset, fetchUserSettings, updateUserSettings, type UpdateUserSettingsRequest, type UserSettings } from '../../api/settings';
@@ -2084,19 +2085,22 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
           {/* CAS answer validation */}
           {showCASValidation && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 5 }}>
-              <span
-                style={{
-                  width: 200,
-                  fontSize: 12,
-                  color: casAnswerIsCorrect ? '#0f5f0f' : '#b30000',
-                  whiteSpace: 'nowrap',
-                  visibility: casAnswerIsCorrect === null ? 'hidden' : 'visible',
-                  alignItems: 'center',
-                  textAlign: 'center',
-                }}
-              >
-                {casAnswerIsCorrect ? 'CAS answer is correct.' : 'CAS answer is incorrect.'}
-              </span>
+              <div style={{ width: 200, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: casAnswerIsCorrect ? '#0f5f0f' : '#b30000',
+                    whiteSpace: 'nowrap',
+                    visibility: casAnswerIsCorrect === null ? 'hidden' : 'visible',
+                    textAlign: 'center',
+                  }}
+                >
+                  {casAnswerIsCorrect ? 'CAS answer is correct.' : 'CAS answer is incorrect.'}
+                </span>
+                {casAnswerIsCorrect && (
+                  <DifficultyRating exerciseId={selectedExerciseId} resetKey={`${selectedExerciseId}-${casAnswerInput}`} />
+                )}
+              </div>
 
               <span style={{ justifyContent: 'center', whiteSpace: 'nowrap', alignItems: 'center', fontSize: 12 }}>Manual validation:</span>
               <input

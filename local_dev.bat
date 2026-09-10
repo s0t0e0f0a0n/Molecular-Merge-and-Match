@@ -35,6 +35,7 @@ call venv\Scripts\activate
 if not exist venv\Lib\site-packages\fastapi (
     echo Installing dependencies...
     python -m pip install -r req-local-dev.txt
+    python -m pip install pyinstaller
 )
 echo 
 

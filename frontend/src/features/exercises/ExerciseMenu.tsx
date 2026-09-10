@@ -3,6 +3,7 @@ import type { ExerciseSummary } from '../../api/exercises';
 import type { Tag } from '../../api/tags';
 import { ExerciseCreationForm } from './ExerciseCreationForm';
 import { ExerciseZipImport } from './ExerciseZipImport';
+import { formatChemistryText } from '../../utils/formatChemistryText';
 
 const exerciseNameCollator = new Intl.Collator(undefined, {
   numeric: true,
@@ -57,6 +58,16 @@ export function ExerciseMenu({
   const getExerciseSummaryLabel = useCallback(
     (exercise: ExerciseSummary) => exercise.name ?? `Exercise ${exercise.id}`,
     [],
+  );
+
+  const renderExerciseSummaryLabel = useCallback(
+    (exercise: ExerciseSummary) => {
+      const label = getExerciseSummaryLabel(exercise);
+      return exercise.exercise_set?.trim().toLowerCase() === 'references'
+        ? formatChemistryText(label)
+        : label;
+    },
+    [getExerciseSummaryLabel],
   );
 
   const scheduleExerciseMenuClose = useCallback(() => {
@@ -274,7 +285,7 @@ export function ExerciseMenu({
             {loadingExerciseSummaries
               ? 'Loading…'
               : (exerciseSummaries.find((exercise) => exercise.id === selectedExerciseId)
-                ? getExerciseSummaryLabel(exerciseSummaries.find((exercise) => exercise.id === selectedExerciseId)!)
+                ? renderExerciseSummaryLabel(exerciseSummaries.find((exercise) => exercise.id === selectedExerciseId)!)
                 : 'Exercises')}
           </span>
           {exerciseSummaries.find((exercise) => exercise.id === selectedExerciseId)?.completed === true ? (
@@ -369,7 +380,7 @@ export function ExerciseMenu({
                                   style={{ flex: 1, textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: '1px solid #ccc', background: selectedExerciseId === exercise.id ? '#111' : '#f9f9f9', color: selectedExerciseId === exercise.id ? '#fff' : '#111', cursor: 'pointer', fontSize: 13 }}
                                 >
                                   <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                    <span>{getExerciseSummaryLabel(exercise)}</span>
+                                    <span>{renderExerciseSummaryLabel(exercise)}</span>
                                     {exercise.completed === true ? (
                                       <svg aria-hidden="true" viewBox="0 0 16 16" version="1.1" width="16" height="16" style={{ fill: '#238636', flexShrink: 0, display: 'inline-block', verticalAlign: 'text-bottom' }}>
                                         <path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.75.75 0 0 0-1.06-1.06L7 8.94 5.28 7.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.06 0l4.25-4.25Z"></path>

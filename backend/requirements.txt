@@ -5,3 +5,4 @@ python-multipart==0.0.12
 SQLAlchemy==2.0.36
 rdkit==2025.9.6
 nmrglue==0.12
+matplotlib==3.11.1

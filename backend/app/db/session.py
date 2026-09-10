@@ -522,6 +522,20 @@ def _migrate_add_missing_columns() -> None:
             conn.execute(
                 text("ALTER TABLE statistics ADD COLUMN cheats_used VARCHAR(15) NOT NULL DEFAULT '000000000000'")
             )
+        if "difficulty" not in existing_statistics:
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN difficulty VARCHAR(10) NOT NULL DEFAULT 'O0'"))
+            conn.commit()
+        if "merges_done" not in existing_statistics:
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN merges_done INTEGER NOT NULL DEFAULT 0"))
+            conn.commit()
+        if "matches_done" not in existing_statistics:
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN matches_done INTEGER NOT NULL DEFAULT 0"))
+            conn.commit()
+        if "fragments_drawn" not in existing_statistics:
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN fragments_drawn INTEGER NOT NULL DEFAULT 0"))
+            conn.commit()
+        if "eligible_purge_time" not in existing_statistics:
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN eligible_purge_time DATETIME"))
             conn.commit()
         elif next(row[2] for row in statistics_columns if row[1] == "cheats_used").upper() != "VARCHAR(15)":
             conn.execute(text("ALTER TABLE statistics RENAME TO statistics_legacy"))
@@ -532,21 +546,26 @@ def _migrate_add_missing_columns() -> None:
                     exercise_id VARCHAR(50) NOT NULL,
                     incorrect_count INTEGER NOT NULL DEFAULT 0,
                     cheats_used VARCHAR(15) NOT NULL DEFAULT '000000000000',
+                    difficulty VARCHAR(10) NOT NULL DEFAULT 'O0',
+                    merges_done INTEGER NOT NULL DEFAULT 0,
+                    matches_done INTEGER NOT NULL DEFAULT 0,
+                    fragments_drawn INTEGER NOT NULL DEFAULT 0,
                     start_counting DATETIME,
                     stop_counting DATETIME,
                     timer_total INTEGER NOT NULL DEFAULT 0,
                     started_at DATETIME,
-                    completed_at DATETIME
+                    completed_at DATETIME,
+                    eligible_purge_time DATETIME
                 )
                 """
             ))
             conn.execute(text(
                 """
                 INSERT INTO statistics
-                    (id, exercise_id, incorrect_count, cheats_used, start_counting,
-                     stop_counting, timer_total, started_at, completed_at)
-                SELECT id, exercise_id, incorrect_count, CAST(cheats_used AS TEXT),
-                       start_counting, stop_counting, timer_total, started_at, completed_at
+                    (id, exercise_id, incorrect_count, cheats_used, difficulty, merges_done, matches_done, fragments_drawn, start_counting,
+                     stop_counting, timer_total, started_at, completed_at, eligible_purge_time)
+                SELECT id, exercise_id, incorrect_count, CAST(cheats_used AS TEXT), difficulty, merges_done, matches_done, fragments_drawn, start_counting,
+                       stop_counting, timer_total, started_at, completed_at, eligible_purge_time
                 FROM statistics_legacy
                 """
             ))
