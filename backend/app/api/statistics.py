@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
-from app.db.models import Exercise, Statistics
+from app.db.models import Exercise, Statistics, UserSettings
 from app.db.session import get_db
 
 router = APIRouter(prefix="/statistics", tags=["statistics"])
@@ -14,6 +14,7 @@ router = APIRouter(prefix="/statistics", tags=["statistics"])
 class StatisticsOut(BaseModel):
     exercise_id: str
     incorrect_count: int
+    cheats_used: str
     start_counting: datetime | None = None
     stop_counting: datetime | None = None
     timer_total: int = 0
@@ -144,6 +145,8 @@ def mark_exercise_completed(exercise_id: int | str) -> None:
             return
 
         row, _ = _ensure_statistics_row(db, exercise_id)
+        settings = db.query(UserSettings).filter(UserSettings.name == "User").first()
+        row.cheats_used = settings.cheats if settings is not None else "000000000000"
         completed_at = row.completed_at or datetime.now()
         row.completed_at = completed_at
         _finalize_timer(row, completed_at, count_short_elapsed=True)

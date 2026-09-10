@@ -43,7 +43,7 @@ Built for the Software Engineering course at Leiden University (2026).
 │   │   │   ├── reset.py             # POST to delete fragments, working solution, logbook with current exercise id.
 │   │   │   ├── router.py            # Aggregates all v1 routers under /api/v1
 │   │   │   ├── settings.py          # GET/PUT for changing user settings (the link inheritance behaviour)
-│   │   │   ├── warnings.py			 # GET /api/v1/warnings
+│   │   │   ├── warnings.py             # GET /api/v1/warnings
 │   │   │   └── working_solution.py  # GET/PUT/DELETE for the working solution per exercise
 │   │   ├── core/
 │   │   │   └── config.py            # Pydantic-based settings from environment variables
@@ -52,7 +52,7 @@ Built for the Software Engineering course at Leiden University (2026).
 │   │       ├── models.py            # ORM models (Fragment, WorkingSolution, PredefinedFragment, Exercise)
 │   │       └── session.py           # Engine, session factory, init_db()
 │   ├── data/
-│   │   ├── examples/				 # Example spectra (SVG)
+│   │   ├── examples/                 # Example spectra (SVG)
 │   │   ├── uploads/
 │   │   │   └── exercises/
 │   │   │       ├── additional/      # Additional spectra (IR, MS, …)
@@ -80,10 +80,10 @@ Built for the Software Engineering course at Leiden University (2026).
 │
 ├── build-assets/
 │   ├── icon.icns
-│   └── icon.png					 # Icon for Electron app (min. 256x256px, .png or .ico)
+│   └── icon.png                     # Icon for Electron app (min. 256x256px, .png or .ico)
 │
 ├── docs/
-│   └── architecture-decisions.md	 # Technical decision records
+│   └── architecture-decisions.md     # Technical decision records
 │   └── installation-guide.md        # How to install the application on Windows, MACOS and Linux
 │   └── packaging.md                 # Walkthrough guide for building the app with Electron-builder
 │
@@ -110,22 +110,22 @@ Built for the Software Engineering course at Leiden University (2026).
 │   │   │   ├── RDKitViewer.tsx      # RDKit molecule viewer with descriptor computation
 │   │   │   └── StereoChoiceDialog.tsx # Cis/trans configuration dialog after merge
 │   │   ├── context/
-│   │   │   ├── ExerciseDataContext.tsx	# React context provider for data of the selected exercise
-│   │   │   ├── HistoryContext.tsx  	# React context provider for the logbook
+│   │   │   ├── ExerciseDataContext.tsx    # React context provider for data of the selected exercise
+│   │   │   ├── HistoryContext.tsx      # React context provider for the logbook
 │   │   │   ├── RDKitContext.tsx        # React context provider for RDKit WASM instance
 │   │   │   └── WarningContext.tsx      # React context provider for data of the warnings
 │   │   ├── features/
 │   │   │   ├── exercises/
 │   │   │   │   ├── ExerciseCreationForm.tsx       # Form for creating exercises
-│   │   │   │   ├── ExerciseImportUtils.ts		   # Parsing of the data, both from ZIP and manual input
+│   │   │   │   ├── ExerciseImportUtils.ts           # Parsing of the data, both from ZIP and manual input
 │   │   │   │   └── ExerciseZipImport.tsx          # ZIP-based bulk exercise import (CSV manifest + spectra)
 │   │   │   ├── history/
-│   │   │   │   └── LogbookPanel.tsx			   # Collapsible logbook panel
+│   │   │   │   └── LogbookPanel.tsx               # Collapsible logbook panel
 │   │   │   ├── layout/
 │   │   │   │   ├── LoadingExerciseOverlay.tsx     # Loading screen, when loading an exercise
 │   │   │   │   └── MolecularBookkeepingPage.tsx   # Main dashboard layout, merge orchestration. 
 │   │   │   ├── linking/
-│   │   │   │   ├── LinkInheritOptionsPopup.tsx	   # Popup to change link inheritance settings
+│   │   │   │   ├── LinkInheritOptionsPopup.tsx       # Popup to change link inheritance settings
 │   │   │   │   ├── PeakTableColumn.tsx            # Peak list component
 │   │   │   │   └── WorkingFragmentsStrip.tsx      # Bottom fragment strip with merge/link controls
 │   │   │   ├── molecule/
@@ -138,9 +138,9 @@ Built for the Software Engineering course at Leiden University (2026).
 │   │   │   │   ├── AdditionalSpectraPopup.tsx     # Modal popup with tabs for additional spectra (IR, MS, …)
 │   │   │   │   └── SpectraPrototype.tsx           # Interactive 1H/13C-NMR spectrum display
 │   │   │   └── warning/
-│   │   │       ├── atom_count.svg				   # warning icon to be displayed when there are to many atoms or DBE
-│   │   │       ├── double_assignment.svg		   # warning icon to be displayed when more than one fragment is linked to a peak
-│   │   │       └── WarningPanel.tsx			   # Warnings are shown is this box
+│   │   │       ├── atom_count.svg                   # warning icon to be displayed when there are to many atoms or DBE
+│   │   │       ├── double_assignment.svg           # warning icon to be displayed when more than one fragment is linked to a peak
+│   │   │       └── WarningPanel.tsx               # Warnings are shown is this box
 │   │   ├── hooks/
 │   │   │   ├── useFragments.ts      # CRUD hook for working fragments
 │   │   │   ├── useLinkedFragmentWarnings.ts # fragment and linking information is send to the backend here and warning information is send to the warning context
@@ -151,7 +151,7 @@ Built for the Software Engineering course at Leiden University (2026).
 │   │   │   └── setup.ts             # Vitest setup (SVG mocks)
 │   │   ├── types/
 │   │   │   ├── molecule.ts          # MolGraph, MergeState, NewStereoBond type definitions
-│   │   │   └── peak.ts 			 # PeakDef type definition
+│   │   │   └── peak.ts              # PeakDef type definition
 │   │   └── utils/
 │   │       ├── formatChemistryText.tsx # Formatting text above spectra, uses subscript for numbers and allows for italic using /it{} and numbers without subscript using /notsub{}
 │   │       ├── mergeFragments.ts    # Atom-to-atom merge algorithm for MolGraphs
@@ -186,18 +186,18 @@ Built for the Software Engineering course at Leiden University (2026).
 │   │       └── svgMergePointLocator.test.ts
 │   ├── Dockerfile                   # Multi-stage image: Node build → nginx serve
 │   ├── eslint.config.js             # ESLint v9 flat config (TypeScript + React rules)
-│   ├── index.html         	         # html which is used during the built
+│   ├── index.html                      # html which is used during the built
 │   ├── nginx.conf                   # nginx: SPA fallback + /api/ reverse-proxy to backend
 │   ├── package.json
-│   ├── package-lock.json			
-│   ├── README.md					 # Frontend README
+│   ├── package-lock.json            
+│   ├── README.md                     # Frontend README
 │   ├── tsconfig.json
 │   ├── tsconfig.node.json
 │   └── vite.config.ts               # Build config + dev proxy + Node polyfills for Ketcher
 │
 ├── .gitignore
 ├── docker-compose.yml               # One-command full-stack startup
-├── LICENSE           				 # MIT License
+├── LICENSE                            # MIT License
 ├── main.js                          # Main entry point of Electron
 ├── package.json                     # Specifies Electron build configuration
 ├── preload.js                       # Preload script

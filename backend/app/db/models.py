@@ -216,6 +216,8 @@ class TagsUsed(Base):
     is_cheat: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     tag_count: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
     user_tag: Mapped[bool] = mapped_column(Boolean, nullable=True, default=False)
+    progression_use: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    allowed_stats: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Soft-delete: NULL = active, timestamp = soft-deleted. Similar to Fragment. Want to re-use the same name in current session
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True, default=None
@@ -275,7 +277,7 @@ class Statistics(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     exercise_id: Mapped[str] = mapped_column(String(50), nullable=False, default="ex1")
     incorrect_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    cheats_used: Mapped[int] = mapped_column(Integer, nullable=False, default=000000)
+    cheats_used: Mapped[str] = mapped_column(String(15), nullable=False, default="000000000000")
     start_counting: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True, default=None
     )

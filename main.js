@@ -1,4 +1,4 @@
-const { app, BrowserWindow, protocol, net, ipcMain } = require('electron');
+const { app, BrowserWindow, protocol, net, ipcMain, globalShortcut } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -6,6 +6,8 @@ const nodeNet = require('net');
 
 let backendProcess = null;
 let backendPort = 8000;
+let mainWindow = null;
+let nmrWindow = null;
 
 protocol.registerSchemesAsPrivileged([
     { scheme: 'api', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }
@@ -229,6 +231,7 @@ function createWindow() {
             sandbox: true
         }
     });
+    mainWindow = win;
 
     win.once('ready-to-show', () => {
         win.maximize();
@@ -250,6 +253,33 @@ function createWindow() {
     win.loadFile(indexPath);
 }
 
+function openNmrWindow() {
+    if (nmrWindow && !nmrWindow.isDestroyed()) {
+        nmrWindow.show();
+        nmrWindow.focus();
+        return;
+    }
+
+    nmrWindow = new BrowserWindow({
+        width: 1400,
+        height: 900,
+        minWidth: 900,
+        minHeight: 650,
+        title: 'nmrglue Test Bench',
+        icon: path.join(__dirname, 'build-assets', 'icon.png'),
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true
+        }
+    });
+
+    nmrWindow.on('closed', () => { nmrWindow = null; });
+    const nmrPath = path.join(__dirname, 'frontend', 'dist', 'nmrglueGUI.html');
+    nmrWindow.loadFile(nmrPath);
+}
+
 app.whenReady().then(async () => {
     try {
         backendPort = await getFreePort();
@@ -260,6 +290,10 @@ app.whenReady().then(async () => {
     setupUserData();
     startBackend();
     createWindow();
+    const nmrShortcut = process.platform === 'darwin' ? 'Command+F8' : 'F8';
+    if (!globalShortcut.register(nmrShortcut, openNmrWindow)) {
+        console.warn(`Could not register ${nmrShortcut} for the NMR test bench.`);
+    }
 });
 
 app.on('window-all-closed', () => {
@@ -267,6 +301,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
   if (backendProcess) {
     console.log("Killing backend process...");
     if (process.platform === 'win32') {

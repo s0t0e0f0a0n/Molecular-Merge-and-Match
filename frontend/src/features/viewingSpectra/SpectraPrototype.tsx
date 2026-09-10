@@ -417,7 +417,7 @@ function SpectrumCanvas({
               color: 'white',
               fontSize: 10,
               lineHeight: 0.9,              
-			  
+        
               pointerEvents: 'none',
               whiteSpace: 'pre-wrap',
               overflowWrap: 'break-word',

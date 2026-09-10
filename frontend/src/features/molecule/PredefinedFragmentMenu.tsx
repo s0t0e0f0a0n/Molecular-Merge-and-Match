@@ -185,7 +185,7 @@ export function PredefinedFragmentMenu({ onAdd }: PredefinedFragmentMenuProps) {
             left: 0,
             marginTop: 6,
             width: 336,
-            maxHeight: 485,
+            maxHeight: 503,
             overflowY: 'auto',
             background: 'white',
             border: '1px solid #ddd',

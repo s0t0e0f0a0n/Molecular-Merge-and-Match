@@ -93,7 +93,11 @@ async function readAdditionalSpectrum(zip: JSZip, spectrum: { file: string; labe
   };
 }
 
-async function processJsonImport(zip: JSZip, jsonEntry: JSZipObject): Promise<{ updatedCount: number; failures: string[] }> {
+async function processJsonImport(
+  zip: JSZip,
+  jsonEntry: JSZipObject,
+  onProgress?: (done: number, total: number) => void,
+): Promise<{ updatedCount: number; failures: string[] }> {
   const manifest = JSON.parse(await jsonEntry.async("text")) as {
     schema_version?: number;
     operation?: string;
@@ -116,6 +120,7 @@ async function processJsonImport(zip: JSZip, jsonEntry: JSZipObject): Promise<{ 
 
   let updatedCount = 0;
   const failures: string[] = [];
+  const totalChanges = manifest.changes.length;
   for (let index = 0; index < manifest.changes.length; index += 1) {
     const change = manifest.changes[index];
     try {
@@ -150,6 +155,7 @@ async function processJsonImport(zip: JSZip, jsonEntry: JSZipObject): Promise<{ 
     } catch (error) {
       failures.push(`Change ${index + 1}: ${error instanceof Error ? error.message : "Failed to update exercise."}`);
     }
+    onProgress?.(index + 1, totalChanges);
   }
   return { updatedCount, failures };
 }
@@ -191,6 +197,7 @@ export function ExerciseZipImport({ onImported, onImportingChange }: ExerciseZip
   const [importing, setImporting] = useState(false);
   const [successText, setSuccessText] = useState<string | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -211,6 +218,7 @@ export function ExerciseZipImport({ onImported, onImportingChange }: ExerciseZip
     setImporting(true);
     setSuccessText(null);
     setErrorText(null);
+    setProgress(null);
 
     try {
       const zip = await JSZip.loadAsync(file);
@@ -220,7 +228,9 @@ export function ExerciseZipImport({ onImported, onImportingChange }: ExerciseZip
         if (allCsvEntries.length > 0) {
           throw new Error("ZIP cannot contain both JSON and CSV import files.");
         }
-        const { updatedCount, failures } = await processJsonImport(zip, jsonEntry);
+        const { updatedCount, failures } = await processJsonImport(zip, jsonEntry, (done, total) => {
+          setProgress({ done, total });
+        });
         if (failures.length === 0) {
           setSuccessText(`JSON import complete: ${updatedCount} exercises updated.`);
         } else {
@@ -241,15 +251,25 @@ export function ExerciseZipImport({ onImported, onImportingChange }: ExerciseZip
       const defaultC13AxisEnd = Number(DEFAULT_C13_AXIS_END);
 
       let createdCount = 0;
+      let processedRows = 0;
       const failures: string[] = [];
 
+      // Parse all CSVs up front so the total row count (progress denominator) is known before importing.
+      const csvFiles = await Promise.all(
+        allCsvEntries.map(async (csvEntry) => {
+          const csvDirectoryPath = getParentDirectory(csvEntry.name);
+          const exerciseSet = getDirectoryName(csvDirectoryPath);
+          const filesInCsvDirectory = getFilesInDirectory(zip, csvDirectoryPath);
+          const csvText = await csvEntry.async("text");
+          const { headers, rows } = parseCsv(csvText);
+          return { csvEntry, exerciseSet, filesInCsvDirectory, headers, rows };
+        }),
+      );
+      const totalRows = csvFiles.reduce((sum, csv) => sum + csv.rows.length, 0);
+      setProgress({ done: 0, total: totalRows });
+
       // Process each CSV file (one per folder)
-      for (const csvEntry of allCsvEntries) {
-        const csvDirectoryPath = getParentDirectory(csvEntry.name);
-        const exerciseSet = getDirectoryName(csvDirectoryPath);
-        const filesInCsvDirectory = getFilesInDirectory(zip, csvDirectoryPath);
-        const csvText = await csvEntry.async("text");
-        const { headers, rows } = parseCsv(csvText);
+      for (const { csvEntry, exerciseSet, filesInCsvDirectory, headers, rows } of csvFiles) {
         if (headers.length === 0 || rows.length === 0) {
           failures.push(`${getFileName(csvEntry.name)} in folder "${exerciseSet}" is empty or invalid.`);
           continue;
@@ -258,6 +278,7 @@ export function ExerciseZipImport({ onImported, onImportingChange }: ExerciseZip
         // Process each row in this CSV
         for (let i = 0; i < rows.length; i += 1) {
           const row = rows[i];
+          try {
           const { payload, error, displayName, problemNumber } = buildPayloadFromCsvRow(
             headers,
             row,
@@ -350,6 +371,10 @@ export function ExerciseZipImport({ onImported, onImportingChange }: ExerciseZip
               `${exerciseSet} - Row ${i + 2} (${displayNameUsed}): ${result.detail ?? "Failed to create exercise."}`,
             );
           }
+          } finally {
+            processedRows += 1;
+            setProgress({ done: processedRows, total: totalRows });
+          }
         }
       }
 
@@ -372,34 +397,49 @@ export function ExerciseZipImport({ onImported, onImportingChange }: ExerciseZip
       setErrorText(error instanceof Error ? error.message : "Failed to import ZIP.");
     } finally {
       setImporting(false);
+      setProgress(null);
       onImportingChange?.(false);
     }
   };
 
+  const progressPercent = progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <label
-        style={{ ...buttonStyle, display: "inline-flex", alignItems: "center", width: "fit-content" }}
-        onClick={() => { onImportingChange?.(true); }}
-      >
-        {importing ? "Importing ZIP..." : "Upload exercise ZIP"}
-        <input
-          type="file"
-          accept=".zip,application/zip"
-          disabled={importing}
-          style={{ display: "none" }}
-          ref={fileInputRef}
-          onChange={(event) => {
-            const selectedFile = event.currentTarget.files?.[0] ?? null;
-            if (!selectedFile) {
-              onImportingChange?.(false);
-              return;
-            }
-            void onZipFileChange(selectedFile);
-            event.currentTarget.value = "";
-          }}
-        />
-      </label>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <label
+          style={{ ...buttonStyle, display: "inline-flex", alignItems: "center", width: "fit-content", flex: "0 0 auto" }}
+          onClick={() => { onImportingChange?.(true); }}
+        >
+          {importing ? "Importing ZIP..." : "Upload exercise ZIP"}
+          <input
+            type="file"
+            accept=".zip,application/zip"
+            disabled={importing}
+            style={{ display: "none" }}
+            ref={fileInputRef}
+            onChange={(event) => {
+              const selectedFile = event.currentTarget.files?.[0] ?? null;
+              if (!selectedFile) {
+                onImportingChange?.(false);
+                return;
+              }
+              void onZipFileChange(selectedFile);
+              event.currentTarget.value = "";
+            }}
+          />
+        </label>
+        {importing ? (
+          <div style={{ flex: "1 1 auto", display: "flex", alignItems: "center", gap: 8 }}>
+            {progress && progress.total > 0 ? (
+              <progress value={progress.done} max={progress.total} style={{ width: "100%", height: 10 }} />
+            ) : (
+              <progress style={{ width: "100%", height: 10 }} />
+            )}
+            <span style={{ fontSize: 12, fontWeight: 600, minWidth: 36, textAlign: "right" }}>{progressPercent}%</span>
+          </div>
+        ) : null}
+      </div>
       {errorText ? (
         <div
           style={{

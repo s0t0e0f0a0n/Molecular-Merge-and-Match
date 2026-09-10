@@ -16,7 +16,7 @@ if [ -z "$1" ]; then
     echo "Waiting for local servers to start..."
     sleep 10
     
-    # Start de browser (1. Edge -> 2. Falkon Flatpak -> 3. Standaardbrowser)
+    # Start the browser (1. Edge -> 2. Falkon Flatpak -> 3. Standard browser)
     if command -v microsoft-edge >/dev/null 2>&1; then
         microsoft-edge http://localhost:5173 >/dev/null 2>&1 &
     elif command -v flatpak >/dev/null 2>&1 && flatpak info org.kde.falkon >/dev/null 2>&1; then

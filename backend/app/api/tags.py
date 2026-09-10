@@ -22,6 +22,7 @@ class TagOut(BaseModel):
     is_cheat: bool
     tag_count: int
     user_tag: bool
+    progression_use: bool
 
     model_config = {"from_attributes": True}
 
@@ -40,6 +41,7 @@ def list_tags() -> list[TagOut]:
             is_cheat=bool(r.is_cheat),
             tag_count=int(r.tag_count or 0),
             user_tag=bool(r.user_tag),
+            progression_use=bool(r.progression_use),
         ) for r in rows]
 
 
@@ -59,6 +61,7 @@ def get_tag(tag_id: int) -> TagOut:
             is_cheat=bool(row.is_cheat),
             tag_count=int(row.tag_count or 0),
             user_tag=bool(row.user_tag),
+            progression_use=bool(row.progression_use),
         )
 
 
@@ -96,6 +99,7 @@ def set_tag_hidden(tag_id: int, payload: TagHideIn) -> TagOut:
             is_cheat=bool(row.is_cheat),
             tag_count=int(row.tag_count or 0),
             user_tag=bool(row.user_tag),
+            progression_use=bool(row.progression_use),
         )
 
 
@@ -118,4 +122,5 @@ def restore_tag(tag_id: int) -> TagOut:
             is_cheat=bool(row.is_cheat),
             tag_count=int(row.tag_count or 0),
             user_tag=bool(row.user_tag),
+            progression_use=bool(row.progression_use),
         )

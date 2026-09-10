@@ -28,6 +28,8 @@ backend/data/app.db
 backend/data/test.db
 backend/data/uploads/
 
+backend/req-local-dev.txt
+
 # OS
 .DS_Store
 

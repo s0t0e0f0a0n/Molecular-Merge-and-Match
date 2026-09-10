@@ -7,7 +7,7 @@ if "%~1"=="" (
     start "MMM - Backend" cmd /k ""%~f0" run_backend"
     start "MMM - Frontend" cmd /k ""%~f0" run_frontend"
 
-	:: Wait 10 seconds for the processes (like Uvicorn) to initialize
+  :: Wait 10 seconds for the processes (like Uvicorn) to initialize
     echo Waiting for local servers to start...
     timeout /t 10 /nobreak >nul
     
@@ -34,9 +34,7 @@ if not exist venv (
 call venv\Scripts\activate
 if not exist venv\Lib\site-packages\fastapi (
     echo Installing dependencies...
-    python -m pip install -r requirements.txt
-	python -m pip install -r requirements-dev.txt
-	python -m pip install tzdata pyinstaller fonttools brotli
+    python -m pip install -r req-local-dev.txt
 )
 echo 
 

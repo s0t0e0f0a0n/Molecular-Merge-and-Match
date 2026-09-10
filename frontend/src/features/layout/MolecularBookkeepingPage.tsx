@@ -17,8 +17,7 @@ import { useRDKit } from '../../context/RDKitContext';
 import { parseMolBlock, molGraphToMolBlock } from '../../utils/molParser';
 import { mergeAtAtoms } from '../../utils/mergeFragments';
 import type { MolGraph } from '../../types/molecule';
-import { ExerciseCreationForm } from '../exercises/ExerciseCreationForm';
-import { ExerciseZipImport } from '../exercises/ExerciseZipImport';
+import { ExerciseMenu } from '../exercises/ExerciseMenu';
 import {
   fetchExerciseStatistics,
   fetchExerciseSummaries,
@@ -50,6 +49,7 @@ import {
 } from '../../api/solvents';
 import { fetchTags, type Tag } from '../../api/tags';
 import { SettingsPanel } from '../settings/SettingsPanel';
+import { StatisticsPanel } from '../statistics/StatisticsPanel';
 import {
   ExerciseTimerDisplay,
   PauseExerciseButton,
@@ -284,6 +284,9 @@ export function MolecularBookkeepingPage() {
   const [selectedPreset, setSelectedPreset] = useState('User');
   const [availablePresets, setAvailablePresets] = useState<string[]>(['Default', 'Beginner', 'Exam', 'User']);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [statisticsPanelOpen, setStatisticsPanelOpen] = useState(false);
+  const [cheatMenuOpen, setCheatMenuOpen] = useState(false);
+  const cheatMenuRef = useRef<HTMLDivElement>(null);
   const [solvents, setSolvents] = useState<SolventPreference[]>([]);
   const [solventsLoading, setSolventsLoading] = useState(false);
   const cheating = useCheating(cheatBits);
@@ -308,6 +311,19 @@ export function MolecularBookkeepingPage() {
     setCasAnswerIsCorrect(null);
     setValidatingCasAnswer(false);
   }, [selectedExerciseId]);
+
+  useEffect(() => {
+    if (!cheatMenuOpen) return;
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      if (cheatMenuRef.current && !cheatMenuRef.current.contains(event.target as Node)) {
+        setCheatMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown);
+    return () => document.removeEventListener('pointerdown', handleOutsidePointerDown);
+  }, [cheatMenuOpen]);
 
   useLayoutEffect(() => {
     if (loadingSelectedExercise || selectedExerciseId === null) {
@@ -430,57 +446,10 @@ export function MolecularBookkeepingPage() {
   },
   [fragments, updateFragment, history],
 );
-  {/* exercise menu */}
-  const [exerciseMenuOpen, setExerciseMenuOpen] = useState(false);
-  const [creationFormOpen, setCreationFormOpen] = useState(false);
-  const [expandedExerciseSets, setExpandedExerciseSets] = useState<string[]>([]);
-  const [activeSetFilters, setActiveSetFilters] = useState<string[]>([]);
-  const [activeTagFilters, setActiveTagFilters] = useState<string[]>([]);
-  const [tagFilterMode, setTagFilterMode] = useState<'AND' | 'OR'>('AND');
-  const [deletionMode, setDeletionMode] = useState(false);
-  const [selectedForDeletion, setSelectedForDeletion] = useState<Set<string>>(new Set());
-
-  // Auto-close the exercise menu when the mouse leaves it. We use a short
-  // timer so brushing the small gap between the button and the dropdown
-  // doesnt close the menu by accident.
-  const exerciseMenuCloseTimer = useRef<number | null>(null);
-  const zipImportingRef = useRef(false);
-  const exerciseMenuRef = useRef<HTMLDivElement | null>(null);
-  const scheduleExerciseMenuClose = useCallback(() => {
-    if (creationFormOpen) return;
-    if (zipImportingRef.current) return;
-    if (exerciseMenuCloseTimer.current) window.clearTimeout(exerciseMenuCloseTimer.current);
-    const delay = deletionMode ? 1000 : 150;
-    exerciseMenuCloseTimer.current = window.setTimeout(() => setExerciseMenuOpen(false), delay);
-  }, [creationFormOpen, deletionMode]);
-  const cancelExerciseMenuClose = useCallback(() => {
-    if (exerciseMenuCloseTimer.current) {
-      window.clearTimeout(exerciseMenuCloseTimer.current);
-      exerciseMenuCloseTimer.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!exerciseMenuOpen) return;
-    function onClickOutside(e: MouseEvent) {
-      if (exerciseMenuRef.current && !exerciseMenuRef.current.contains(e.target as Node)) {
-        setExerciseMenuOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
-  }, [exerciseMenuOpen]);
   const [exerciseSummaries, setExerciseSummaries] = useState<ExerciseSummary[]>([]);
   const [activeTags, setActiveTags] = useState<Tag[]>([]);
   const [loadingExerciseSummaries, setLoadingExerciseSummaries] = useState(false);
   const [exerciseSummariesError, setExerciseSummariesError] = useState<string | null>(null);
-
-  const getExerciseSummaryLabel = useCallback((exercise: ExerciseSummary) => exercise.name ?? `Exercise ${exercise.id}`, []);
-
-  const normalizeExerciseSet = useCallback((value: string | null | undefined) => {
-    const trimmed = value?.trim();
-    return trimmed ? trimmed : 'Unassigned';
-  }, []);
 
   const loadActiveTags = useCallback(async () => {
     try {
@@ -536,13 +505,22 @@ useEffect(() => {
 }, [selectExerciseById, initialUrlId, loadActiveTags]);
 
 useEffect(() => {
-  const handleExerciseCompleted = () => {
+  const handleExerciseSummariesRefresh = () => {
     void loadExerciseSummaries();
   };
 
-  window.addEventListener('exercise-completed', handleExerciseCompleted);
-  return () => window.removeEventListener('exercise-completed', handleExerciseCompleted);
+  window.addEventListener('exercise-completed', handleExerciseSummariesRefresh);
+  window.addEventListener('exercise-statistics-updated', handleExerciseSummariesRefresh);
+  return () => {
+    window.removeEventListener('exercise-completed', handleExerciseSummariesRefresh);
+    window.removeEventListener('exercise-statistics-updated', handleExerciseSummariesRefresh);
+  };
 }, [loadExerciseSummaries]);
+
+useEffect(() => {
+  if (!statisticsPanelOpen) return;
+  void loadExerciseSummaries();
+}, [statisticsPanelOpen, loadExerciseSummaries]);
 
 useEffect(() => {
   if (selectedExerciseId === null) return;
@@ -551,145 +529,7 @@ useEffect(() => {
   window.history.replaceState(null, '', `?${params.toString()}`);
 }, [selectedExerciseId]);
 
-  useEffect(() => {
-    if (!exerciseMenuOpen || selectedExerciseId === null) return;
-    const selected = exerciseSummaries.find((ex) => ex.id === selectedExerciseId);
-    if (!selected) return;
-    const setName = normalizeExerciseSet(selected.exercise_set);
-    setExpandedExerciseSets((prev) =>
-      prev.includes(setName) ? prev : [...prev, setName],
-    );
-  }, [exerciseMenuOpen, selectedExerciseId, exerciseSummaries, normalizeExerciseSet]);
-
-  useEffect(() => {
-    if (creationFormOpen) {
-      cancelExerciseMenuClose();
-    }
-  }, [creationFormOpen, cancelExerciseMenuClose]);
-
-  useEffect(() => {
-    if (!showCreation && creationFormOpen) {
-      setCreationFormOpen(false);
-    }
-  }, [showCreation, creationFormOpen]);
-
-  const exerciseSetOptions = useMemo(() => {
-    const setNames = new Set<string>();
-    for (const ex of exerciseSummaries) {
-      setNames.add(normalizeExerciseSet(ex.exercise_set));
-    }
-    return Array.from(setNames).sort((a, b) => a.localeCompare(b));
-  }, [exerciseSummaries, normalizeExerciseSet]);
-
   const showCheatTags = normalizeCheatBits(cheatBits).padEnd(DEFAULT_CHEATS.length, '0')[8] === '1';
-
-  const tagOptions = useMemo(() => {
-    const activeTagNames = new Set(activeTags.map((tag) => tag.tag_name.toLocaleLowerCase()));
-    const cheatTagNames = new Set(activeTags.filter((tag) => tag.is_cheat).map((tag) => tag.tag_name.toLocaleLowerCase()));
-    const tags = new Set<string>();
-    for (const ex of exerciseSummaries) {
-      for (const tag of ex.tags) {
-        const normalizedTag = tag.toLocaleLowerCase();
-        if (activeTagNames.has(normalizedTag) && (showCheatTags || !cheatTagNames.has(normalizedTag))) {
-          tags.add(tag);
-        }
-      }
-    }
-    return Array.from(tags).sort((a, b) => a.localeCompare(b));
-  }, [activeTags, exerciseSummaries, showCheatTags]);
-
-  useEffect(() => {
-    const allowedTagNames = new Set(
-      activeTags
-        .filter((tag) => showCheatTags || !tag.is_cheat)
-        .map((tag) => tag.tag_name.toLocaleLowerCase()),
-    );
-    setActiveTagFilters((previous) =>
-      previous.filter((tag) => allowedTagNames.has(tag.toLocaleLowerCase())),
-    );
-  }, [activeTags, showCheatTags]);
-
-  const exercisesBySet = useMemo(() => {
-    const matchesSet = (setName: string) =>
-      activeSetFilters.length === 0 || activeSetFilters.includes(setName);
-    const matchesTags = (tags: string[]) => {
-      if (activeTagFilters.length === 0) return true;
-      if (tagFilterMode === 'AND') {
-        return activeTagFilters.every((filter) => tags.includes(filter));
-      } else {
-        return tags.some((tag) => activeTagFilters.includes(tag));
-      }
-    };
-
-    const map = new Map<string, ExerciseSummary[]>();
-    for (const ex of exerciseSummaries) {
-      const setName = normalizeExerciseSet(ex.exercise_set);
-      if (!matchesSet(setName) || !matchesTags(ex.tags)) {
-        continue;
-      }
-      const list = map.get(setName) ?? [];
-      list.push(ex);
-      map.set(setName, list);
-    }
-
-    return Array.from(map.entries())
-      .map(([setName, exercises]) => ({
-        setName,
-        exercises: [...exercises].sort((a, b) => a.id - b.id),
-      }))
-      .sort((a, b) => a.setName.localeCompare(b.setName));
-  }, [exerciseSummaries, activeSetFilters, activeTagFilters, tagFilterMode, normalizeExerciseSet]);
-
-  const toggleExpandedSet = useCallback((setName: string) => {
-    setExpandedExerciseSets((prev) =>
-      prev.includes(setName) ? prev.filter((name) => name !== setName) : [...prev, setName],
-    );
-  }, []);
-
-  const toggleSetFilter = useCallback((setName: string) => {
-    setActiveSetFilters((prev) =>
-      prev.includes(setName) ? prev.filter((name) => name !== setName) : [...prev, setName],
-    );
-  }, []);
-
-  const toggleTagFilter = useCallback((tag: string) => {
-    setActiveTagFilters((prev) =>
-      prev.includes(tag) ? prev.filter((name) => name !== tag) : [...prev, tag],
-    );
-  }, []);
-
-  const toggleDeleteSelection = useCallback((id: string) => {
-    setSelectedForDeletion((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const toggleSetForDeletion = useCallback((setName: string) => {
-    const exerciseIds = new Set(exercisesBySet
-      .find((s) => s.setName === setName)
-      ?.exercises.map((e) => `ex-${e.id}`) ?? []);
-    const setId = `set-${setName}`;
-
-    setSelectedForDeletion((prev) => {
-      const next = new Set(prev);
-      const allSelected = exerciseIds.size > 0 && 
-        Array.from(exerciseIds).every((id) => next.has(id)) &&
-        next.has(setId);
-
-      if (allSelected) {
-        next.delete(setId);
-        exerciseIds.forEach((id) => next.delete(id));
-      } else {
-        next.add(setId);
-        exerciseIds.forEach((id) => next.add(id));
-      }
-      return next;
-    });
-  }, [exercisesBySet]);
-
   const loadSolventPreferences = useCallback(async () => {
     setSolventsLoading(true);
     try {
@@ -719,18 +559,9 @@ useEffect(() => {
     void loadActiveTags();
   }, [loadActiveTags, loadExerciseSummaries]);
 
-  const handleDeleteSelected = useCallback(async () => {
-    const ok = window.confirm(
-      `Delete ${selectedForDeletion.size} item${selectedForDeletion.size !== 1 ? 's' : ''}? This cannot be undone.`
-    );
-    if (!ok) return;
-
-    const exerciseIds = Array.from(selectedForDeletion)
-      .filter((id) => id.startsWith('ex-'))
-      .map((id) => Number(id.slice(3)));
-
+  const handleDeleteExercises = useCallback(async (exerciseIds: number[]): Promise<number[]> => {
     const failed: number[] = [];
-    
+
     for (const id of exerciseIds) {
       try {
         await deleteExercise(id);
@@ -739,9 +570,7 @@ useEffect(() => {
       }
     }
     
-    setSelectedForDeletion(new Set());
-    setDeletionMode(false);
-    
+
     try {
       const updatedSummaries = await fetchExerciseSummaries();
       setExerciseSummaries(updatedSummaries);
@@ -758,12 +587,9 @@ useEffect(() => {
     } catch (error) {
       console.error('Failed to refresh summaries after delete', error);
     }
-    
-    if (failed.length > 0) {
-      const message = `Failed to delete: ${failed.join(', ')}`;
-      alert(message);
-    }
-  }, [selectedForDeletion, selectedExerciseId, selectExerciseById, clearSelectedExercise, loadSolventPreferences]);
+
+    return failed;
+  }, [selectedExerciseId, selectExerciseById, clearSelectedExercise, loadSolventPreferences]);
 
   const currentPeaks = useMemo<PeakDef[]>(() => {
     if (!selectedExercise) {
@@ -1121,6 +947,26 @@ const handleCheatBitsChange = useCallback(
   },
   [persistUserSettings],
 );
+
+useEffect(() => {
+  const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+
+  const handleCheatHotkey = (event: KeyboardEvent) => {
+    if (event.key !== 'F7') return;
+
+    const isPlainF7 = !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey;
+    const isMacCommandF7 = isMac && event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey;
+    if (!isPlainF7 && !isMacCommandF7) return;
+
+    event.preventDefault();
+    const normalized = normalizeCheatBits(cheatBits).padEnd(DEFAULT_CHEATS.length, '0');
+    const nextEnabled = normalized[0] !== '1';
+    handleCheatBitsChange(`${nextEnabled ? '1' : '0'}${normalized.slice(1)}`);
+  };
+
+  window.addEventListener('keydown', handleCheatHotkey);
+  return () => window.removeEventListener('keydown', handleCheatHotkey);
+}, [cheatBits, handleCheatBitsChange]);
 
 const hAxisRange: [number, number] | null =
   selectedExercise?.h1_axis_end != null && selectedExercise?.h1_axis_start != null
@@ -1708,13 +1554,16 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
       try {
         const result = await validateExerciseCasAnswer(selectedExerciseId, normalizedCas);
         setCasAnswerIsCorrect(result.is_correct);
+        try {
+          const statistics = await fetchExerciseStatistics(selectedExerciseId);
+          setSelectedExerciseStatistics(statistics);
+          window.dispatchEvent(new CustomEvent('exercise-statistics-updated', {
+            detail: { exerciseId: selectedExerciseId },
+          }));
+        } catch (error) {
+          console.error('statistics refresh failed', error);
+        }
         if (result.is_correct) {
-          try {
-            const statistics = await fetchExerciseStatistics(selectedExerciseId);
-            setSelectedExerciseStatistics(statistics);
-          } catch (error) {
-            console.error('statistics refresh failed', error);
-          }
           window.dispatchEvent(new CustomEvent('exercise-completed', { detail: { exerciseId: selectedExerciseId } }));
         }
       } catch {
@@ -1780,7 +1629,6 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
           flexShrink: 0,
         }}
       >
-        {/* Left: icon + current exercise name/formula + additional spectra */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <img
             src={`${import.meta.env.BASE_URL}atom.png`}
@@ -1810,10 +1658,39 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
             }}
           >
           <svg style={{ verticalAlign: 'middle', position: 'absolute', transition: 'all 0.7s ease-in-out', opacity: settingsHover ? 0 : 1 }} 
-          	width="32px" height="32px" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="none"><g stroke-width="0"></g><g stroke-linecap="round" stroke-linejoin="round"></g><g><path fill="#555" d="m80.16 29.054-5.958-.709 5.958.71Zm31.68 0-5.958.71 5.958-.71Zm34.217 19.756-2.365-5.515 2.365 5.514Zm10.081 3.352 5.196-3-5.196 3Zm7.896 13.676 5.196-3-5.196 3Zm-2.137 10.407-3.594-4.805 3.594 4.805Zm0 39.51 3.593-4.805-3.593 4.805Zm2.137 10.407 5.196 3-5.196-3Zm-7.896 13.676-5.196-3 5.196 3Zm-10.081 3.353 2.364-5.515-2.364 5.515Zm-34.217 19.755 5.958.709-5.958-.709Zm-31.68 0-5.958.709 5.958-.709Zm-34.217-19.755-2.364-5.515 2.364 5.515Zm-10.08-3.353-5.197 3 5.196-3Zm-7.897-13.676 5.196-3-5.196 3Zm2.137-10.407 3.594 4.805-3.594-4.805Zm0-39.51L26.51 81.05l3.593-4.805Zm-2.137-10.407 5.196 3-5.196-3Zm7.896-13.676-5.196-3 5.196 3Zm10.081-3.352-2.364 5.514 2.364-5.514Zm7.85 3.365-2.365 5.515 2.364-5.515Zm0 87.65 2.364 5.514-2.365-5.514ZM36.235 111.17l-3.594-4.805 3.594 4.805Zm76.823 41.535 5.958.71-5.958-.71Zm39.854-69.742-3.593-4.805 3.593 4.805Zm-16.369-30.074 2.364 5.514-2.364-5.514Zm-23.485-13.594-5.958.709 5.958-.71ZM88.104 16a14 14 0 0 0-13.902 12.345l11.916 1.419A2 2 0 0 1 88.104 28V16Zm15.792 0H88.104v12h15.792V16Zm13.902 12.345A14 14 0 0 0 103.896 16v12a2 2 0 0 1 1.986 1.764l11.916-1.419Zm1.219 10.24-1.219-10.24-11.916 1.419 1.219 10.24 11.916-1.419Zm24.675 4.71-9.513 4.08 4.729 11.028 9.513-4.08-4.729-11.028Zm17.642 5.867a14 14 0 0 0-17.642-5.867l4.729 11.029a2 2 0 0 1 2.521.838l10.392-6Zm7.896 13.676-7.896-13.676-10.392 6 7.896 13.676 10.392-6Zm-3.74 18.212a14 14 0 0 0 3.74-18.212l-10.392 6a2 2 0 0 1-.535 2.602l7.187 9.61Zm-8.984 6.718 8.984-6.718-7.187-9.61-8.983 6.718 7.186 9.61Zm8.984 23.182-8.984-6.718-7.186 9.61 8.983 6.718 7.187-9.61Zm3.74 18.212a14 14 0 0 0-3.74-18.212l-7.187 9.61a2 2 0 0 1 .535 2.602l10.392 6Zm-7.896 13.676 7.896-13.676-10.392-6-7.896 13.676 10.392 6Zm-17.642 5.867a14 14 0 0 0 17.642-5.867l-10.392-6a2.001 2.001 0 0 1-2.521.838l-4.729 11.029Zm-9.513-4.08 9.513 4.08 4.729-11.029-9.512-4.079-4.73 11.028Zm-16.381 19.03 1.219-10.24-11.916-1.419-1.219 10.24 11.916 1.419ZM103.896 176a14 14 0 0 0 13.902-12.345l-11.916-1.419a2 2 0 0 1-1.986 1.764v12Zm-15.792 0h15.792v-12H88.104v12Zm-13.902-12.345A14 14 0 0 0 88.104 176v-12a2 2 0 0 1-1.986-1.764l-11.916 1.419Zm-1.012-8.504 1.012 8.504 11.916-1.419-1.012-8.504-11.916 1.419ZM51.428 134.31l-7.85 3.366 4.73 11.029 7.849-3.366-4.73-11.029Zm-7.85 3.366a2 2 0 0 1-2.52-.838l-10.392 6a14 14 0 0 0 17.642 5.867l-4.73-11.029Zm-2.52-.838-7.896-13.676-10.392 6 7.896 13.676 10.392-6Zm-7.896-13.676a2 2 0 0 1 .535-2.602l-7.187-9.61a14 14 0 0 0-3.74 18.212l10.392-6Zm.535-2.602 6.132-4.585-7.187-9.61-6.132 4.585 7.187 9.61ZM26.51 81.05l6.132 4.586 7.187-9.61-6.132-4.586-7.187 9.61Zm-3.74-18.212a14 14 0 0 0 3.74 18.212l7.187-9.61a2 2 0 0 1-.535-2.602l-10.392-6Zm7.896-13.676L22.77 62.838l10.392 6 7.896-13.676-10.392-6Zm17.642-5.867a14 14 0 0 0-17.642 5.867l10.392 6a2 2 0 0 1 2.52-.838l4.73-11.029Zm7.849 3.366-7.85-3.366-4.729 11.029 7.85 3.366 4.729-11.029Zm18.045-18.316-1.012 8.504 11.916 1.419 1.012-8.504-11.916-1.419Zm-1.754 27.552c6.078-3.426 11.69-9.502 12.658-17.63L73.19 36.85c-.382 3.209-2.769 6.415-6.635 8.595l5.893 10.453Zm-21.02 1.793c7.284 3.124 15.055 1.57 21.02-1.793l-5.893-10.453c-3.704 2.088-7.481 2.468-10.398 1.217l-4.73 11.029ZM49 96c0-7.1-2.548-15.022-9.171-19.975l-7.187 9.61C35.36 87.668 37 91.438 37 96h12Zm23.448 40.103c-5.965-3.363-13.736-4.917-21.02-1.793l4.729 11.029c2.917-1.251 6.694-.871 10.398 1.218l5.893-10.454Zm-32.62-20.128C46.452 111.022 49 103.1 49 96H37c0 4.563-1.64 8.333-4.358 10.365l7.187 9.61Zm78.679 19.575c-5.536 3.298-10.517 8.982-11.406 16.446l11.916 1.419c.329-2.765 2.318-5.582 5.632-7.557l-6.142-10.308Zm20.402-1.953c-7.094-3.042-14.669-1.463-20.402 1.953l6.142 10.308c3.382-2.015 6.872-2.372 9.53-1.233l4.73-11.028Zm-53.803 20.135c-.968-8.127-6.58-14.202-12.658-17.629l-5.893 10.454c3.866 2.179 6.253 5.385 6.635 8.594l11.916-1.419ZM141 96c0 6.389 2.398 13.414 8.32 17.842l7.186-9.61C154.374 102.638 153 99.668 153 96h-12Zm8.32-17.842C143.398 82.586 141 89.61 141 96h12c0-3.668 1.374-6.638 3.506-8.232l-7.186-9.61ZM118.507 56.45c5.733 3.416 13.308 4.995 20.401 1.953l-4.729-11.029c-2.658 1.14-6.148.782-9.53-1.233l-6.142 10.31Zm-11.406-16.446c.889 7.464 5.87 13.148 11.406 16.446l6.142-10.309c-3.314-1.974-5.303-4.79-5.632-7.556l-11.916 1.419Z"></path><path stroke="#555" stroke-linecap="round" stroke-linejoin="round" stroke-width="12" d="M96 120c13.255 0 24-10.745 24-24s-10.745-24-24-24-24 10.745-24 24 10.745 24 24 24Z"></path></g></svg>
+            width="32px" height="32px" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="none"><g stroke-width="0"></g><g stroke-linecap="round" stroke-linejoin="round"></g><g><path fill="#555" d="m80.16 29.054-5.958-.709 5.958.71Zm31.68 0-5.958.71 5.958-.71Zm34.217 19.756-2.365-5.515 2.365 5.514Zm10.081 3.352 5.196-3-5.196 3Zm7.896 13.676 5.196-3-5.196 3Zm-2.137 10.407-3.594-4.805 3.594 4.805Zm0 39.51 3.593-4.805-3.593 4.805Zm2.137 10.407 5.196 3-5.196-3Zm-7.896 13.676-5.196-3 5.196 3Zm-10.081 3.353 2.364-5.515-2.364 5.515Zm-34.217 19.755 5.958.709-5.958-.709Zm-31.68 0-5.958.709 5.958-.709Zm-34.217-19.755-2.364-5.515 2.364 5.515Zm-10.08-3.353-5.197 3 5.196-3Zm-7.897-13.676 5.196-3-5.196 3Zm2.137-10.407 3.594 4.805-3.594-4.805Zm0-39.51L26.51 81.05l3.593-4.805Zm-2.137-10.407 5.196 3-5.196-3Zm7.896-13.676-5.196-3 5.196 3Zm10.081-3.352-2.364 5.514 2.364-5.514Zm7.85 3.365-2.365 5.515 2.364-5.515Zm0 87.65 2.364 5.514-2.365-5.514ZM36.235 111.17l-3.594-4.805 3.594 4.805Zm76.823 41.535 5.958.71-5.958-.71Zm39.854-69.742-3.593-4.805 3.593 4.805Zm-16.369-30.074 2.364 5.514-2.364-5.514Zm-23.485-13.594-5.958.709 5.958-.71ZM88.104 16a14 14 0 0 0-13.902 12.345l11.916 1.419A2 2 0 0 1 88.104 28V16Zm15.792 0H88.104v12h15.792V16Zm13.902 12.345A14 14 0 0 0 103.896 16v12a2 2 0 0 1 1.986 1.764l11.916-1.419Zm1.219 10.24-1.219-10.24-11.916 1.419 1.219 10.24 11.916-1.419Zm24.675 4.71-9.513 4.08 4.729 11.028 9.513-4.08-4.729-11.028Zm17.642 5.867a14 14 0 0 0-17.642-5.867l4.729 11.029a2 2 0 0 1 2.521.838l10.392-6Zm7.896 13.676-7.896-13.676-10.392 6 7.896 13.676 10.392-6Zm-3.74 18.212a14 14 0 0 0 3.74-18.212l-10.392 6a2 2 0 0 1-.535 2.602l7.187 9.61Zm-8.984 6.718 8.984-6.718-7.187-9.61-8.983 6.718 7.186 9.61Zm8.984 23.182-8.984-6.718-7.186 9.61 8.983 6.718 7.187-9.61Zm3.74 18.212a14 14 0 0 0-3.74-18.212l-7.187 9.61a2 2 0 0 1 .535 2.602l10.392 6Zm-7.896 13.676 7.896-13.676-10.392-6-7.896 13.676 10.392 6Zm-17.642 5.867a14 14 0 0 0 17.642-5.867l-10.392-6a2.001 2.001 0 0 1-2.521.838l-4.729 11.029Zm-9.513-4.08 9.513 4.08 4.729-11.029-9.512-4.079-4.73 11.028Zm-16.381 19.03 1.219-10.24-11.916-1.419-1.219 10.24 11.916 1.419ZM103.896 176a14 14 0 0 0 13.902-12.345l-11.916-1.419a2 2 0 0 1-1.986 1.764v12Zm-15.792 0h15.792v-12H88.104v12Zm-13.902-12.345A14 14 0 0 0 88.104 176v-12a2 2 0 0 1-1.986-1.764l-11.916 1.419Zm-1.012-8.504 1.012 8.504 11.916-1.419-1.012-8.504-11.916 1.419ZM51.428 134.31l-7.85 3.366 4.73 11.029 7.849-3.366-4.73-11.029Zm-7.85 3.366a2 2 0 0 1-2.52-.838l-10.392 6a14 14 0 0 0 17.642 5.867l-4.73-11.029Zm-2.52-.838-7.896-13.676-10.392 6 7.896 13.676 10.392-6Zm-7.896-13.676a2 2 0 0 1 .535-2.602l-7.187-9.61a14 14 0 0 0-3.74 18.212l10.392-6Zm.535-2.602 6.132-4.585-7.187-9.61-6.132 4.585 7.187 9.61ZM26.51 81.05l6.132 4.586 7.187-9.61-6.132-4.586-7.187 9.61Zm-3.74-18.212a14 14 0 0 0 3.74 18.212l7.187-9.61a2 2 0 0 1-.535-2.602l-10.392-6Zm7.896-13.676L22.77 62.838l10.392 6 7.896-13.676-10.392-6Zm17.642-5.867a14 14 0 0 0-17.642 5.867l10.392 6a2 2 0 0 1 2.52-.838l4.73-11.029Zm7.849 3.366-7.85-3.366-4.729 11.029 7.85 3.366 4.729-11.029Zm18.045-18.316-1.012 8.504 11.916 1.419 1.012-8.504-11.916-1.419Zm-1.754 27.552c6.078-3.426 11.69-9.502 12.658-17.63L73.19 36.85c-.382 3.209-2.769 6.415-6.635 8.595l5.893 10.453Zm-21.02 1.793c7.284 3.124 15.055 1.57 21.02-1.793l-5.893-10.453c-3.704 2.088-7.481 2.468-10.398 1.217l-4.73 11.029ZM49 96c0-7.1-2.548-15.022-9.171-19.975l-7.187 9.61C35.36 87.668 37 91.438 37 96h12Zm23.448 40.103c-5.965-3.363-13.736-4.917-21.02-1.793l4.729 11.029c2.917-1.251 6.694-.871 10.398 1.218l5.893-10.454Zm-32.62-20.128C46.452 111.022 49 103.1 49 96H37c0 4.563-1.64 8.333-4.358 10.365l7.187 9.61Zm78.679 19.575c-5.536 3.298-10.517 8.982-11.406 16.446l11.916 1.419c.329-2.765 2.318-5.582 5.632-7.557l-6.142-10.308Zm20.402-1.953c-7.094-3.042-14.669-1.463-20.402 1.953l6.142 10.308c3.382-2.015 6.872-2.372 9.53-1.233l4.73-11.028Zm-53.803 20.135c-.968-8.127-6.58-14.202-12.658-17.629l-5.893 10.454c3.866 2.179 6.253 5.385 6.635 8.594l11.916-1.419ZM141 96c0 6.389 2.398 13.414 8.32 17.842l7.186-9.61C154.374 102.638 153 99.668 153 96h-12Zm8.32-17.842C143.398 82.586 141 89.61 141 96h12c0-3.668 1.374-6.638 3.506-8.232l-7.186-9.61ZM118.507 56.45c5.733 3.416 13.308 4.995 20.401 1.953l-4.729-11.029c-2.658 1.14-6.148.782-9.53-1.233l-6.142 10.31Zm-11.406-16.446c.889 7.464 5.87 13.148 11.406 16.446l6.142-10.309c-3.314-1.974-5.303-4.79-5.632-7.556l-11.916 1.419Z"></path><path stroke="#555" stroke-linecap="round" stroke-linejoin="round" stroke-width="12" d="M96 120c13.255 0 24-10.745 24-24s-10.745-24-24-24-24 10.745-24 24 10.745 24 24 24Z"></path></g></svg>
           <svg style={{ verticalAlign: 'middle', position: 'absolute', transition: 'all 0.7s ease-in-out', opacity: settingsHover ? 1 : 0, transform: 'rotate(90deg)' }} 
           width="32px" height="32px" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="none"><g stroke-width="0"></g><g stroke-linecap="round" stroke-linejoin="round"></g><g><path fill="#555" d="m80.16 29.054-5.958-.709 5.958.71Zm31.68 0-5.958.71 5.958-.71Zm34.217 19.756-2.365-5.515 2.365 5.514Zm10.081 3.352 5.196-3-5.196 3Zm7.896 13.676 5.196-3-5.196 3Zm-2.137 10.407-3.594-4.805 3.594 4.805Zm0 39.51 3.593-4.805-3.593 4.805Zm2.137 10.407 5.196 3-5.196-3Zm-7.896 13.676-5.196-3 5.196 3Zm-10.081 3.353 2.364-5.515-2.364 5.515Zm-34.217 19.755 5.958.709-5.958-.709Zm-31.68 0-5.958.709 5.958-.709Zm-34.217-19.755-2.364-5.515 2.364 5.515Zm-10.08-3.353-5.197 3 5.196-3Zm-7.897-13.676 5.196-3-5.196 3Zm2.137-10.407 3.594 4.805-3.594-4.805Zm0-39.51L26.51 81.05l3.593-4.805Zm-2.137-10.407 5.196 3-5.196-3Zm7.896-13.676-5.196-3 5.196 3Zm10.081-3.352-2.364 5.514 2.364-5.514Zm7.85 3.365-2.365 5.515 2.364-5.515Zm0 87.65 2.364 5.514-2.365-5.514ZM36.235 111.17l-3.594-4.805 3.594 4.805Zm76.823 41.535 5.958.71-5.958-.71Zm39.854-69.742-3.593-4.805 3.593 4.805Zm-16.369-30.074 2.364 5.514-2.364-5.514Zm-23.485-13.594-5.958.709 5.958-.71ZM88.104 16a14 14 0 0 0-13.902 12.345l11.916 1.419A2 2 0 0 1 88.104 28V16Zm15.792 0H88.104v12h15.792V16Zm13.902 12.345A14 14 0 0 0 103.896 16v12a2 2 0 0 1 1.986 1.764l11.916-1.419Zm1.219 10.24-1.219-10.24-11.916 1.419 1.219 10.24 11.916-1.419Zm24.675 4.71-9.513 4.08 4.729 11.028 9.513-4.08-4.729-11.028Zm17.642 5.867a14 14 0 0 0-17.642-5.867l4.729 11.029a2 2 0 0 1 2.521.838l10.392-6Zm7.896 13.676-7.896-13.676-10.392 6 7.896 13.676 10.392-6Zm-3.74 18.212a14 14 0 0 0 3.74-18.212l-10.392 6a2 2 0 0 1-.535 2.602l7.187 9.61Zm-8.984 6.718 8.984-6.718-7.187-9.61-8.983 6.718 7.186 9.61Zm8.984 23.182-8.984-6.718-7.186 9.61 8.983 6.718 7.187-9.61Zm3.74 18.212a14 14 0 0 0-3.74-18.212l-7.187 9.61a2 2 0 0 1 .535 2.602l10.392 6Zm-7.896 13.676 7.896-13.676-10.392-6-7.896 13.676 10.392 6Zm-17.642 5.867a14 14 0 0 0 17.642-5.867l-10.392-6a2.001 2.001 0 0 1-2.521.838l-4.729 11.029Zm-9.513-4.08 9.513 4.08 4.729-11.029-9.512-4.079-4.73 11.028Zm-16.381 19.03 1.219-10.24-11.916-1.419-1.219 10.24 11.916 1.419ZM103.896 176a14 14 0 0 0 13.902-12.345l-11.916-1.419a2 2 0 0 1-1.986 1.764v12Zm-15.792 0h15.792v-12H88.104v12Zm-13.902-12.345A14 14 0 0 0 88.104 176v-12a2 2 0 0 1-1.986-1.764l-11.916 1.419Zm-1.012-8.504 1.012 8.504 11.916-1.419-1.012-8.504-11.916 1.419ZM51.428 134.31l-7.85 3.366 4.73 11.029 7.849-3.366-4.73-11.029Zm-7.85 3.366a2 2 0 0 1-2.52-.838l-10.392 6a14 14 0 0 0 17.642 5.867l-4.73-11.029Zm-2.52-.838-7.896-13.676-10.392 6 7.896 13.676 10.392-6Zm-7.896-13.676a2 2 0 0 1 .535-2.602l-7.187-9.61a14 14 0 0 0-3.74 18.212l10.392-6Zm.535-2.602 6.132-4.585-7.187-9.61-6.132 4.585 7.187 9.61ZM26.51 81.05l6.132 4.586 7.187-9.61-6.132-4.586-7.187 9.61Zm-3.74-18.212a14 14 0 0 0 3.74 18.212l7.187-9.61a2 2 0 0 1-.535-2.602l-10.392-6Zm7.896-13.676L22.77 62.838l10.392 6 7.896-13.676-10.392-6Zm17.642-5.867a14 14 0 0 0-17.642 5.867l10.392 6a2 2 0 0 1 2.52-.838l4.73-11.029Zm7.849 3.366-7.85-3.366-4.729 11.029 7.85 3.366 4.729-11.029Zm18.045-18.316-1.012 8.504 11.916 1.419 1.012-8.504-11.916-1.419Zm-1.754 27.552c6.078-3.426 11.69-9.502 12.658-17.63L73.19 36.85c-.382 3.209-2.769 6.415-6.635 8.595l5.893 10.453Zm-21.02 1.793c7.284 3.124 15.055 1.57 21.02-1.793l-5.893-10.453c-3.704 2.088-7.481 2.468-10.398 1.217l-4.73 11.029ZM49 96c0-7.1-2.548-15.022-9.171-19.975l-7.187 9.61C35.36 87.668 37 91.438 37 96h12Zm23.448 40.103c-5.965-3.363-13.736-4.917-21.02-1.793l4.729 11.029c2.917-1.251 6.694-.871 10.398 1.218l5.893-10.454Zm-32.62-20.128C46.452 111.022 49 103.1 49 96H37c0 4.563-1.64 8.333-4.358 10.365l7.187 9.61Zm78.679 19.575c-5.536 3.298-10.517 8.982-11.406 16.446l11.916 1.419c.329-2.765 2.318-5.582 5.632-7.557l-6.142-10.308Zm20.402-1.953c-7.094-3.042-14.669-1.463-20.402 1.953l6.142 10.308c3.382-2.015 6.872-2.372 9.53-1.233l4.73-11.028Zm-53.803 20.135c-.968-8.127-6.58-14.202-12.658-17.629l-5.893 10.454c3.866 2.179 6.253 5.385 6.635 8.594l11.916-1.419ZM141 96c0 6.389 2.398 13.414 8.32 17.842l7.186-9.61C154.374 102.638 153 99.668 153 96h-12Zm8.32-17.842C143.398 82.586 141 89.61 141 96h12c0-3.668 1.374-6.638 3.506-8.232l-7.186-9.61ZM118.507 56.45c5.733 3.416 13.308 4.995 20.401 1.953l-4.729-11.029c-2.658 1.14-6.148.782-9.53-1.233l-6.142 10.31Zm-11.406-16.446c.889 7.464 5.87 13.148 11.406 16.446l6.142-10.309c-3.314-1.974-5.303-4.79-5.632-7.556l-11.916 1.419Z"></path><path stroke="#555" stroke-linecap="round" stroke-linejoin="round" stroke-width="12" d="M96 120c13.255 0 24-10.745 24-24s-10.745-24-24-24-24 10.745-24 24 10.745 24 24 24Z"></path></g></svg>
           
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatisticsPanelOpen(true)}
+            title="Open settings"
+            aria-label="Open settings"
+            style={{
+              width: 36,
+              height: 36,
+              padding: 1,
+              border: 'none',
+              background: 'white',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <svg width="28px" height="28px" fill="#555" style={{ verticalAlign: 'middle', position: 'absolute' }} version="1.1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 31.869 31.869" xmlSpace="preserve">
+              <g stroke-width="0"></g>
+                <g stroke-linecap="round" stroke-linejoin="round"></g>
+                  <g> <g> <g>
+                    <path d="M1.271,31.741V19.816a2.0,2.0 0 0 1 2.0,-2.0h1.4a2.0,2.0 0 0 1 2.0,2.0V31.741z"></path>
+                    <path d="M13.237,31.741V2.126a2.0,2.0 0 0 1 2.0,-2.0h1.4a2.0,2.0 0 0 1 2.0,2.0V31.741z"></path>
+                    <path d="M25.198,31.741V11.358a2.0,2.0 0 0 1 2.0,-2.0h1.4a2.0,2.0 0 0 1 2.0,2.0V31.741z"></path>
+                  </g> </g> </g>
+            </svg>
           </button>
           {selectedExercise ? (
             <div
@@ -1842,16 +1719,70 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
           )}
           <AdditionalSpectraPopup spectra={selectedExercise?.additional_spectra ?? []} />
           {cheating.isEnabled(1) && (
-            <span
-              title="Cheats are enabled for this exercise."
-              style={{ cursor: 'help', display: 'inline-flex' }}
-            >
-              <img
-                src={`${import.meta.env.BASE_URL}use_cheats.svg`}
-                alt="Cheats enabled"
-                style={{ width: 32, height: 32 }}
-              />
-            </span>
+            <div ref={cheatMenuRef} style={{ position: 'relative', display: 'inline-flex' }}>
+              <button
+                type="button"
+                title="Cheats are enabled"
+                aria-label="Cheats are enabled"
+                aria-haspopup="menu"
+                aria-expanded={cheatMenuOpen}
+                onClick={() => setCheatMenuOpen((open) => !open)}
+                style={{
+                  display: 'inline-flex',
+                  padding: 0,
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                }}
+              >
+                <img
+                  src={`${import.meta.env.BASE_URL}use_cheats.svg`}
+                  alt="Cheats enabled"
+                  style={{ width: 32, height: 32 }}
+                />
+              </button>
+              {cheatMenuOpen && (
+                <div
+                  role="menu"
+                  aria-label="Cheat options"
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 4px)',
+                    left: 0,
+                    zIndex: 20,
+                    minWidth: 100,
+                    padding: 4,
+                    background: 'white',
+                    border: '1px solid #ccc',
+                    borderRadius: 6,
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  }}
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      const normalized = normalizeCheatBits(cheatBits).padEnd(DEFAULT_CHEATS.length, '0');
+                      handleCheatBitsChange(`0${normalized.slice(1)}`);
+                      setCheatMenuOpen(false);
+                    }}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      padding: '0px 8px',
+                      border: 'none',
+                      background: 'transparent',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Disable cheats
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -1910,468 +1841,27 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
             onEditComplete={() => setEditingFragment(null)}
           />
 
-          {/* Exercise menu */}
-          <div
-            ref={exerciseMenuRef}
-            style={{
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              zIndex: 50,
-            }}
-            onMouseLeave={scheduleExerciseMenuClose}
-            onMouseEnter={cancelExerciseMenuClose}
-          >
-            <button
-              type="button"
-              onClick={() => setExerciseMenuOpen((open) => !open)}
-              onMouseLeave={scheduleExerciseMenuClose}
-              onMouseEnter={cancelExerciseMenuClose}
-              style={{
-                color: '#111',
-                width: 200,
-                borderRadius: 12,
-                height: 36,
-                border: '1px solid #111',
-                background: 'white',
-                cursor: 'pointer',
-                fontSize: 13,
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '0px 12px',
-                whiteSpace: 'nowrap',
-                boxShadow: exerciseMenuOpen ? '0 4px 14px rgba(0,0,0,0.08)' : 'none',
-              }}
-              title={exerciseMenuOpen ? 'Hide exercises' : 'Show exercises'}
-              data-testid="exercise-menu-button"
-            >
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {loadingExerciseSummaries
-                    ? 'Loading…'
-                    : (exerciseSummaries.find((e) => e.id === selectedExerciseId)
-                        ? getExerciseSummaryLabel(exerciseSummaries.find((e) => e.id === selectedExerciseId)!)
-                        : 'Exercises')}
-                </span>
-                {exerciseSummaries.find((e) => e.id === selectedExerciseId)?.completed === true ? (
-                  <span aria-hidden="true" style={{ color: '#16a34a', fontWeight: 700, marginLeft: 8, flexShrink: 0 }}>✓</span>
-                ) : null}
-              </span>
-              <span style={{ fontSize: 12 }}>{exerciseMenuOpen ? '▲' : '▼'}</span>
-            </button>
+          <ExerciseMenu
+            selectedExerciseId={selectedExerciseId}
+            exerciseSummaries={exerciseSummaries}
+            activeTags={activeTags}
+            loadingExerciseSummaries={loadingExerciseSummaries}
+            exerciseSummariesError={exerciseSummariesError}
+            showCheatTags={showCheatTags}
+            showCreation={showCreation}
+            onSelectExercise={(id) => void selectExerciseById(id)}
+            onExercisesMutated={handleExercisesMutated}
+            onDeleteExercises={handleDeleteExercises}
+            onResetExercise={() => void handleResetExercise()}
+          />
+          {/*
+            The menu implementation is kept in ExerciseMenu.tsx. The old
+            inline implementation is removed below.
+          */}
 
-            {/* The button to reset the exercise */}
-            <button
-              type="button"
-              onClick={() => void handleResetExercise()}
-              title="Reset this exercise"
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: '1px 3px',
-                cursor: 'pointer',
-                fontSize: 14,
-                color: '#b33',
-                lineHeight: 1,
-                borderRadius: 4,
-              }}
-            >
-              {'\u21BA'}
-            </button>
-
-            {showTimer && (
-              <ExerciseTimerDisplay formattedDisplayedTimer={formattedDisplayedTimer} />
-            )}
-
-            <div
-              onMouseEnter={cancelExerciseMenuClose}
-              onMouseLeave={scheduleExerciseMenuClose}
-              style={{
-                position: 'absolute',
-                top: 44,
-                right: 0,
-                width: 680,
-                maxWidth: '90vw',
-                maxHeight: '85vh',
-                overflow: 'auto',
-                borderRadius: 12,
-                border: '1px solid #ddd',
-                background: 'white',
-                padding: 12,
-                display: exerciseMenuOpen ? 'flex' : 'none',
-                flexDirection: 'column',
-                gap: 8,
-                boxShadow: '0 12px 30px rgba(0,0,0,0.12)',
-                zIndex: 60,
-                pointerEvents: exerciseMenuOpen ? 'auto' : 'none',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>Exercises</div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDeletionMode(!deletionMode);
-                    setSelectedForDeletion(new Set());
-                  }}
-                  title={deletionMode ? 'Cancel deletion' : 'Delete exercises'}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: '2px 2px',
-                    cursor: 'pointer',
-                    lineHeight: 1,
-                    borderRadius: 4,
-                    opacity: deletionMode ? 1 : 0.6,
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
-                >
-                  <img
-                    src={`${import.meta.env.BASE_URL}chemisch_afval.svg`}
-                    alt="Delete"
-                    style={{ width: 16, height: 16 }}
-                  />
-                </button>
-              </div>
-
-              <div
-                style={{
-                  display: creationFormOpen ? 'none' : 'grid',
-                  gridTemplateColumns: '1.2fr 0.8fr',
-                  gap: 12,
-                }}
-              >
-                  <div
-                    style={{
-                      border: '1px solid #e5e5e5',
-                      borderRadius: 12,
-                      padding: 10,
-                      background: '#fafafa',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 8,
-                      minHeight: 0,
-                    }}
-                  >
-                    <div style={{ fontSize: 12, fontWeight: 700 }}>Exercise sets</div>
-                    <div
-                      style={{
-                        flex: 1,
-                        minHeight: 0,
-                        maxHeight: '52vh',
-                        overflowY: 'auto',
-                        paddingRight: 4,
-                      }}
-                    >
-                      {loadingExerciseSummaries ? (
-                        <div style={{ fontSize: 12, opacity: 0.7 }}>Loading exercises...</div>
-                      ) : exerciseSummariesError ? (
-                        <div style={{ fontSize: 12, color: '#b30000' }}>
-                          {exerciseSummariesError}
-                        </div>
-                      ) : exerciseSummaries.length === 0 ? (
-                        <div style={{ fontSize: 12, opacity: 0.7 }}>No exercises found.</div>
-                      ) : exercisesBySet.length === 0 ? (
-                        <div style={{ fontSize: 12, opacity: 0.7 }}>
-                          No exercises match the current filters.
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {exercisesBySet.map(({ setName, exercises }) => {
-                            const expanded = expandedExerciseSets.includes(setName);
-                            return (
-                              <div
-                                key={setName}
-                                style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
-                              >
-                                <div
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                  }}
-                                >
-                                  {deletionMode && (
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedForDeletion.has(`set-${setName}`)}
-                                      onChange={() => toggleSetForDeletion(setName)}
-                                      style={{ cursor: 'pointer' }}
-                                    />
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (deletionMode) {
-                                        toggleSetForDeletion(setName);
-                                      } else {
-                                        toggleExpandedSet(setName);
-                                      }
-                                    }}
-                                    style={{
-                                      flex: 1,
-                                      textAlign: 'left',
-                                      padding: '8px 10px',
-                                      borderRadius: 8,
-                                      border: '1px solid #d8d8d8',
-                                      background: 'white',
-                                      cursor: 'pointer',
-                                      fontSize: 13,
-                                      fontWeight: 600,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      gap: 8,
-                                    }}
-                                  >
-                                    <span>{setName}</span>
-                                    <span style={{ fontSize: 11 }}>
-                                      {expanded ? '▲' : '▼'}
-                                    </span>
-                                  </button>
-                                </div>
-                                {expanded ? (
-                                  <div
-                                    style={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: 6,
-                                      paddingLeft: 10,
-                                    }}
-                                  >
-                                    {exercises.map((ex) => (
-                                      <div
-                                        key={ex.id}
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: 8,
-                                        }}
-                                      >
-                                        {deletionMode && (
-                                          <input
-                                            type="checkbox"
-                                            checked={selectedForDeletion.has(`ex-${ex.id}`)}
-                                            onChange={() => toggleDeleteSelection(`ex-${ex.id}`)}
-                                            style={{ cursor: 'pointer' }}
-                                          />
-                                        )}
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            if (deletionMode) {
-                                              toggleDeleteSelection(`ex-${ex.id}`);
-                                            } else {
-                                              void selectExerciseById(ex.id);
-                                            }
-                                          }}
-                                          style={{
-                                            flex: 1,
-                                            textAlign: 'left',
-                                            padding: '8px 10px',
-                                            borderRadius: 8,
-                                            border: '1px solid #ccc',
-                                            background: selectedExerciseId === ex.id ? '#111' : '#f9f9f9',
-                                            color: selectedExerciseId === ex.id ? '#fff' : '#111',
-                                            cursor: 'pointer',
-                                            fontSize: 13,
-                                          }}
-                                        >
-                                          <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                            <span>{getExerciseSummaryLabel(ex)}</span>
-                                            {ex.completed === true ? (
-                                              <span aria-hidden="true" style={{ color: '#22c55e', fontWeight: 700, flexShrink: 0 }}>{'\u2713'}</span>
-                                            ) : null}
-                                          </div>
-                                        </button>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : null}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      border: '1px solid #e5e5e5',
-                      borderRadius: 12,
-                      padding: 10,
-                      background: '#fafafa',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 12,
-                    }}
-                  >
-                    <div style={{ fontSize: 12, fontWeight: 700 }}>Filters</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600 }}>Exercise sets</div>
-                      {exerciseSetOptions.length === 0 ? (
-                        <div style={{ fontSize: 12, opacity: 0.7 }}>No sets available.</div>
-                      ) : (
-                        <div
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 6,
-                            maxHeight: 160,
-                            overflowY: 'auto',
-                            paddingRight: 4,
-                          }}
-                        >
-                          {exerciseSetOptions.map((setName) => (
-                            <label
-                              key={`set-${setName}`}
-                              style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={activeSetFilters.includes(setName)}
-                                onChange={() => toggleSetFilter(setName)}
-                              />
-                              <span>{setName}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600 }}>Tags</div>
-                        <button
-                          type="button"
-                          onClick={() => setTagFilterMode(tagFilterMode === 'AND' ? 'OR' : 'AND')}
-                          style={{
-                            padding: '2px 6px',
-                            borderRadius: 4,
-                            border: '1px solid #ccc',
-                            background: '#f0f0f0',
-                            fontSize: 11,
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                          }}
-                        >
-                          {tagFilterMode}
-                        </button>
-                      </div>
-                      {tagOptions.length === 0 ? (
-                        <div style={{ fontSize: 12, opacity: 0.7 }}>No tags available.</div>
-                      ) : (
-                        <div
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 6,
-                            maxHeight: 220,
-                            overflowY: 'auto',
-                            paddingRight: 4,
-                          }}
-                        >
-                          {tagOptions.map((tag) => (
-                            <label
-                              key={`tag-${tag}`}
-                              style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={activeTagFilters.includes(tag)}
-                                onChange={() => toggleTagFilter(tag)}
-                              />
-                              <span>{tag}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    marginTop: creationFormOpen ? 0 : 8,
-                    borderTop: creationFormOpen ? 'none' : '1px solid #eee',
-                    paddingTop: creationFormOpen ? 0 : 8,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                  }}
-                >
-                  {deletionMode && selectedForDeletion.size > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteSelected()}
-                      style={{
-                        width: '100%',
-                        padding: '8px 10px',
-                        borderRadius: 8,
-                        border: '1px solid #ccc',
-                        background: '#ff6b6b',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Delete {selectedForDeletion.size} item{selectedForDeletion.size !== 1 ? 's' : ''}
-                    </button>
-                  )}
-
-                  <div style={{ display: creationFormOpen ? 'none' : 'block' }}>
-                    <ExerciseZipImport
-                    onImported={handleExercisesMutated}
-                    onImportingChange={(isImporting) => { zipImportingRef.current = isImporting; }}
-                    />
-                  </div>
-
-                  {showCreation ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setCreationFormOpen((open) => !open)}
-                        style={{
-                          width: '100%',
-                          textAlign: 'left',
-                          padding: '8px 10px',
-                          borderRadius: 8,
-                          border: '1px solid #ccc',
-                          background: '#f9f9f9',
-                          color: '#111',
-                          cursor: 'pointer',
-                          fontSize: 13,
-                          fontWeight: 600,
-                        }}
-                      >
-                        {creationFormOpen
-                          ? 'Hide exercise creation form'
-                          : 'Create new exercise'}
-                      </button>
-
-                      {creationFormOpen ? (
-                        <div
-                          style={{
-                            maxHeight: '70vh',
-                            overflow: 'auto',
-                            border: '1px solid #eee',
-                            borderRadius: 8,
-                            padding: 8,
-                            background: '#fcfcfc',
-                          }}
-                        >
-                          <ExerciseCreationForm onCreated={handleExercisesMutated} />
-                        </div>
-                      ) : null}
-                    </>
-                  ) : null}
-              </div>
-            </div>
-          </div>
+          {showTimer && (
+            <ExerciseTimerDisplay formattedDisplayedTimer={formattedDisplayedTimer} />
+          )}
 
           <PauseExerciseButton
             onPause={() => {
@@ -2748,6 +2238,11 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         solventsLoading={solventsLoading}
         onSolventPreferenceChange={handleSolventPreferenceChange}
         onTagsUpdated={handleTagsUpdated}
+      />
+      <StatisticsPanel
+        isOpen={statisticsPanelOpen}
+        onClose={() => setStatisticsPanelOpen(false)}
+        exerciseSummaries={exerciseSummaries}
       />
       {/* Cis/trans stereo choice dialog */}
       {stereoDialogState && (

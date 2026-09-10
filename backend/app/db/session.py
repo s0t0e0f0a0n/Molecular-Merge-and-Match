@@ -38,6 +38,7 @@ _USER_SETTINGS_PRESETS: tuple[dict[str, object], ...] = (
         "show_warnings": True,
         "show_timer": True,
         "cheats": "000000000000",
+        "show_creation": False,
     },
     {
         "name": "Beginner",
@@ -51,6 +52,7 @@ _USER_SETTINGS_PRESETS: tuple[dict[str, object], ...] = (
         "show_warnings": True,
         "show_timer": True,
         "cheats": "110100000000",
+        "show_creation": False,
     },
     {
         "name": "Exam",
@@ -64,6 +66,7 @@ _USER_SETTINGS_PRESETS: tuple[dict[str, object], ...] = (
         "show_warnings": False,
         "show_timer": True,
         "cheats": "000000000000",
+        "show_creation": False,
     },
     {
         "name": "User",
@@ -77,6 +80,7 @@ _USER_SETTINGS_PRESETS: tuple[dict[str, object], ...] = (
         "show_warnings": True,
         "show_timer": True,
         "cheats": "000000000000",
+        "show_creation": False,
     },
 )
 
@@ -177,6 +181,8 @@ def _seed_tags() -> None:
                 is_cheat=tag.get("is_cheat", False),
                 tag_count=tag.get("tag_count", 0),
                 user_tag=tag.get("user_tag", False),
+                progression_use=tag.get("progression_use", False),
+                allowed_stats=tag.get("allowed_stats", False),
             ))
         db.commit()
     finally:
@@ -497,13 +503,54 @@ def _migrate_add_missing_columns() -> None:
         if "is_cheat" not in existing_tags:
             conn.execute(text("ALTER TABLE tags_used ADD COLUMN is_cheat BOOLEAN NOT NULL DEFAULT 0"))
             conn.commit()
+        if "progression_use" not in existing_tags:
+            conn.execute(text("ALTER TABLE tags_used ADD COLUMN progression_use BOOLEAN NOT NULL DEFAULT 0"))
+            conn.commit()
+        if "allowed_stats" not in existing_tags:
+            conn.execute(text("ALTER TABLE tags_used ADD COLUMN allowed_stats BOOLEAN NOT NULL DEFAULT 0"))
+            conn.commit()
 
 
         # Update Statistics model
         result_statistics = conn.execute(text("PRAGMA table_info(statistics)"))
-        existing_statistics = {row[1] for row in result_statistics}
+        statistics_columns = list(result_statistics)
+        existing_statistics = {row[1] for row in statistics_columns}
         if "started_at" not in existing_statistics:
             conn.execute(text("ALTER TABLE statistics ADD COLUMN started_at DATETIME"))
+            conn.commit()
+        if "cheats_used" not in existing_statistics:
+            conn.execute(
+                text("ALTER TABLE statistics ADD COLUMN cheats_used VARCHAR(15) NOT NULL DEFAULT '000000000000'")
+            )
+            conn.commit()
+        elif next(row[2] for row in statistics_columns if row[1] == "cheats_used").upper() != "VARCHAR(15)":
+            conn.execute(text("ALTER TABLE statistics RENAME TO statistics_legacy"))
+            conn.execute(text(
+                """
+                CREATE TABLE statistics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    exercise_id VARCHAR(50) NOT NULL,
+                    incorrect_count INTEGER NOT NULL DEFAULT 0,
+                    cheats_used VARCHAR(15) NOT NULL DEFAULT '000000000000',
+                    start_counting DATETIME,
+                    stop_counting DATETIME,
+                    timer_total INTEGER NOT NULL DEFAULT 0,
+                    started_at DATETIME,
+                    completed_at DATETIME
+                )
+                """
+            ))
+            conn.execute(text(
+                """
+                INSERT INTO statistics
+                    (id, exercise_id, incorrect_count, cheats_used, start_counting,
+                     stop_counting, timer_total, started_at, completed_at)
+                SELECT id, exercise_id, incorrect_count, CAST(cheats_used AS TEXT),
+                       start_counting, stop_counting, timer_total, started_at, completed_at
+                FROM statistics_legacy
+                """
+            ))
+            conn.execute(text("DROP TABLE statistics_legacy"))
             conn.commit()
 
         # Update WorkingSolution model

@@ -11,7 +11,7 @@
     "clean:win": "if exist dist-electron rmdir /s /q dist-electron && if exist frontend\\dist rmdir /s /q frontend\\dist",
     "clean:unix": "rm -rf dist-electron frontend/dist",
     "clean": "npm run clean:win 2>nul || npm run clean:unix",
-    "dist": "electron-builder",
+    "dist": "electron-builder --publish never",
     "postinstall": "electron-builder install-app-deps",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

@@ -5,6 +5,13 @@ import App from './App'
 import { ExerciseDataProvider } from './context/ExerciseDataContext'
 import { HistoryProvider } from './context/HistoryContext'
 
+window.addEventListener('keydown', (event) => {
+  if (window.location.protocol !== 'file:' && event.key === 'F8') {
+    event.preventDefault();
+    window.open('/nmrglueGUI.html', 'nmrglue-test-bench');
+  }
+});
+
 if (import.meta.env.PROD) {
   // Save a reference to the browser's original fetch function
   const originalFetch = window.fetch;

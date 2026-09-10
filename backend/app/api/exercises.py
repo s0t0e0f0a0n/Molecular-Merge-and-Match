@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+from datetime import datetime
 import hashlib
 import hmac
 import logging
@@ -48,6 +49,7 @@ from app.db.models import (
     ExerciseH1Peak,
     Fragment,
     LogbookState,
+    Statistics,
     TagsUsed,
     WorkingSolution,
 )
@@ -306,6 +308,12 @@ class ExerciseSummaryOut(BaseModel):
     exercise_set: str | None
     tags: list[str]
     completed: bool | None = None
+    incorrect_count: int | None = None
+    timer_total: int | None = None
+    cheats_used: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    has_saved_progress: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -706,7 +714,11 @@ def _to_response(row: Exercise, db) -> ExerciseOut:
         ],
     )
 
-def _to_summary_response(row: Exercise) -> ExerciseSummaryOut:
+def _to_summary_response(
+    row: Exercise,
+    statistics: Statistics | None = None,
+    has_saved_progress: bool = False,
+) -> ExerciseSummaryOut:
     tags = []
     parts: list[str] = []
     hidden_names: set[str] = set()
@@ -734,7 +746,19 @@ def _to_summary_response(row: Exercise) -> ExerciseSummaryOut:
             seen.add(p)
             tags.append(p)
 
-    return ExerciseSummaryOut(id=row.id, name=row.name, exercise_set=row.exercise_set, tags=tags, completed=row.completed)
+    return ExerciseSummaryOut(
+        id=row.id,
+        name=row.name,
+        exercise_set=row.exercise_set,
+        tags=tags,
+        completed=row.completed,
+        incorrect_count=statistics.incorrect_count if statistics is not None else None,
+        timer_total=statistics.timer_total if statistics is not None else None,
+        cheats_used=statistics.cheats_used if statistics is not None else None,
+        started_at=statistics.started_at if statistics is not None else None,
+        completed_at=statistics.completed_at if statistics is not None else None,
+        has_saved_progress=has_saved_progress,
+    )
 
 
 # =====================================================================
@@ -745,7 +769,37 @@ def _to_summary_response(row: Exercise) -> ExerciseSummaryOut:
 def list_exercise_summaries() -> list[ExerciseSummaryOut]:
     with get_db() as db:
         rows = db.query(Exercise).order_by(Exercise.id.desc()).all()
-        return [_to_summary_response(row) for row in rows]
+        exercise_ids = {str(row.id) for row in rows}
+        statistics_by_exercise_id = {
+            statistics.exercise_id: statistics
+            for statistics in db.query(Statistics)
+            .filter(Statistics.exercise_id.in_(exercise_ids))
+            .all()
+        }
+        storage_keys = {f"exercise-{exercise_id}" for exercise_id in exercise_ids}
+        storage_keys_with_fragments = {
+            fragment_exercise_id
+            for (fragment_exercise_id,) in db.query(Fragment.exercise_id)
+            .filter(Fragment.exercise_id.in_(storage_keys))
+            .distinct()
+            .all()
+        }
+        storage_keys_with_solutions = {
+            solution_exercise_id
+            for (solution_exercise_id,) in db.query(WorkingSolution.exercise_id)
+            .filter(WorkingSolution.exercise_id.in_(storage_keys))
+            .distinct()
+            .all()
+        }
+        storage_keys_with_progress = storage_keys_with_fragments | storage_keys_with_solutions
+        return [
+            _to_summary_response(
+                row,
+                statistics_by_exercise_id.get(str(row.id)),
+                has_saved_progress=f"exercise-{row.id}" in storage_keys_with_progress,
+            )
+            for row in rows
+        ]
 
 
 @router.post("/import-update", response_model=ExerciseOut)

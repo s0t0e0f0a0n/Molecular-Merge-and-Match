@@ -232,6 +232,40 @@ it('shows mocked exercises in the selector', async () => {
   expect(await screen.findByRole('button', { name: /^Exercise 2$/ })).toBeInTheDocument();
 });
 
+it('sorts numbered exercise names in natural order within a set', async () => {
+  const user = userEvent.setup();
+  vi.mocked(fetchExerciseSummaries).mockResolvedValueOnce([
+    { ...mockSummaries[0], id: 1, name: 'Exercise 1' },
+    { ...mockSummaries[0], id: 10, name: 'Exercise 10' },
+    { ...mockSummaries[1], id: 2, name: 'Exercise 2' },
+  ]);
+
+  renderPage();
+
+  await user.click(await screen.findByTestId('exercise-menu-button'));
+
+  const exerciseButtons = screen.getAllByRole('button').filter((button) =>
+    /^Exercise (1|2|10)$/.test(button.textContent?.trim() ?? ''),
+  );
+
+  expect(exerciseButtons.map((button) => button.textContent?.trim())).toEqual([
+    'Exercise 1',
+    'Exercise 2',
+    'Exercise 10',
+  ]);
+});
+
+it('filters the exercise selector to incomplete exercises', async () => {
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByTestId('exercise-menu-button'));
+  await user.click(screen.getByRole('checkbox', { name: 'Show only incomplete exercises' }));
+
+  expect(screen.queryByRole('button', { name: /^Exercise 1$/ })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /^Exercise 2$/ })).toBeInTheDocument();
+});
+
 it('does not show exercise tags in the exercise menu', async () => {
   const user = userEvent.setup();
   renderPage();

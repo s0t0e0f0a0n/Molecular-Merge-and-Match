@@ -18,7 +18,7 @@
       "c13_alt_text": "13C-NMR (Acetone, 75 MHz): 206.13 (s, 1), 29.84 (hept, J = 19.4 Hz, 2);",
       "c13_frequency_mhz": 75.0,
       "c13_solvent": "%solv{7}",
-	    "c13_apt": true,
+      "c13_apt": true,
       "completed": true,
       "solution_inchi_hash": "7b3928f4e29c0ca0bb70f04abcacdaa561e057950482dcb1e0b5c7a3612f8378",
       "solution_cas_hash": "c2f4b7b448cfe55bd38667b359c98c1253e519f5bb09cca8ad00944ee40d259c",
@@ -40,7 +40,7 @@
         "proton_count": 0,
         "extra_info": "1H, t, J = 1.0 Hz"
       },
-	  {
+    {
         "ppm": 2.05,
         "multiplicity": "p",
         "j_values_hz_csv": 2.2,
@@ -54,37 +54,37 @@
         "atom_count": 1,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 30.61,
         "atom_count": 0,
         "atom_tag": 2
       },
-	  {
+    {
         "ppm": 30.35,
         "atom_count": 0,
         "atom_tag": 2
       },
-	  {
+    {
         "ppm": 30.09,
         "atom_count": 0,
         "atom_tag": 2
       },
-	  {
+    {
         "ppm": 29.84,
         "atom_count": 1,
         "atom_tag": 2
       },
-	  {
+    {
         "ppm": 29.58,
         "atom_count": 0,
         "atom_tag": 2
       },
-	  {
+    {
         "ppm": 29.33,
         "atom_count": 0,
         "atom_tag": 2
       },
-	  {
+    {
         "ppm": 29.07,
         "atom_count": 0,
         "atom_tag": 2
@@ -126,7 +126,7 @@
       "c13_alt_text": "13C-NMR (CD3CN, 75 MHz): 118.31 (s, 1), 1.32 (hept, J = 20.8 Hz, 2);",
       "c13_frequency_mhz": 75.0,
       "c13_solvent": "%solv{3}",
-	    "c13_apt": true,
+      "c13_apt": true,
       "completed": true,
       "solution_inchi_hash": "82419b411ed68ac3aa063fbaa163f01f11e9c5ae7089f9f3ed786ea03fa3bca7",
       "solution_cas_hash": "4ef3da238d1bf39beed19990ffd06c2ef61fcecea1a5f3052cdc8fa008d07a64",
@@ -148,7 +148,7 @@
         "proton_count": 0,
         "extra_info": "1H, t, J = 1.1 Hz"
       },
-	  {
+    {
         "ppm": 1.94,
         "multiplicity": "p",
         "j_values_hz_csv": 2.5,
@@ -162,37 +162,37 @@
         "atom_count": 1,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 2.15,
         "atom_count": 0,
         "atom_tag": 2
       },
-	  {
+    {
         "ppm": 1.87,
         "atom_count": 0,
         "atom_tag": 2
       },
-	  {
+    {
         "ppm": 1.60,
         "atom_count": 0,
         "atom_tag": 2
       },
-	  {
+    {
         "ppm": 1.32,
         "atom_count": 1,
         "atom_tag": 2
       },
-	  {
+    {
         "ppm": 1.05,
         "atom_count": 0,
         "atom_tag": 2
       },
-	  {
+    {
         "ppm": 0.77,
         "atom_count": 0,
         "atom_tag": 2
       },
-	  {
+    {
         "ppm": 0.49,
         "atom_count": 0,
         "atom_tag": 2
@@ -234,7 +234,7 @@
       "c13_alt_text": "13C-NMR (C6D6, 75 MHz): 128.06 (t, J = 24.3 Hz, 1);",
       "c13_frequency_mhz": 75.0,
       "c13_solvent": "%solv{6}",
-	    "c13_apt": true,      
+      "c13_apt": true,      
       "completed": true,
       "solution_inchi_hash": "f3bccdd24ecb7855922a8d38c50a9ce17549289579b20e781d3fd92f5ac80f05",
       "solution_cas_hash": "2ef43eaa23adf58dcfe776567c32d1799a3d19878fb2e9588fa8bc4886c4e14a",
@@ -263,12 +263,12 @@
         "atom_count": 0,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 128.06,
         "atom_count": 1,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 127.74,
         "atom_count": 0,
         "atom_tag": 1
@@ -303,7 +303,7 @@
       "c13_alt_text": "13C-NMR (CDCl3, 75 MHz): 77.16 (t, J = 31.9 Hz, 1);",
       "c13_frequency_mhz": 75.0,
       "c13_solvent": "%solv{1}",
-	    "c13_apt": true,
+      "c13_apt": true,
       "completed": true,
       "solution_inchi_hash": "4a23884f530cf2d1d0b5b5bae97a18ea5832da18108460330a1e124a0ba15e42",
       "solution_cas_hash": "2335449a56d37be2a25d86b9358d7b6c59e51eb2df97f1c081532e02603fd43e",
@@ -339,12 +339,12 @@
         "atom_count": 1,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 77.16,
         "atom_count": 1,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 76.74,
         "atom_count": 1,
         "atom_tag": 1
@@ -379,7 +379,7 @@
       "c13_alt_text": "13C-NMR (DMSO, 75 MHz): 39.52 (hept, J = 21.0 Hz, 1);",
       "c13_frequency_mhz": 75.0,
       "c13_solvent": "%solv{2}",
-	    "c13_apt": true,
+      "c13_apt": true,
       "completed": true,
       "solution_inchi_hash": "c96b24cadd8546181eb5c3806c0dae36558dc9b79df8b5d1cb1631563ad8aff6",
       "solution_cas_hash": "fb9260a1cf986ce435d55eadc437ba3d6c666254f23f309d18e3580de990f1b8",
@@ -408,32 +408,32 @@
         "atom_count": 1,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 40.07,
         "atom_count": 1,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 39.80,
         "atom_count": 1,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 39.52,
         "atom_count": 1,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 39.24,
         "atom_count": 1,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 38.96,
         "atom_count": 1,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 38.68,
         "atom_count": 1,
         "atom_tag": 1
@@ -468,7 +468,7 @@
       "c13_alt_text": "13C-NMR (MeOD, 75 MHz): 49.00 (hept, J = 21.4 Hz, 1);",
       "c13_frequency_mhz": 75.0,
       "c13_solvent": "%solv{4}",
-	    "c13_apt": true,
+      "c13_apt": true,
       "completed": true,
       "solution_inchi_hash": "4497374f21092c4f45f5d1eba13d6158b33bfc6fe6c518801376a24f0ec33349",
       "solution_cas_hash": "4d1e72bd02c28263b87269ca171626cab4ee3fd1ed8c4a3f447908d47c1258c1",
@@ -497,32 +497,32 @@
         "atom_count": 0,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 49.57,
         "atom_count": 0,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 49.28,
         "atom_count": 0,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 49.00,
         "atom_count": 1,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 48.72,
         "atom_count": 0,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 48.43,
         "atom_count": 0,
         "atom_tag": 1
       },
-	  {
+    {
         "ppm": 48.15,
         "atom_count": 0,
         "atom_tag": 1
@@ -556,7 +556,7 @@
       "c13_nmr_text": "13C-NMR (D2O, 75 MHz): ;",
       "c13_frequency_mhz": 75.0,
       "c13_solvent": "%solv{5}",
-	    "c13_apt": false,
+      "c13_apt": false,
       "completed": true,
       "solution_inchi_hash": "0d5bb44e2fc4ed97a1e93ef846dd025663d8f5fe8532d57d2757a9c8050d6832",
       "solution_cas_hash": "c2c4778c0202331ff59eeee92e7c1976555e703daa73d9a1ed9ff20168bc68d4",
@@ -591,7 +591,7 @@
       "c13_nmr_text": "13C-NMR (CDCl3, 75 MHz): 167.1, 133.0, 130.2, 129.6, 128.4, 52.1;",
       "c13_frequency_mhz": 75.0,
       "c13_solvent": "%solv{1}",
-	    "c13_apt": true,      
+      "c13_apt": true,      
       "completed": false,
       "solution_inchi_hash": "098da47f606f5d650d105e13bbccb58343a68bddb917eebc7f5cd23000c20461",
       "solution_cas_hash": "4e54f5760f2c8151ca823e5b736307f3ea71ba72cbc7f3626235a51dabad71fe",
@@ -690,7 +690,7 @@
       "c13_nmr_text": "13C-NMR (D2O, 126 MHz): 103.6, 92.1, 81.3, 76.3, 73.9, 72.5, 72.3, 71.0, 69.2, 62.3, 61.3, 60.1;",
       "c13_frequency_mhz": 126.0,
       "c13_solvent": "%solv{5}",
-	    "c13_apt": true,
+      "c13_apt": true,
       "completed": true,
       "solution_inchi_hash": "f55c3ff3ff10c1cead53ca1dd27cf9cb91e33f5787251b1e4dd34405d834c4a8",
       "solution_cas_hash": "f9d2c5db3a58b02126616c5c939890387bf51b1b135c32fdff04cf2fb2d5b699",

@@ -383,13 +383,16 @@ useEffect(() => {
       const hash = await sha256Hex(inchi);
       const result = await validateExerciseSolutionHash(exerciseId, hash);
       setValidationResult(result.is_correct);
+      try {
+        const statistics = await fetchExerciseStatistics(exerciseId);
+        setSelectedExerciseStatistics(statistics);
+        window.dispatchEvent(new CustomEvent('exercise-statistics-updated', {
+          detail: { exerciseId },
+        }));
+      } catch (error) {
+        console.error('statistics refresh failed', error);
+      }
       if (result.is_correct) {
-        try {
-          const statistics = await fetchExerciseStatistics(exerciseId);
-          setSelectedExerciseStatistics(statistics);
-        } catch (error) {
-          console.error('statistics refresh failed', error);
-        }
         window.dispatchEvent(new CustomEvent('exercise-completed', { detail: { exerciseId } }));
       }
     } catch {

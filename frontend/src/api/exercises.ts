@@ -4,6 +4,12 @@ export type ExerciseSummary = {
   exercise_set: string | null;
   tags: string[];
   completed?: boolean | null;
+  incorrect_count?: number | null;
+  timer_total?: number | null;
+  cheats_used?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  has_saved_progress?: boolean | null;
 };
 
 export type ApiH1Peak = {
@@ -101,6 +107,7 @@ export type SolutionValidationResponse = {
 export type ExerciseStatistics = {
   exercise_id: string;
   incorrect_count: number;
+  cheats_used: string;
   start_counting: string | null;
   stop_counting: string | null;
   timer_total: number;

@@ -10,6 +10,7 @@ export type Tag = {
   is_cheat: boolean;
   tag_count: number;
   user_tag: boolean;
+  progression_use: boolean;
 };
 
 export async function fetchTags(): Promise<Tag[]> {

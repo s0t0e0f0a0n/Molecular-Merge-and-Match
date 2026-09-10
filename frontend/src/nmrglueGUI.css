@@ -1,5 +1,17 @@
+html,
+body,
+#root {
+    width: 100%;
+    height: auto;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
 .nmr-standalone-page {
     min-height: 100vh;
+    width: 100%;
+    max-width: none;
     overflow: auto;
     position: relative;
     background: #f8fafc;
@@ -37,21 +49,60 @@
 .nmr-processing-controls select { width: 168px; }
 .nmr-processing-status { margin: 8px 0 4px; color: #0f766e; font-size: 11px; }
 .nmr-phase-label { align-self: center; color: #0f172a; font-size: 12px; font-weight: 700; }
+.nmr-phase-button { align-self: end; border: 1px solid #0f766e; border-radius: 5px; background: #ecfdf5; color: #0f766e; cursor: pointer; font-size: 12px; font-weight: 700; padding: 6px 8px; }
 .nmr-imaginary-toggle input { width: 16px; height: 16px; accent-color: #0f766e; }
 
-.nmr-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 18px 0 12px; }
+.nmr-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 18px 0 12px; }
 .nmr-metrics span { border-left: 3px solid #14b8a6; background: #fff; color: #64748b; font-size: 11px; padding: 8px 10px; }
 .nmr-metrics b { display: block; color: #0f172a; font-family: var(--font-mono); font-size: 13px; }
-.nmr-trace-card { margin-top: 12px; border: 1px solid #dbe4ea; background: #fff; padding: 12px; }
+.nmr-trace-card { width: 100%; margin-top: 12px; border: 1px solid #dbe4ea; background: #fff; padding: 12px; }
+.nmr-pulse-card { width: 100%; margin-top: 12px; border: 1px solid #dbe4ea; background: #fff; padding: 12px; }
+.nmr-pulse-diagram { position: relative; min-height: 128px; margin-top: 12px; padding-left: 62px; border: 1px solid #cbd5e1; background: repeating-linear-gradient(90deg, #f8fafc 0, #f8fafc 9.9%, #e2e8f0 10%); }
+.nmr-pulse-lane-label { position: absolute; left: 8px; z-index: 1; color: #0f766e; font-family: var(--font-mono); font-size: 11px; font-weight: 700; }
+.nmr-pulse-lane-label:nth-child(1) { top: 24px; }
+.nmr-pulse-lane-label:nth-child(2) { top: 101px; }
+.nmr-pulse-lane { position: absolute; left: 62px; right: 0; height: 2px; background: #64748b; }
+.nmr-pulse-lane-f2 { top: 38px; }
+.nmr-pulse-lane-f1 { top: 105px; }
+.nmr-pulse-decoupling-band { position: absolute; left: 62px; right: 0; top: 27px; height: 22px; background: rgba(254, 215, 170, 0.4); border-top: 1px solid #fdba74; border-bottom: 1px solid #fdba74; color: #9a3412; font-size: 9px; line-height: 18px; text-align: center; }
+.nmr-pulse-decoupling-band span { background: rgba(255, 247, 237, 0.9); padding: 2px 6px; }
+.nmr-pulse-event-group { position: absolute; top: 0; right: auto; bottom: 0; pointer-events: none; }
+.nmr-pulse-event-line { position: absolute; top: 0; bottom: 0; left: 0; border-left: 1px dotted #94a3b8; }
+.nmr-pulse-state { position: absolute; left: 0; right: 0; top: 27px; display: flex; align-items: center; justify-content: center; border-top: 1px solid #fdba74; border-bottom: 1px solid #fdba74; background: rgba(253, 186, 116, 0.4); }
+.nmr-pulse-state.is-low { background: rgba(254, 215, 170, 0.4); background-image: repeating-linear-gradient(135deg, transparent 0, transparent 4px, rgba(194, 120, 60, 0.28) 4px, rgba(194, 120, 60, 0.28) 6px); }
+.nmr-pulse-state span { overflow: hidden; border-radius: 2px; background: rgba(255, 247, 237, 0.85); padding: 0 4px; color: #9a3412; font-size: 8px; white-space: nowrap; }
+.nmr-pulse-event { position: absolute; min-width: 6px; height: 24px; overflow: hidden; border-radius: 2px; border: 1px solid rgba(15, 23, 42, 0.18); color: #0f172a; font-size: 9px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.nmr-pulse-event span { position: relative; z-index: 1; display: block; overflow: hidden; padding: 3px; text-overflow: ellipsis; }
+.nmr-pulse-event.is-f1 { background: #99f6e4; }
+.nmr-pulse-event.is-f2 { background: #fed7aa; }
+.nmr-pulse-event.is-acquisition { background: transparent; border: 0; }
+.nmr-pulse-fid-icon { position: absolute; left: 0; width: 100%; height: 72px; transform: translateY(-50%); pointer-events: none; }
+.nmr-pulse-fid-icon path { fill: none; stroke: #1d4ed8; stroke-width: 0.9; stroke-linecap: round; stroke-linejoin: round; opacity: 0.85; }
+.nmr-pulse-event.is-sequence { top: 52px !important; height: 22px; border: 0; background: transparent; color: #64748b; font-size: 9px; }
+.nmr-pulse-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; color: #64748b; font-size: 11px; }
+.nmr-pulse-legend i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; vertical-align: -1px; }
+.nmr-pulse-legend .is-f1 { background: #99f6e4; }
+.nmr-pulse-legend .is-f2 { background: #fed7aa; }
+.nmr-pulse-legend .is-acquisition { background: #93c5fd; }
+.nmr-pulse-legend .is-sequence { background: #e2e8f0; }
+.nmr-pulse-details { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; color: #64748b; font-size: 11px; }
+.nmr-pulse-details span { border-left: 3px solid #cbd5e1; background: #f8fafc; padding: 6px 8px; }
+.nmr-pulse-details b { color: #0f172a; font-family: var(--font-mono); }
+.nmr-pulse-event-list { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; color: #64748b; font-size: 10px; }
+.nmr-pulse-event-list span { border-left: 2px solid #cbd5e1; padding-left: 6px; }
+.nmr-pulse-event-list b { color: #0f172a; }
 .nmr-trace-heading span { color: #64748b; font-size: 11px; white-space: nowrap; }
 .nmr-trace-heading i { display: inline-block; width: 12px; height: 2px; margin: 0 4px 3px 8px; }
 .nmr-legend-real { background: #0f766e; }
 .nmr-legend-imaginary { background: #f97316; }
-.nmr-trace { display: block; width: 100%; height: 190px; margin-top: 8px; background: #f8fafc; }
+.nmr-trace { display: block; width: 100%; max-width: none; height: 218px; margin-top: 8px; background: #f8fafc; }
 .nmr-zero-line { stroke: #cbd5e1; stroke-dasharray: 3 4; }
 .nmr-series-real { fill: none; stroke: #0f766e; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .nmr-series-imaginary { fill: none; stroke: #f97316; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
 .nmr-axis-labels { display: flex; justify-content: space-between; color: #64748b; font-family: var(--font-mono); font-size: 10px; }
+.nmr-axis-tick-row { position: relative; height: 18px; border-top: 1px solid #cbd5e1; color: #64748b; font-family: var(--font-mono); font-size: 10px; }
+.nmr-axis-tick-row span { position: absolute; top: 3px; transform: translateX(-50%); white-space: nowrap; }
+.nmr-standalone-page > * { width: 100%; }
 .nmr-error-state { padding: 24px; color: #991b1b; }
 .nmr-error-state p { font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
 
