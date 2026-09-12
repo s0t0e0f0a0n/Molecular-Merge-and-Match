@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { useRDKit } from "../context/RDKitContext";
 
-export default function RDKitViewer() {
+interface RDKitViewerProps {
+  onTransferToEditor: (smiles: string, molFile: string) => void;
+  onAddToWorkingFragments: (smiles: string, molFile: string) => Promise<number | null>;
+}
+
+export default function RDKitViewer({ onTransferToEditor, onAddToWorkingFragments }: RDKitViewerProps) {
   const { rdkit } = useRDKit();
   const [smilesInput, setSmilesInput] = useState("c1ccccc1");
   const [svg, setSvg] = useState("");
@@ -41,6 +46,38 @@ export default function RDKitViewer() {
     }
   };
 
+  const handleTransfer = () => {
+    if (!rdkit) return;
+    const mol = rdkit.get_mol(smilesInput);
+    if (!mol || !mol.is_valid()) {
+      mol?.delete();
+      setError("Render a valid SMILES string first.");
+      return;
+    }
+
+    try {
+      onTransferToEditor(mol.get_smiles(), mol.get_molblock());
+    } finally {
+      mol.delete();
+    }
+  };
+
+  const handleAddToWorkingFragments = async () => {
+    if (!rdkit) return;
+    const mol = rdkit.get_mol(smilesInput);
+    if (!mol || !mol.is_valid()) {
+      mol?.delete();
+      setError("Render a valid SMILES string first.");
+      return;
+    }
+
+    try {
+      await onAddToWorkingFragments(mol.get_smiles(), mol.get_molblock());
+    } finally {
+      mol.delete();
+    }
+  };
+
   return (
     <div>
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -60,10 +97,20 @@ export default function RDKitViewer() {
       {error && <p style={{ color: "#c00", marginTop: 8 }}>{error}</p>}
 
       {svg && (
-        <div
-          style={{ marginTop: 16, border: "1px solid #ccc", borderRadius: 8, background: "#fff", padding: 16, display: "inline-block" }}
-          dangerouslySetInnerHTML={{ __html: svg }}
-        />
+        <>
+          <div
+            style={{ marginTop: 16, border: "1px solid #ccc", borderRadius: 8, background: "#fff", padding: 16, display: "inline-block" }}
+            dangerouslySetInnerHTML={{ __html: svg }}
+          />
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button type="button" onClick={handleTransfer} disabled={!rdkit} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #ccc', background: 'white', cursor: 'pointer', fontSize: 13 }}>
+              Transfer to editor
+            </button>
+            <button type="button" onClick={() => void handleAddToWorkingFragments()} disabled={!rdkit} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #ccc', background: 'white', cursor: 'pointer', fontSize: 13 }}>
+              Add to working fragments
+            </button>
+          </div>
+        </>
       )}
 
       {Object.keys(info).length > 0 && (

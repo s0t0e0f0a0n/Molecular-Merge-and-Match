@@ -88,18 +88,6 @@ function seriesPath(values: number[], width: number, height: number): string {
   }).join(' ');
 }
 
-function decayingSinePath(width: number, height: number): string {
-  const points = 240;
-  const mid = height / 2;
-  const amplitude = height * 0.42;
-  return Array.from({ length: points + 1 }, (_, index) => {
-    const t = index / points;
-    const x = t * width;
-    const y = mid - Math.sin(t * Math.PI * 28) * Math.exp(-t * 3.2) * amplitude;
-    return `${index === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`;
-  }).join(' ');
-}
-
 function tickPosition(tick: number, ppm: number[]): number {
   const high = ppm[0];
   const low = ppm[ppm.length - 1];
@@ -144,9 +132,7 @@ function NumberInput({ label, value, onChange, onCommit }: { label: string; valu
 function PulseProgramOverview({ preview }: { preview: NmrPreview }) {
   const { pulse_program_steps: steps } = preview;
   if (!steps.length) return null;
-  // Pulses and acquisition are the interesting parts; delays are de-emphasized so they don't dominate the timeline.
-  const channelWidthFactor: Record<string, number> = { f1: 1.7, f2: 1.7, acquisition: 1.9, sequence: 0.5 };
-  const visualWeights = steps.map((step) => Math.max(1, Math.log10(step.duration_us + 10)) * (channelWidthFactor[step.channel] ?? 1));
+  const visualWeights = steps.map((step) => Math.max(1, Math.log10(step.duration_us + 10)));
   const totalWeight = visualWeights.reduce((sum, weight) => sum + weight, 0);
   let accumulatedWeight = 0;
   return (
@@ -164,9 +150,7 @@ function PulseProgramOverview({ preview }: { preview: NmrPreview }) {
           const protonObserved = preview.nucleus.toUpperCase().startsWith('1H');
           const lane = step.channel === 'f1' ? (protonObserved ? 0 : 1) : step.channel === 'f2' ? (protonObserved ? 1 : 0) : step.channel === 'acquisition' ? (protonObserved ? 0 : 1) : -1;
           const f2Level = step.f2_level ?? 0;
-          const isAcquisition = step.channel === 'acquisition';
-          const laneLineTop = lane === 0 ? 38 : 105;
-          return <div key={`${step.label}-${index}`} className="nmr-pulse-event-group" style={{ left: `${left}%`, width: `${width}%` }}><i className="nmr-pulse-event-line" />{f2Level > 0 ? <div className={`nmr-pulse-state ${f2Level < 1 ? 'is-low' : 'is-high'}`} style={{ height: `${22 * f2Level}px` }} title={`F2 ${f2Level < 1 ? 'low-power pl13' : 'high-power pl12'}: ${step.duration_us.toFixed(2)} us`}>{f2Level >= 1 && width > 6 ? <span>CPD decoupling</span> : null}</div> : null}{isAcquisition ? <svg className="nmr-pulse-fid-icon" viewBox="0 0 60 24" preserveAspectRatio="none" aria-hidden="true" style={{ top: `${laneLineTop}px` }}><path d={decayingSinePath(60, 24)} /></svg> : null}<div className={`nmr-pulse-event is-${step.channel}`} style={{ left: isAcquisition ? '0%' : '12%', width: isAcquisition ? '100%' : '76%', top: lane < 0 ? '18px' : lane === 0 ? '4px' : '76px' }} title={`${step.label}: ${step.duration_us.toFixed(2)} us`}><span>{step.label}</span></div></div>;
+          return <div key={`${step.label}-${index}`} className="nmr-pulse-event-group" style={{ left: `${left}%`, width: `${width}%` }}><i className="nmr-pulse-event-line" />{f2Level > 0 ? <div className={`nmr-pulse-state ${f2Level < 1 ? 'is-low' : 'is-high'}`} style={{ height: `${22 * f2Level}px` }} title={`F2 ${f2Level < 1 ? 'low-power pl13' : 'high-power pl12'}: ${step.duration_us.toFixed(2)} us`} /> : null}<div className={`nmr-pulse-event is-${step.channel}`} style={{ left: '12%', width: '76%', top: lane < 0 ? '18px' : lane === 0 ? '4px' : '76px' }} title={`${step.label}: ${step.duration_us.toFixed(2)} us`}><span>{step.label}</span></div></div>;
         })}
       </div>
       <div className="nmr-pulse-legend"><span><i className="is-f1" />{preview.nucleus.toUpperCase().startsWith('1H') ? '1H RF pulse' : '13C RF pulse'}</span><span><i className="is-f2" />{preview.nucleus.toUpperCase().startsWith('1H') ? '13C RF/decoupling' : '1H RF/decoupling'}</span><span><i className="is-acquisition" />acquisition</span><span><i className="is-sequence" />delay/sequence</span></div>

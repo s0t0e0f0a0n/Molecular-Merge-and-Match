@@ -53,6 +53,21 @@ export function MoleculeEditorPopup(props: MoleculeWorkspaceProps) {
   const [position, setPosition] = useState(getInitialPosition);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const toggleRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (panelRef.current?.contains(target) || toggleRef.current?.contains(target)) return;
+      setIsOpen(false);
+      props.onEditComplete?.();
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown);
+    return () => document.removeEventListener('pointerdown', handleOutsidePointerDown);
+  }, [isOpen, props.onEditComplete]);
 
   // Keep popup within window bounds on resize (e.g., exiting fullscreen)
   useEffect(() => {
@@ -126,6 +141,7 @@ export function MoleculeEditorPopup(props: MoleculeWorkspaceProps) {
     <>
       <button
         type="button"
+        ref={toggleRef}
         onClick={handleToggle}
         aria-pressed={isOpen}
         style={{

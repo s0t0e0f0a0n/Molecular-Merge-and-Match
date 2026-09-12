@@ -8,6 +8,32 @@ Changes and additions since release version 1.0.0 are grouped by:
 4. Other
 
 
+V 1.4 
+
+Molecular editor changes
+The molecular editor can now be closed by clicking anywhere outside the editor pop-up.
+The editor had a “view” option that renders SMILES into an SVG picture of the chemical structure. Now that molecule can be transferred to the editor and/or to the Working Fragments space.
+frontend/src/components/KetcherEditor.tsx
+frontend/src/components/RDKitViewer.tsx
+frontend/src/features/molecule/MoleculeEditorPopup.tsx
+frontend/src/features/molecule/MoleculeWorkspace.tsx
+Cheats
+Cheats can be quickly enabled/disabled by pressing F7 (command+F7 on macOS).
+The cheats icon is clickable and allows you to disable the cheats. For individual cheats you still must go to the settings menu itself.
+NMRglue data preview
+By pressing F8 (command+F8 on macOS) you can open a spectral data viewer realized by matplotlib and nmrglue. A (temporary) button has also been placed in the main window.
+You can drag in and 1H or 13C NMR spectrum measured on a Bruker spectrometer. The rudimentary viewer already does a lot of things. It zero-fills, applies a window function, Fourier transforms and attempts automatic phasing.
+frontend/src/nmrglueGUI.css
+frontend/src/nmrglueGUI.tsx
+frontend/src/features/layout/MolecularBookkeepingPage.tsx
+frontend/nmrglueGUI.html
+backend/app/api/nmr_preview.py
+main.js
+preload.js
+
+
+
+
 ## Feature and file changes in Version 1.1.2
 
 ## 1. Style/layout additions and changes

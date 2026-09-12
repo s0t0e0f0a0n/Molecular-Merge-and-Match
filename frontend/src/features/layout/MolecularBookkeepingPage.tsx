@@ -1667,8 +1667,8 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
           <button
             type="button"
             onClick={() => setStatisticsPanelOpen(true)}
-            title="Open settings"
-            aria-label="Open settings"
+            title="Open statistics"
+            aria-label="Open statistics"
             style={{
               width: 36,
               height: 36,
@@ -1692,6 +1692,38 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
                     <path d="M25.198,31.741V11.358a2.0,2.0 0 0 1 2.0,-2.0h1.4a2.0,2.0 0 0 1 2.0,2.0V31.741z"></path>
                   </g> </g> </g>
             </svg>
+          </button>
+          
+          <button
+            type="button"
+            title="Open NMR preview"
+            aria-label="Open NMR preview"
+            onClick={() => {
+              const electronApi = (window as Window & { electronAPI?: { openNmrPreview?: () => void } }).electronAPI;
+              if (electronApi?.openNmrPreview) {
+                electronApi.openNmrPreview();
+              } else {
+                window.open('/nmrglueGUI.html', 'nmrglue-test-bench');
+              }
+            }}
+            style={{
+              width: 36,
+              height: 36,
+              padding: 1,
+              border: 'none',
+              background: 'white',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+          <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 2 28 Q 13 28 14.5 18 C 15.3 12 15.2 3 16 3 C 16.8 3 16.7 12 17.5 18 Q 19 28 30 28" 
+              fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
           </button>
           {selectedExercise ? (
             <div

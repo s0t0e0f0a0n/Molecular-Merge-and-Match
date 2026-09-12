@@ -15,6 +15,7 @@ interface EditingFragment {
 
 interface KetcherEditorProps {
   onExportFragment: (fragment: ExportedFragment) => void;
+  moleculeToLoad?: ExportedFragment | null;
   editingFragment?: EditingFragment | null;
   onCancelEdit?: () => void;
 }
@@ -91,7 +92,7 @@ const hiddenButtons = {
   paste: { hidden: true },
 } as const;
 
-export default function KetcherEditor({ onExportFragment, editingFragment = null, onCancelEdit }: KetcherEditorProps) {
+export default function KetcherEditor({ onExportFragment, moleculeToLoad = null, editingFragment = null, onCancelEdit }: KetcherEditorProps) {
   const { rdkit, error: rdkitError } = useRDKit();
   const ketcherRef = useRef<Ketcher | null>(null);
   const changeHandlerRef = useRef<(() => void) | null>(null);
@@ -131,6 +132,11 @@ export default function KetcherEditor({ onExportFragment, editingFragment = null
   // Load fragment into editor when entering edit mode; clear canvas when leaving
   useEffect(() => {
     if (!ready || !ketcherRef.current) return;
+    if (moleculeToLoad && !editingFragment) {
+      ketcherRef.current.setMolecule(moleculeToLoad.molFile).catch(console.error);
+      setStructError(null);
+      return;
+    }
 
     const currentId = editingFragment?.id ?? null;
     const prevId = prevEditingIdRef.current;
@@ -148,7 +154,7 @@ export default function KetcherEditor({ onExportFragment, editingFragment = null
     }
 
     prevEditingIdRef.current = currentId;
-  }, [editingFragment?.id, ready]);
+  }, [editingFragment?.id, moleculeToLoad, ready]);
 
   const handleExport = useCallback(async () => {
     const ketcher = ketcherRef.current;

@@ -77,7 +77,7 @@ class NmrUploadOut(BaseModel):
 def _active_dataset_path() -> Path:
     if (TEMP_DATASET_DIR / "fid").is_file() and (TEMP_DATASET_DIR / "acqus").is_file():
         return TEMP_DATASET_DIR
-    raise HTTPException(status_code=404, detail="No dataset available. Upload a Bruker folder first.")
+    return Path(__file__).resolve().parents[1] / "core" / "27"
 
 
 def _safe_upload_path(filename: str) -> Path:

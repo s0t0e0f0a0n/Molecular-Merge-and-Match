@@ -24,6 +24,32 @@ describe('MoleculeEditorPopup', () => {
     expect(await screen.findByText(/Molecule editor/)).toBeInTheDocument();
   });
 
+  it('closes when clicking outside while preserving the mounted editor', async () => {
+    const user = userEvent.setup();
+    const onEditComplete = vi.fn();
+    render(<MoleculeEditorPopup {...defaultProps} onEditComplete={onEditComplete} />);
+
+    await user.click(screen.getByRole('button', { name: /Open molecule editor/ }));
+    const dialog = screen.getByRole('dialog', { name: /Molecule editor popup/ });
+    expect(dialog).toHaveAttribute('aria-hidden', 'false');
+
+    await user.click(document.body);
+
+    expect(dialog).toHaveAttribute('aria-hidden', 'true');
+    expect(onEditComplete).toHaveBeenCalledOnce();
+    expect(screen.getByText(/Molecule editor/)).toBeInTheDocument();
+  });
+
+  it('does not close when clicking inside the editor', async () => {
+    const user = userEvent.setup();
+    render(<MoleculeEditorPopup {...defaultProps} />);
+
+    await user.click(screen.getByRole('button', { name: /Open molecule editor/ }));
+    await user.click(screen.getByText(/Molecule editor/));
+
+    expect(screen.getByRole('dialog', { name: /Molecule editor popup/ })).toHaveAttribute('aria-hidden', 'false');
+  });
+
   it('can be dragged beyond the page boundaries', async () => {
     const user = userEvent.setup();
     render(<MoleculeEditorPopup {...defaultProps} />);

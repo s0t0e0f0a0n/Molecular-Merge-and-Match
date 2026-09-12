@@ -25,9 +25,11 @@ export function MoleculeWorkspace({
   editingFragment = null,
   onEditComplete,
   editor: editorProp,
+  onEditorChange,
 }: MoleculeWorkspaceProps) {
   const [internalEditor] = useState<EditorType>('ketcher');
   const editor = editorProp ?? internalEditor;
+  const [moleculeToLoad, setMoleculeToLoad] = useState<ExportedFragment | null>(null);
 
   const handleExportFragment = async (fragment: ExportedFragment) => {
     if (editingFragment) {
@@ -46,6 +48,7 @@ export function MoleculeWorkspace({
           <section style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <KetcherEditor
               onExportFragment={handleExportFragment}
+              moleculeToLoad={moleculeToLoad}
               editingFragment={
                 editingFragment
                   ? { id: editingFragment.id, label: editingFragment.label, molFile: editingFragment.mol_file }
@@ -59,7 +62,13 @@ export function MoleculeWorkspace({
 
       {editor === 'rdkit' && (
         <Suspense fallback={<p>Loading RDKit...</p>}>
-          <RDKitViewer />
+          <RDKitViewer
+            onTransferToEditor={(smiles, molFile) => {
+              setMoleculeToLoad({ smiles, molFile });
+              onEditorChange?.('ketcher');
+            }}
+            onAddToWorkingFragments={(smiles, molFile) => onCreateFragment('', smiles, molFile)}
+          />
         </Suspense>
       )}
     </div>

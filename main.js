@@ -21,6 +21,10 @@ ipcMain.on('toggle-fullscreen', (event) => {
     }
 });
 
+ipcMain.on('open-nmr-preview', () => {
+    openNmrWindow();
+});
+
 // Controleer of de app binnen een Snap-omgeving draait
 if (process.platform === 'linux' && process.env.SNAP) {
     app.commandLine.appendSwitch('no-sandbox');

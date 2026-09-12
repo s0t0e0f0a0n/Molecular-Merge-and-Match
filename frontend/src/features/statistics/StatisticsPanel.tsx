@@ -23,7 +23,7 @@ const CONTRIBUTION_STATUSES = [
   { color: 'red', label: 'Attempted and incorrect' },
   { color: 'yellow', label: 'Completed with cheats activated' },
   { color: 'blue', label: 'Started but incomplete' },
-  { color: 'grey', label: 'References set' },
+  { color: 'grey', label: 'Examples or References set' },
   { color: 'white', label: 'Not attempted' },
 ] as const;
 
@@ -247,7 +247,7 @@ function StatisticsSummary({ exerciseSummaries }: { exerciseSummaries: ExerciseS
 
 function isTrackedExerciseSet(exercise: ExerciseSummary): boolean {
   const exerciseSet = exercise.exercise_set?.trim().toLowerCase();
-  return exerciseSet !== 'references';
+  return exerciseSet !== 'examples' && exerciseSet !== 'references';
 }
 
 function ProgressionBar({ title, exercises, layout = 'stacked', rowClassName = '' }: { title: string; exercises: ExerciseSummary[]; layout?: 'stacked' | 'row'; rowClassName?: string }) {
@@ -382,15 +382,16 @@ function ProgressionTab({ exerciseSummaries }: { exerciseSummaries: ExerciseSumm
 }
 
 function ContributionGrid({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
+  const trackedExercises = exerciseSummaries.filter(isTrackedExerciseSet);
   const slotCount = Math.ceil(exerciseSummaries.length / CONTRIBUTION_COLUMNS) * CONTRIBUTION_COLUMNS;
-  const solvedExercises = exerciseSummaries.filter((exercise) => exercise.completed_at);
+  const solvedExercises = trackedExercises.filter((exercise) => exercise.completed_at);
   const fastestExercises = [...solvedExercises]
     .sort((left, right) => (left.timer_total ?? Number.POSITIVE_INFINITY) - (right.timer_total ?? Number.POSITIVE_INFINITY))
     .slice(0, 10);
   const slowestExercises = [...solvedExercises]
     .sort((left, right) => (right.timer_total ?? Number.NEGATIVE_INFINITY) - (left.timer_total ?? Number.NEGATIVE_INFINITY))
     .slice(0, 10);
-  const mostIncorrectExercises = [...exerciseSummaries]
+  const mostIncorrectExercises = [...trackedExercises]
     .filter((exercise) => (exercise.incorrect_count ?? 0) > 0)
     .sort((left, right) => (right.incorrect_count ?? 0) - (left.incorrect_count ?? 0))
     .slice(0, 10);
@@ -426,7 +427,7 @@ function ContributionGrid({ exerciseSummaries }: { exerciseSummaries: ExerciseSu
           <RankedExerciseList title="Slowest solved exercises" exercises={slowestExercises} includeTime />
           <div className="statistics-ranking-list-column">
             <RankedExerciseList title="Most incorrect answers" exercises={mostIncorrectExercises} includeIncorrectCount />
-            <StatisticsSummary exerciseSummaries={exerciseSummaries} />
+            <StatisticsSummary exerciseSummaries={trackedExercises} />
           </div>
         </div>
       </div>

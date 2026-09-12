@@ -64,20 +64,17 @@ body,
 .nmr-pulse-lane { position: absolute; left: 62px; right: 0; height: 2px; background: #64748b; }
 .nmr-pulse-lane-f2 { top: 38px; }
 .nmr-pulse-lane-f1 { top: 105px; }
-.nmr-pulse-decoupling-band { position: absolute; left: 62px; right: 0; top: 27px; height: 22px; background: rgba(254, 215, 170, 0.4); border-top: 1px solid #fdba74; border-bottom: 1px solid #fdba74; color: #9a3412; font-size: 9px; line-height: 18px; text-align: center; }
+.nmr-pulse-decoupling-band { position: absolute; left: 62px; right: 0; top: 27px; height: 22px; background: rgba(251, 146, 60, 0.35); border-top: 2px solid #f97316; border-bottom: 2px solid #f97316; color: #9a3412; font-size: 9px; line-height: 18px; text-align: center; }
 .nmr-pulse-decoupling-band span { background: rgba(255, 247, 237, 0.9); padding: 2px 6px; }
 .nmr-pulse-event-group { position: absolute; top: 0; right: auto; bottom: 0; pointer-events: none; }
 .nmr-pulse-event-line { position: absolute; top: 0; bottom: 0; left: 0; border-left: 1px dotted #94a3b8; }
-.nmr-pulse-state { position: absolute; left: 0; right: 0; top: 27px; display: flex; align-items: center; justify-content: center; border-top: 1px solid #fdba74; border-bottom: 1px solid #fdba74; background: rgba(253, 186, 116, 0.4); }
-.nmr-pulse-state.is-low { background: rgba(254, 215, 170, 0.4); background-image: repeating-linear-gradient(135deg, transparent 0, transparent 4px, rgba(194, 120, 60, 0.28) 4px, rgba(194, 120, 60, 0.28) 6px); }
-.nmr-pulse-state span { overflow: hidden; border-radius: 2px; background: rgba(255, 247, 237, 0.85); padding: 0 4px; color: #9a3412; font-size: 8px; white-space: nowrap; }
+.nmr-pulse-state { position: absolute; left: 0; right: 0; top: 27px; border-top: 2px solid #f97316; border-bottom: 2px solid #f97316; background: rgba(249, 115, 22, 0.82); }
+.nmr-pulse-state.is-low { background: rgba(251, 146, 60, 0.48); background-image: repeating-linear-gradient(135deg, transparent 0, transparent 4px, rgba(154, 52, 18, 0.45) 4px, rgba(154, 52, 18, 0.45) 6px); }
 .nmr-pulse-event { position: absolute; min-width: 6px; height: 24px; overflow: hidden; border-radius: 2px; border: 1px solid rgba(15, 23, 42, 0.18); color: #0f172a; font-size: 9px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
-.nmr-pulse-event span { position: relative; z-index: 1; display: block; overflow: hidden; padding: 3px; text-overflow: ellipsis; }
+.nmr-pulse-event span { display: block; overflow: hidden; padding: 3px; text-overflow: ellipsis; }
 .nmr-pulse-event.is-f1 { background: #99f6e4; }
 .nmr-pulse-event.is-f2 { background: #fed7aa; }
-.nmr-pulse-event.is-acquisition { background: transparent; border: 0; }
-.nmr-pulse-fid-icon { position: absolute; left: 0; width: 100%; height: 72px; transform: translateY(-50%); pointer-events: none; }
-.nmr-pulse-fid-icon path { fill: none; stroke: #1d4ed8; stroke-width: 0.9; stroke-linecap: round; stroke-linejoin: round; opacity: 0.85; }
+.nmr-pulse-event.is-acquisition { background: #93c5fd; }
 .nmr-pulse-event.is-sequence { top: 52px !important; height: 22px; border: 0; background: transparent; color: #64748b; font-size: 9px; }
 .nmr-pulse-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; color: #64748b; font-size: 11px; }
 .nmr-pulse-legend i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; vertical-align: -1px; }
