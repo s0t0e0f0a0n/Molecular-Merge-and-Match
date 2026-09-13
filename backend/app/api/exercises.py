@@ -49,6 +49,7 @@ from app.db.models import (
     ExerciseH1Peak,
     Fragment,
     LogbookState,
+    SolventsUsed,
     Statistics,
     TagsUsed,
     WorkingSolution,
@@ -59,6 +60,22 @@ _SVG_SCRIPT_RE = re.compile(r"<script[\s\S]*?</script\s*>", re.IGNORECASE)
 _SVG_EVENT_ATTR_RE = re.compile(
     r"""\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)""", re.IGNORECASE
 )
+
+
+def _recount_solvent_usage(db) -> None:
+    solvent_rows = db.query(SolventsUsed).all()
+    counts = {row.id: 0 for row in solvent_rows}
+    for exercise in db.query(Exercise).all():
+        used_ids = extract_solvent_ids(exercise.h1_solvent) | extract_solvent_ids(exercise.c13_solvent)
+        raw_text = " ".join(filter(None, (exercise.h1_solvent, exercise.c13_solvent)))
+        for row in solvent_rows:
+            if row.match and re.search(rf"(?<![0-9A-Za-z]){re.escape(row.match)}(?![0-9A-Za-z])", raw_text, flags=re.IGNORECASE):
+                used_ids.add(row.id)
+        for solvent_id in used_ids:
+            if solvent_id in counts:
+                counts[solvent_id] += 1
+    for row in solvent_rows:
+        row.count = counts[row.id]
 _ADDITIONAL_SPECTRUM_PRIORITY_BY_NAME = {
     "ir": 1,
     "h-presat": 2,
@@ -1107,9 +1124,6 @@ def delete_exercise(exercise_id: int) -> None:
             if spec.file_path:
                 file_paths.append(spec.file_path)
 
-        used_solvent_ids = extract_solvent_ids(exercise.h1_solvent) | extract_solvent_ids(exercise.c13_solvent)
-        apply_solvent_count_delta(db, used_solvent_ids, -1)
-
         tag_ids = set()
         try:
             tag_ids |= extract_tag_ids(exercise.tags_csv)
@@ -1118,6 +1132,7 @@ def delete_exercise(exercise_id: int) -> None:
         apply_tag_count_delta(db, tag_ids, -1)
 
         db.delete(exercise)
+        _recount_solvent_usage(db)
         db.commit()
         sqlite_root = Path(settings.sqlite_path).resolve().parent
         for path in file_paths:

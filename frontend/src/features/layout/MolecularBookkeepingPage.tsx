@@ -547,6 +547,44 @@ useEffect(() => {
   useEffect(() => {
     void loadSolventPreferences();
   }, [loadSolventPreferences]);
+    
+    useEffect(() => {
+      const handleExerciseReset = (event: Event) => {
+        const detail = (event as CustomEvent<{ level?: string }>).detail;
+        if (detail.level === 'remove') void loadSolventPreferences();
+      };
+      window.addEventListener('exercise-reset', handleExerciseReset);
+      return () => window.removeEventListener('exercise-reset', handleExerciseReset);
+    }, [loadSolventPreferences]);
+
+  useEffect(() => {
+    const handleExerciseReset = (event: Event) => {
+      const detail = (event as CustomEvent<{ exerciseIds?: number[]; level?: string }>).detail;
+      if (!selectedExerciseId || !detail.exerciseIds?.includes(selectedExerciseId) || !detail.level) return;
+
+      void (async () => {
+        await history.clearHistory();
+        if (detail.level !== 'logbook') await refetchFragments();
+        if (detail.level !== 'logbook' && detail.level !== 'workspace') await refetchSolution();
+        if (detail.level === 'completion' || detail.level === 'progression') {
+          await selectExerciseById(selectedExerciseId);
+        } else if (detail.level === 'remove') {
+          const updatedSummaries = await fetchExerciseSummaries();
+          setExerciseSummaries(updatedSummaries);
+          const selectedIndex = exerciseSummaries.findIndex((exercise) => exercise.id === selectedExerciseId);
+          const removedIds = new Set(detail.exerciseIds);
+          const nextExercise = exerciseSummaries.slice(selectedIndex + 1).find((exercise) => !removedIds.has(exercise.id) && updatedSummaries.some((candidate) => candidate.id === exercise.id));
+          const fallbackExercise = exerciseSummaries.slice(0, selectedIndex).reverse().find((exercise) => !removedIds.has(exercise.id) && updatedSummaries.some((candidate) => candidate.id === exercise.id));
+          const replacement = nextExercise ?? fallbackExercise ?? updatedSummaries[0];
+          if (replacement) await selectExerciseById(replacement.id);
+          else await clearSelectedExercise();
+        }
+      })().catch((error) => console.error('Failed to refresh workspace after reset', error));
+    };
+
+    window.addEventListener('exercise-reset', handleExerciseReset);
+    return () => window.removeEventListener('exercise-reset', handleExerciseReset);
+  }, [clearSelectedExercise, exerciseSummaries, history, refetchFragments, refetchSolution, selectExerciseById, selectedExerciseId]);
 
   const handleExercisesMutated = useCallback(async () => {
     await Promise.all([
@@ -578,11 +616,15 @@ useEffect(() => {
       await loadSolventPreferences();
       
       if (selectedExerciseId && exerciseIds.includes(selectedExerciseId)) {
-        const nextExercise = updatedSummaries.find(s => s.id !== selectedExerciseId);
-        if (nextExercise) {
-          await selectExerciseById(nextExercise.id);
+        const selectedIndex = exerciseSummaries.findIndex((exercise) => exercise.id === selectedExerciseId);
+        const removedIds = new Set(exerciseIds);
+        const nextExercise = exerciseSummaries.slice(selectedIndex + 1).find((exercise) => !removedIds.has(exercise.id) && updatedSummaries.some((candidate) => candidate.id === exercise.id));
+        const fallbackExercise = exerciseSummaries.slice(0, selectedIndex).reverse().find((exercise) => !removedIds.has(exercise.id) && updatedSummaries.some((candidate) => candidate.id === exercise.id));
+        const replacement = nextExercise ?? fallbackExercise ?? updatedSummaries[0];
+        if (replacement) {
+          await selectExerciseById(replacement.id);
         } else {
-          clearSelectedExercise();
+          await clearSelectedExercise();
         }
       }
     } catch (error) {
@@ -2275,6 +2317,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         isOpen={statisticsPanelOpen}
         onClose={() => setStatisticsPanelOpen(false)}
         exerciseSummaries={exerciseSummaries}
+        selectedExerciseId={selectedExerciseId}
       />
       {/* Cis/trans stereo choice dialog */}
       {stereoDialogState && (

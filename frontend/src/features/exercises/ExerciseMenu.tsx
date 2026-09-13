@@ -381,10 +381,12 @@ export function ExerciseMenu({
                                 >
                                   <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                                     <span>{renderExerciseSummaryLabel(exercise)}</span>
-                                    {exercise.completed === true ? (
+                                    {exercise.completed === true && Boolean(exercise.completed_at && exercise.completed_at !== '0') ? (
                                       <svg aria-hidden="true" viewBox="0 0 16 16" version="1.1" width="16" height="16" style={{ fill: '#238636', flexShrink: 0, display: 'inline-block', verticalAlign: 'text-bottom' }}>
                                         <path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.75.75 0 0 0-1.06-1.06L7 8.94 5.28 7.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.06 0l4.25-4.25Z"></path>
                                       </svg>
+                                    ) : /^(?:E|M|H|O)\d+$/.test(exercise.difficulty ?? '') && Number(exercise.difficulty?.slice(1)) !== 0 ? (
+                                      <span aria-label="Exercise completed" style={{ color: '#238636', fontWeight: 700, flexShrink: 0 }}>{'\u2713'}</span>
                                     ) : exercise.incorrect_count != null && exercise.incorrect_count > 0 ? (
                                       /* Failed before */
                                       <svg
@@ -413,7 +415,7 @@ export function ExerciseMenu({
                                       >
                                         <circle cx="8" cy="8" r="7" fill="#ffffff" />
                                         <path
-                                          fill="#d29922"
+                                          fill="#3b82f6"
                                           d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16ZM4.25 7.25a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5Z"
                                         />
                                       </svg>

@@ -2,15 +2,17 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ExerciseSummary } from '../../api/exercises';
 import { fetchAllLogbooks } from '../../api/logbook';
+import { resetExercises, type ResetLevel } from '../../api/reset';
 import { fetchTags, type Tag } from '../../api/tags';
 import '../../panelStyles.css';
 
-type StatisticsTabId = '1' | '2' | '3' | '4' | '5' | '6';
+type StatisticsTabId = '1' | '2' | '3' | '4' | '5' | '6' | '7';
 
 type StatisticsPanelProps = {
   isOpen: boolean;
   onClose: () => void;
   exerciseSummaries: ExerciseSummary[];
+  selectedExerciseId: number | null;
 };
 // tab 1 contains progression overview and graph.
 // tab 2 contains timing tables
@@ -24,6 +26,7 @@ const TABS: Array<{ id: StatisticsTabId; label: string }> = [
   { id: '4', label: 'Table' },
   { id: '5', label: 'Table' },
   { id: '6', label: 'Logbook' },
+  { id: '7', label: 'Reset' },
 ];
 
 const CONTRIBUTION_STATUSES = [
@@ -720,6 +723,88 @@ function ProgressionTab({ exerciseSummaries }: { exerciseSummaries: ExerciseSumm
   );
 }
 
+type ResetRowId = 'current' | 'set' | 'tag' | 'age' | 'difficulty' | 'all';
+
+function ResetTab({ exerciseSummaries, selectedExerciseId }: { exerciseSummaries: ExerciseSummary[]; selectedExerciseId: number | null }) {
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [selectedSet, setSelectedSet] = useState('');
+  const [selectedTag, setSelectedTag] = useState('');
+  const [minimumAge, setMinimumAge] = useState('');
+  const [maximumAge, setMaximumAge] = useState('');
+  const [selectedDifficulty, setSelectedDifficulty] = useState('');
+  const [resetLevels, setResetLevels] = useState<Record<ResetRowId, ResetLevel | ''>>({ current: '', set: '', tag: '', age: '', difficulty: '', all: '' });
+  const [pendingReset, setPendingReset] = useState<{ exerciseIds: number[]; level: ResetLevel } | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const exerciseSets = Array.from(new Set(exerciseSummaries.map((exercise) => exercise.exercise_set?.trim()).filter((set): set is string => Boolean(set)))).sort((left, right) => left.localeCompare(right));
+
+  useEffect(() => {
+    fetchTags().then(setTags).catch(() => setTags([]));
+  }, []);
+
+  const idsForDateRange = (minimum: number, maximum: number): number[] => exerciseSummaries
+    .filter((exercise) => {
+      const dateValue = exercise.completed_at ?? exercise.started_at;
+      if (!dateValue) return false;
+      const ageDays = (Date.now() - new Date(dateValue).getTime()) / 86_400_000;
+      return ageDays >= minimum && ageDays <= maximum;
+    })
+    .map((exercise) => exercise.id);
+
+  const requestReset = (rowId: ResetRowId, exerciseIds: number[]) => {
+    const level = resetLevels[rowId];
+    if (exerciseIds.length === 0 || level === '') return;
+    setResetError(null);
+    setPendingReset({ exerciseIds, level });
+  };
+
+  const proceedWithReset = async () => {
+    if (!pendingReset || resetting) return;
+    setResetting(true);
+    setResetError(null);
+    try {
+      await resetExercises(pendingReset.exerciseIds, pendingReset.level);
+      setPendingReset(null);
+      window.dispatchEvent(new CustomEvent('exercise-reset', { detail: pendingReset }));
+      window.dispatchEvent(new Event('exercise-statistics-updated'));
+    } catch (error) {
+      setResetError(error instanceof Error ? error.message : 'Reset failed.');
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const scopeSelect = (rowId: ResetRowId, label: string) => (
+    <select className="statistics-reset-scope" value={resetLevels[rowId]} aria-label={label} onChange={(event) => setResetLevels((levels) => ({ ...levels, [rowId]: event.target.value as ResetLevel | '' }))}>
+      <option value="">...select what to reset...</option>
+      <option value="logbook">Logbook data</option>
+      <option value="workspace">Workspace data</option>
+      <option value="completion">Completion status</option>
+      <option value="progression">Progression data</option>
+      <option value="exercise">Exercise</option>
+    </select>
+  );
+
+  const resetButton = (rowId: ResetRowId, ids: number[]) => (
+    <button type="button" className="statistics-reset-button" disabled={resetLevels[rowId] === ''} onClick={() => requestReset(rowId, ids)}>Reset!</button>
+  );
+
+  return (
+    <section className="statistics-reset-tab" aria-label="Reset options">
+      <div className="statistics-reset-heading"><h3>Reset data</h3><p>Choose the scope for each reset action.</p></div>
+      <div className="statistics-reset-list">
+        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset current exercise</span>{scopeSelect('current', 'Reset level for current exercise')}{resetButton('current', selectedExerciseId === null ? [] : [selectedExerciseId])}</div>
+        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises from the <select className="statistics-reset-select" value={selectedSet} onChange={(event) => setSelectedSet(event.target.value)} aria-label="Exercise set"><option value="" disabled>Select exercise set</option>{exerciseSets.map((set) => <option key={set} value={set}>{set}</option>)}</select> exercise set</span>{scopeSelect('set', 'Reset level for exercise set')}{resetButton('set', exerciseSummaries.filter((exercise) => exercise.exercise_set?.trim() === selectedSet).map((exercise) => exercise.id))}</div>
+        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises with the <select className="statistics-reset-select" value={selectedTag} onChange={(event) => setSelectedTag(event.target.value)} aria-label="Tag"><option value="" disabled>Select tag</option>{tags.map((tag) => <option key={tag.id} value={tag.tag_name}>{tag.tag_name}</option>)}</select> tag</span>{scopeSelect('tag', 'Reset level for tag')}{resetButton('tag', exerciseSummaries.filter((exercise) => exercise.tags.includes(selectedTag)).map((exercise) => exercise.id))}</div>
+        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises between <input className="statistics-reset-number" type="number" min="0" aria-label="Youngest age in days" value={minimumAge} onChange={(event) => setMinimumAge(event.target.value)} /> and <input className="statistics-reset-number" type="number" min="0" aria-label="Oldest age in days" value={maximumAge} onChange={(event) => setMaximumAge(event.target.value)} /> days old</span>{scopeSelect('age', 'Reset level for age range')}{resetButton('age', idsForDateRange(Number(minimumAge) || 0, Number(maximumAge) || Number.POSITIVE_INFINITY))}</div>
+        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises with <select className="statistics-reset-select" value={selectedDifficulty} onChange={(event) => setSelectedDifficulty(event.target.value)} aria-label="Difficulty"><option value="" disabled>Select difficulty</option><option value="E">Easy</option><option value="M">Medium</option><option value="D">Hard</option></select> difficulty</span>{scopeSelect('difficulty', 'Reset level for difficulty')}{resetButton('difficulty', exerciseSummaries.filter((exercise) => exercise.difficulty?.startsWith(selectedDifficulty)).map((exercise) => exercise.id))}</div>
+        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset all exercises</span>{scopeSelect('all', 'Reset level for all exercises')}{resetButton('all', exerciseSummaries.map((exercise) => exercise.id))}</div>
+      </div>
+      {pendingReset ? <div className="statistics-reset-confirmation-backdrop" role="presentation"><div className="statistics-reset-confirmation" role="dialog" aria-modal="true" aria-labelledby="statistics-reset-confirmation-title"><div className="statistics-reset-confirmation-icon" aria-hidden="true">!</div><h3 id="statistics-reset-confirmation-title">Reset data?</h3><p>This action cannot be undone.</p><p className="statistics-reset-confirmation-detail">For the selected exercises, <b>all {pendingReset.level} data</b> will be permanently deleted.</p>{resetError ? <p className="statistics-reset-confirmation-error" role="alert">{resetError}</p> : null}<div className="statistics-reset-confirmation-actions"><button type="button" className="statistics-reset-cancel" disabled={resetting} onClick={() => setPendingReset(null)}>Cancel</button><button type="button" className="statistics-reset-proceed" disabled={resetting} onClick={() => void proceedWithReset()}>{resetting ? 'Resetting...' : 'Proceed'}</button></div></div></div> : null}
+    </section>
+  );
+}
+
 function ContributionGrid({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
   const slotCount = Math.ceil(exerciseSummaries.length / CONTRIBUTION_COLUMNS) * CONTRIBUTION_COLUMNS;
   const solvedExercises = exerciseSummaries.filter((exercise) => exercise.completed_at);
@@ -773,7 +858,7 @@ function ContributionGrid({ exerciseSummaries }: { exerciseSummaries: ExerciseSu
   );
 }
 
-export function StatisticsPanel({ isOpen, onClose, exerciseSummaries }: StatisticsPanelProps) {
+export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedExerciseId }: StatisticsPanelProps) {
   const [activeTab, setActiveTab] = useState<StatisticsTabId>('1');
 
   if (!isOpen) {
@@ -810,7 +895,7 @@ export function StatisticsPanel({ isOpen, onClose, exerciseSummaries }: Statisti
 
         <div className="settings-panel-content">
           <div className="settings-tab-content" id={`statisticstab-${activeTab}`}>
-            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <TimeDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '6' ? <LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /> : null}
+            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <TimeDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '6' ? <LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '7' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} /> : null}
           </div>
         </div>
       </div>

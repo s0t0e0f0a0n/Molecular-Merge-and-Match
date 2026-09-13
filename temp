@@ -1,0 +1,82 @@
+ideeen:
+
+CHECK grafiek die laat zien hoe snel alles is beantwoord en in drie kleuren hoe lastig het was
+
+CHECK gemiddelde tijd per exercise in grafiek (per dag)
+
+CHECK tijd bij hover over
+
+spaced repition
+
+wanneer komt het weer vrij?
+
+Grafiek met kleur voor herhalingen
+
+confidence check before submitting
+
+timestamps worden gemaakt, maar in logbookstates, die worden later eventueel gewist.
+
+Logbook: when are merges made, when are fragmenst created, when are merges made, when is a validation made?
+
+
+Advanced statistics
+
+
+
+Alle info naar info panel
+
+Including tutorail
+
+
+exercises.py
+statistics.py
+exercises.ts
+DifficultyRating.tsx
+MolecularBookkeepingPage.tsx
+WorkingSolutionPanel.tsx
+index.css
+
+Small bugfix:
+WarningSolutionPanel.tsx
+Any warning showed the
+
+
+Wat wil ik allemaal
+
+
+
+2. Grafiek per elk van de 5 confidence levels
+Hoeveel exercises, per confidence level, percentage right at first try
+Doe deze per level 0-5
+of geen grafiek?
+Lijst - voor elk van de opgaven levels. gesplitst in 5 confidence levels zie je
+- Hoeveel exercises totaal, hoeveel incorrect status, percentage in 1x goed. percentage confidence op totaal van die exercise set
+
+
+Horizontale histogram (progress bar is makkelijk te normalizeren)
+
+Wat wil je weten: Voor een Level 2 opgave, hoe zeker was je van je antwoord en daadwerkelijke antwoord.
+
+
+Reset:
+drop down choice: current exercises
+
+
+
+reset x days old
+reset allemaal
+reset currect
+reset per tag
+reset per DifficultyRating
+reset per exercise set
+
+What to reset?
+logbook
+workspace
+completion
+= you can do it again, but incorrect status is preserved
+clear exercise (cheat unlocked)
+remove
+factory reset (is it possible?)
+
+Recalculate space repetition factors
