@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRDKit } from '../../context/RDKitContext';
 import { useExerciseData } from '../../context/ExerciseDataContext';
-import {
-  fetchExerciseStatistics,
-  validateExerciseSolutionHash,
-} from '../../api/exercises';
+import { validateExerciseSolutionHash } from '../../api/exercises';
 import { parseMolBlock } from '../../utils/molParser';
 import { findHighlightedAtomPositions } from '../../utils/svgMergePointLocator';
 import { ExpandedMoleculeView } from '../../components/ExpandedMoleculeView';
-import { DifficultyRating } from '../../components/DifficultyRating';
+import { ValidationOverlay } from '../../components/DifficultyRating';
 import type { WorkingSolution } from '../../hooks/useWorkingSolution';
 import type { MergeState, MolAtom } from '../../types/molecule';
 import { useWarning, type WarningResponse } from '../../context/WarningContext';
@@ -151,7 +148,6 @@ export function WorkingSolutionPanel({
   const {
     selectedExercise,
     loadingSelectedExercise,
-    setSelectedExerciseStatistics,
   } = useExerciseData();
   const molecularFormula = selectedExercise?.molecular_formula ?? undefined;
   const { rdkit } = useRDKit();
@@ -161,6 +157,7 @@ export function WorkingSolutionPanel({
   const [validating, setValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<boolean | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [confidence, setConfidence] = useState(3);
 
   const isPicking = mergeState.phase === 'picking-merge-target';
 
@@ -248,6 +245,7 @@ useEffect(() => {
     setValidating(false);
     setValidationResult(null);
     setValidationError(null);
+    setConfidence(3);
   }, [exerciseId, solution?.smiles]);
 
   useEffect(() => {
@@ -382,20 +380,11 @@ useEffect(() => {
 
     try {
       const hash = await sha256Hex(inchi);
-      const result = await validateExerciseSolutionHash(exerciseId, hash);
+      const result = await validateExerciseSolutionHash(exerciseId, hash, confidence);
       setValidationResult(result.is_correct);
-      try {
-        const statistics = await fetchExerciseStatistics(exerciseId);
-        setSelectedExerciseStatistics(statistics);
-        window.dispatchEvent(new CustomEvent('exercise-statistics-updated', {
-          detail: { exerciseId },
-        }));
-      } catch (error) {
-        console.error('statistics refresh failed', error);
-      }
-      if (result.is_correct) {
-        window.dispatchEvent(new CustomEvent('exercise-completed', { detail: { exerciseId } }));
-      }
+      window.dispatchEvent(new CustomEvent('exercise-statistics-updated', {
+        detail: { exerciseId },
+      }));
     } catch {
       setValidationError('Unable to validate the working solution.');
     } finally {
@@ -602,23 +591,42 @@ useEffect(() => {
           </button>
         </div>
 
-        {validationError ? (
-          <div style={{ fontSize: 12, color: '#b30000' }}>{validationError}</div>
-        ) : (
-          <div
-            style={{
-              fontSize: 12,
-              color: validationResult ? '#0f5f0f' : '#b30000',
-              visibility: validationResult === null ? 'hidden' : 'visible',
-            }}
-          >
-            {validationResult ? 'Your answer is correct.' : 'Your answer is incorrect.'}
+        {validationResult === false && (
+          <div style={{ marginTop: 4, fontSize: 12, color: '#b30000' }}>
+            Your answer is incorrect.
           </div>
         )}
-        {validationResult && (
-          <DifficultyRating exerciseId={exerciseId} resetKey={`${exerciseId}-${solution.smiles}`} />
+        <div style={{ marginTop: 4, fontSize: 12 }}>
+          <div style={{ fontWeight: 600 }}>How confident are you in your answer?</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            <span style={{ color: '#666', fontSize: 11 }}>little</span>
+            <input
+              type="range"
+              min="1"
+              max="5"
+              step="1"
+              value={confidence}
+              onChange={(event) => setConfidence(Number(event.target.value))}
+              aria-label="Confidence in answer"
+              className="confidence-slider"
+              style={{ flex: 1, minWidth: 120 }}
+            />
+            <span style={{ color: '#666', fontSize: 11 }}>very</span>
+          </div>
+        </div>
+        {validationError && (
+          <div style={{ fontSize: 12, color: '#b30000' }}>{validationError}</div>
         )}
       </div>
+
+      {validationResult && (
+        <ValidationOverlay
+          exerciseId={exerciseId}
+          resetKey={`${exerciseId}-${solution.smiles}`}
+          confidence={confidence}
+          onRated={() => setValidationResult(null)}
+        />
+      )}
 
       {expanded && isPicking && (
         <ExpandedMoleculeView

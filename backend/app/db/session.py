@@ -523,7 +523,10 @@ def _migrate_add_missing_columns() -> None:
                 text("ALTER TABLE statistics ADD COLUMN cheats_used VARCHAR(15) NOT NULL DEFAULT '000000000000'")
             )
         if "difficulty" not in existing_statistics:
-            conn.execute(text("ALTER TABLE statistics ADD COLUMN difficulty VARCHAR(10) NOT NULL DEFAULT 'O0'"))
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN difficulty VARCHAR(10) NOT NULL DEFAULT 'M0'"))
+            conn.commit()
+        if "confidence" not in existing_statistics:
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN confidence INTEGER NOT NULL DEFAULT 0"))
             conn.commit()
         if "merges_done" not in existing_statistics:
             conn.execute(text("ALTER TABLE statistics ADD COLUMN merges_done INTEGER NOT NULL DEFAULT 0"))
@@ -546,7 +549,8 @@ def _migrate_add_missing_columns() -> None:
                     exercise_id VARCHAR(50) NOT NULL,
                     incorrect_count INTEGER NOT NULL DEFAULT 0,
                     cheats_used VARCHAR(15) NOT NULL DEFAULT '000000000000',
-                    difficulty VARCHAR(10) NOT NULL DEFAULT 'O0',
+                    difficulty VARCHAR(10) NOT NULL DEFAULT 'M0',
+                    confidence INTEGER NOT NULL DEFAULT 0,
                     merges_done INTEGER NOT NULL DEFAULT 0,
                     matches_done INTEGER NOT NULL DEFAULT 0,
                     fragments_drawn INTEGER NOT NULL DEFAULT 0,
@@ -562,9 +566,9 @@ def _migrate_add_missing_columns() -> None:
             conn.execute(text(
                 """
                 INSERT INTO statistics
-                    (id, exercise_id, incorrect_count, cheats_used, difficulty, merges_done, matches_done, fragments_drawn, start_counting,
+                    (id, exercise_id, incorrect_count, cheats_used, difficulty, confidence, merges_done, matches_done, fragments_drawn, start_counting,
                      stop_counting, timer_total, started_at, completed_at, eligible_purge_time)
-                SELECT id, exercise_id, incorrect_count, CAST(cheats_used AS TEXT), difficulty, merges_done, matches_done, fragments_drawn, start_counting,
+                SELECT id, exercise_id, incorrect_count, CAST(cheats_used AS TEXT), difficulty, confidence, merges_done, matches_done, fragments_drawn, start_counting,
                        stop_counting, timer_total, started_at, completed_at, eligible_purge_time
                 FROM statistics_legacy
                 """

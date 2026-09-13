@@ -281,7 +281,8 @@ class Statistics(Base):
     merges_done: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
     matches_done: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
     fragments_drawn: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
-    difficulty: Mapped[str] = mapped_column(String(10), nullable=False, default="O0")
+    difficulty: Mapped[str] = mapped_column(String(10), nullable=False, default="M0")
+    confidence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     start_counting: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True, default=None
     )
@@ -291,7 +292,6 @@ class Statistics(Base):
     timer_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True, default=None,
-        server_default=func.now(),
     )
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True, default=None,

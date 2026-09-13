@@ -307,6 +307,7 @@ class ExerciseSummaryOut(BaseModel):
     name: str | None
     exercise_set: str | None
     tags: list[str]
+    difficulty: str | None = None
     completed: bool | None = None
     incorrect_count: int | None = None
     timer_total: int | None = None
@@ -331,6 +332,7 @@ class CasAnswerValidationOut(BaseModel):
 
 class SolutionValidationIn(BaseModel):
     solution_hash: str
+    confidence: int = Field(ge=1, le=5)
 
 
 class SolutionValidationOut(BaseModel):
@@ -754,6 +756,7 @@ def _to_summary_response(
         name=row.name,
         exercise_set=row.exercise_set,
         tags=tags,
+        difficulty=statistics.difficulty if statistics is not None else None,
         completed=row.completed,
         incorrect_count=statistics.incorrect_count if statistics is not None else None,
         timer_total=statistics.timer_total if statistics is not None else None,
@@ -1027,8 +1030,19 @@ def validate_solution_answer(
         row = db.query(Exercise).filter(Exercise.id == exercise_id).first()
         if not row:
             raise HTTPException(status_code=404, detail="Exercise not found.")
+        statistics_row = (
+            db.query(Statistics)
+            .filter(Statistics.exercise_id == str(exercise_id))
+            .first()
+        )
+        if statistics_row is None:
+            statistics_row = Statistics(exercise_id=str(exercise_id))
+            db.add(statistics_row)
+        statistics_row.confidence = body.confidence
         if row.solution_inchi_hash is None:
-            increment_incorrect_count(exercise_id)
+            if row.completed is not True:
+                statistics_row.incorrect_count += 1
+            db.commit()
             return SolutionValidationOut(is_correct=False)
 
         is_correct = hmac.compare_digest(row.solution_inchi_hash, input_hash)
@@ -1039,7 +1053,9 @@ def validate_solution_answer(
             if not was_completed:
                 mark_exercise_completed(exercise_id)
         else:
-            increment_incorrect_count(exercise_id)
+            if row.completed is not True:
+                statistics_row.incorrect_count += 1
+            db.commit()
         return SolutionValidationOut(is_correct=is_correct)
 
 @router.get("/{exercise_id}/dbe", response_model=DbeOut)

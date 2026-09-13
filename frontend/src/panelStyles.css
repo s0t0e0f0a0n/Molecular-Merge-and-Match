@@ -155,6 +155,27 @@
     white-space: nowrap;
 }
 
+.statistics-average-time-legend-line {
+    display: inline-block;
+    width: 16px;
+    border-top: 2px solid #1d4ed8;
+}
+
+.statistics-logbook-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+}
+
+.statistics-logbook-swatch.is-create,
+.statistics-logbook-create { background: #008080; }
+
+.statistics-logbook-swatch.is-link,
+.statistics-logbook-link { background: #00a3a3; }
+
+.statistics-logbook-swatch.is-merge,
+.statistics-logbook-merge { background: #00d1d1; }
+
 .statistics-timeline-viewport {
     grid-column: 2;
     grid-row: 2;
@@ -166,18 +187,31 @@
     --timeline-bars-height: 128px;
     --timeline-date-height: 22px;
     display: grid;
-    grid-template-columns: 28px minmax(0, 1fr);
+    grid-template-columns: 28px minmax(0, 1fr) 42px;
     grid-template-rows: auto auto;
     gap: 8px;
-    width: calc(100% + 6px);
+    width: calc(100% + 21px);
     margin-left: -6px;
     min-width: 0;
 }
 
 .statistics-timeline-axis-title {
-    grid-column: 1 / -1;
+    grid-column: 1;
     grid-row: 1;
     justify-self: start;
+    margin-left: 10px;
+    color: #475569;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.statistics-timeline-right-axis-title {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: start;
+    margin-left: -28px;
     color: #475569;
     font-size: 10px;
     font-weight: 600;
@@ -201,6 +235,22 @@
     transform: translateY(50%);
 }
 
+.statistics-timeline-right-axis {
+    grid-column: 3;
+    grid-row: 2;
+    position: relative;
+    height: var(--timeline-bars-height);
+    color: #64748b;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.statistics-timeline-right-axis .statistics-timeline-axis-label {
+    right: auto;
+    left: 0;
+    bottom: calc(var(--average-time-position) * (var(--timeline-bars-height) - 6px));
+}
+
 .statistics-timeline-plot {
     position: relative;
     min-width: 0;
@@ -221,7 +271,7 @@
 
 .statistics-timeline {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     display: grid;
     grid-template-columns: repeat(var(--timeline-days), minmax(24px, 1fr));
     gap: 5px;
@@ -232,6 +282,8 @@
 }
 
 .statistics-timeline-day {
+    position: relative;
+    z-index: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -242,6 +294,8 @@
 }
 
 .statistics-timeline-bar {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: column-reverse;
     justify-content: flex-start;
@@ -266,6 +320,126 @@
 .statistics-timeline-segment.is-blue { background: #3b82f6; }
 
 .statistics-timeline-date {
+    overflow: hidden;
+    width: 100%;
+    color: #64748b;
+    font-size: 10px;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.statistics-average-time-timeline {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(var(--timeline-days), minmax(24px, 1fr));
+    gap: 5px;
+    min-width: max(100%, calc(var(--timeline-days) * 29px));
+    height: calc(var(--timeline-bars-height) + var(--timeline-date-height));
+    align-items: end;
+    border-bottom: 1px solid #cbd5e1;
+}
+
+.statistics-average-time-day {
+    position: relative;
+    z-index: 2;
+    min-width: 0;
+    height: calc(var(--timeline-bars-height) + var(--timeline-date-height));
+}
+
+.statistics-average-time-line {
+    position: absolute;
+    inset: 6px 0 var(--timeline-date-height);
+    z-index: 3;
+    width: 100%;
+    height: calc(var(--timeline-bars-height) - 6px);
+    overflow: visible;
+    pointer-events: none;
+}
+
+.statistics-average-time-line polyline {
+    fill: none;
+    stroke: #1d4ed8;
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+
+.statistics-average-time-point {
+    position: absolute;
+    left: 50%;
+    z-index: 4;
+    bottom: calc(var(--timeline-date-height) + var(--average-time-position) * (var(--timeline-bars-height) - 6px));
+    width: 9px;
+    height: 9px;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    background: #2563eb;
+    box-shadow: 0 0 0 1px #1d4ed8;
+    transform: translate(-50%, 50%);
+}
+
+.statistics-average-time-day .statistics-timeline-date {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+}
+
+.statistics-time-distribution {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(var(--timeline-days), minmax(24px, 1fr));
+    gap: 5px;
+    min-width: max(100%, calc(var(--timeline-days) * 29px));
+    height: calc(var(--timeline-bars-height) + var(--timeline-date-height));
+    align-items: end;
+    border-bottom: 1px solid #cbd5e1;
+}
+
+.statistics-time-distribution-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 5px;
+    min-width: 0;
+    height: calc(var(--timeline-bars-height) + var(--timeline-date-height));
+}
+
+.statistics-time-distribution-label {
+    overflow: hidden;
+    width: 100%;
+    color: #64748b;
+    font-size: 10px;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.statistics-logbook-distribution {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(var(--timeline-days), minmax(24px, 1fr));
+    gap: 5px;
+    min-width: max(100%, calc(var(--timeline-days) * 29px));
+    height: calc(var(--timeline-bars-height) + var(--timeline-date-height));
+    align-items: end;
+    border-bottom: 1px solid #cbd5e1;
+}
+
+.statistics-logbook-bin {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 5px;
+    min-width: 0;
+    height: calc(var(--timeline-bars-height) + var(--timeline-date-height));
+}
+
+.statistics-logbook-label {
     overflow: hidden;
     width: 100%;
     color: #64748b;
@@ -721,7 +895,7 @@
 
 .tag-column-header {
     display: grid;
-    grid-template-columns: 16% 16% 7% 8% 8% 45%;
+    grid-template-columns: 16% 16% 7% 8% 53%;
     gap: 4px;
     font-size: 13px;
     color: #0f172a;
@@ -733,7 +907,7 @@
 
 .tag-row {
     display: grid;
-    grid-template-columns: 16% 16% 7% 8% 8% 44%;
+    grid-template-columns: 16% 16% 7% 8% 52%;
     gap: 4px;
     align-items: center;
     min-height: 36px;
@@ -752,7 +926,6 @@
 }
 
 .tag-hide,
-.tag-statistics,
 .tag-delete {
     display: flex;
     align-items: center;

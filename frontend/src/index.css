@@ -1,3 +1,40 @@
+.confidence-slider {
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.confidence-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: #e0e0e0;
+}
+
+.confidence-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -4px;
+  border: 0;
+  border-radius: 50%;
+  background: #2196f3;
+}
+
+.confidence-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: #e0e0e0;
+}
+
+.confidence-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: #2196f3;
+}
 /* ==========================================================================
    1. Global Resets & Base Variables
    ========================================================================== */

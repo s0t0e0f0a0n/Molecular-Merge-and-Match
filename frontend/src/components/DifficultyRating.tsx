@@ -10,9 +10,11 @@ const ratings = [
 type DifficultyRatingProps = {
   resetKey: string;
   exerciseId: number | null;
+  confidence?: number;
+  onRated?: () => void;
 };
 
-export function DifficultyRating({ resetKey, exerciseId }: DifficultyRatingProps) {
+export function DifficultyRating({ resetKey, exerciseId, confidence = 3, onRated }: DifficultyRatingProps) {
   const [selectedRating, setSelectedRating] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -24,8 +26,13 @@ export function DifficultyRating({ resetKey, exerciseId }: DifficultyRatingProps
     if (exerciseId === null || saving) return;
     setSaving(true);
     try {
-      await rateExerciseDifficulty(exerciseId, rating.value === 'easy' ? 'E' : rating.value === 'medium' ? 'M' : 'D');
+      await rateExerciseDifficulty(
+        exerciseId,
+        rating.value === 'easy' ? 'E' : rating.value === 'medium' ? 'M' : 'D',
+        confidence,
+      );
       setSelectedRating(rating.value);
+      onRated?.();
     } finally {
       setSaving(false);
     }
@@ -60,6 +67,68 @@ export function DifficultyRating({ resetKey, exerciseId }: DifficultyRatingProps
           {rating.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+type ValidationOverlayProps = {
+  exerciseId: number | null;
+  resetKey: string;
+  confidence?: number;
+  onRated: () => void;
+};
+
+export function ValidationOverlay({
+  exerciseId,
+  resetKey,
+  confidence = 3,
+  onRated,
+}: ValidationOverlayProps) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="validation-overlay-title"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 10000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(255, 255, 255, 0.86)',
+        backdropFilter: 'blur(3px)',
+      }}
+    >
+      <div
+        style={{
+          minWidth: 280,
+          padding: 24,
+          border: '1px solid #d8d8d8',
+          borderRadius: 12,
+          background: 'white',
+          boxShadow: '0 12px 30px rgba(0, 0, 0, 0.14)',
+          textAlign: 'center',
+        }}
+      >
+        <div
+          id="validation-overlay-title"
+          style={{ color: '#0f5f0f', fontSize: 18, fontWeight: 700 }}
+        >
+          Your answer is correct.
+        </div>
+        <div style={{ marginTop: 8, fontSize: 13, color: '#555' }}>
+          Rate the difficulty to continue.
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+          <DifficultyRating
+            exerciseId={exerciseId}
+            resetKey={resetKey}
+            confidence={confidence}
+            onRated={onRated}
+          />
+        </div>
+      </div>
     </div>
   );
 }

@@ -47,16 +47,18 @@ export default function WarningPanel() {
       </span>
       )}
 
-        <span
-          title="At least one peak is assigned to multiple fragments."
-          style={{ cursor: 'help', display: 'inline-flex' }}
-        >
-          <img
-            src={doubleAssignmentIcon}
-            alt="Double assignment warning"
-            style={{ width: 32, height: 32 }}
-          />
-        </span>
+        {double_peak_assignment_Warning.warning && (
+          <span
+            title="At least one peak is assigned to multiple fragments."
+            style={{ cursor: 'help', display: 'inline-flex' }}
+          >
+            <img
+              src={doubleAssignmentIcon}
+              alt="Double assignment warning"
+              style={{ width: 32, height: 32 }}
+            />
+          </span>
+        )}
       
     </div>
   )

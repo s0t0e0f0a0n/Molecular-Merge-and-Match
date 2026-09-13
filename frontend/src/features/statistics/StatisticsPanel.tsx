@@ -1,21 +1,29 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ExerciseSummary } from '../../api/exercises';
+import { fetchAllLogbooks } from '../../api/logbook';
 import { fetchTags, type Tag } from '../../api/tags';
 import '../../panelStyles.css';
 
-type StatisticsTabId = '1' | '2' | '3';
+type StatisticsTabId = '1' | '2' | '3' | '4' | '5' | '6';
 
 type StatisticsPanelProps = {
   isOpen: boolean;
   onClose: () => void;
   exerciseSummaries: ExerciseSummary[];
 };
-
+// tab 1 contains progression overview and graph.
+// tab 2 contains timing tables
+// tab 3 contains timing graphs
+// tab 4 contains advanced statistics 
+// tab 5 conatins the reset functions
 const TABS: Array<{ id: StatisticsTabId; label: string }> = [
   { id: '1', label: 'Progression' },
   { id: '2', label: 'Table' },
-  { id: '3', label: 'Reset' },
+  { id: '3', label: 'Time distribution' },
+  { id: '4', label: 'Table' },
+  { id: '5', label: 'Table' },
+  { id: '6', label: 'Logbook' },
 ];
 
 const CONTRIBUTION_STATUSES = [
@@ -111,10 +119,29 @@ function timelineTicks(maximumCount: number): number[] {
   return [maximumCount, Math.ceil(maximumCount / 2), 0];
 }
 
+const TIME_SCALE_STEP_SECONDS = 5 * 60;
+
+function timeScaleMaximum(maximumSeconds: number): number {
+  return Math.max(
+    TIME_SCALE_STEP_SECONDS,
+    Math.ceil(maximumSeconds / TIME_SCALE_STEP_SECONDS) * TIME_SCALE_STEP_SECONDS,
+  );
+}
+
+function timeScaleTicks(maximumSeconds: number): number[] {
+  return [maximumSeconds, maximumSeconds / 2, 0];
+}
+
 function StatisticsTimeline({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
   const days = buildTimeline(exerciseSummaries);
   const maximumCount = Math.max(1, ...days.map((day) => Object.values(day.counts).reduce((sum, count) => sum + count, 0)));
   const ticks = timelineTicks(maximumCount);
+  const averageTimeDays = buildAverageTimeDays(exerciseSummaries);
+  const maximumAverage = timeScaleMaximum(Math.max(0, ...averageTimeDays.map((day) => day.averageSeconds)));
+  const averageTimeTicks = timeScaleTicks(maximumAverage);
+  const averageTimeLinePoints = averageTimeDays
+    .map((day, index) => `${index + 0.5},${100 - (day.averageSeconds / maximumAverage) * 100}`)
+    .join(' ');
 
   return (
     <section className="statistics-timeline-section" aria-label="Daily statistics timeline">
@@ -127,11 +154,15 @@ function StatisticsTimeline({ exerciseSummaries }: { exerciseSummaries: Exercise
               {status.label}
             </span>
           ))}
+          <span className="statistics-timeline-legend-item">
+            <span className="statistics-average-time-legend-line" aria-hidden="true" />
+            Average time per exercise
+          </span>
         </div>
       </div>
       <div className="statistics-timeline-chart">
         <div className="statistics-timeline-axis-title">Number of exercises</div>
-        <div aria-hidden="true" />
+        <div className="statistics-timeline-right-axis-title">Average time</div>
         <div className="statistics-timeline-axis" aria-label="Number of exercises">
           {ticks.map((tick) => (
             <span key={tick} className="statistics-timeline-axis-label" style={{ bottom: `${(tick / maximumCount) * 100}%` }}>
@@ -147,8 +178,17 @@ function StatisticsTimeline({ exerciseSummaries }: { exerciseSummaries: Exercise
               ))}
             </div>
             <div className="statistics-timeline" style={{ '--timeline-days': days.length } as React.CSSProperties}>
+              <svg
+                className="statistics-average-time-line"
+                viewBox={`0 0 ${days.length} 100`}
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <polyline points={averageTimeLinePoints} />
+              </svg>
               {days.map((day) => {
                 const total = Object.values(day.counts).reduce((sum, count) => sum + count, 0);
+                const averageTimeDay = averageTimeDays.find((candidate) => localDateKey(candidate.date) === localDateKey(day.date));
                 return (
                   <div key={localDateKey(day.date)} className="statistics-timeline-day" title={`${formatTimelineDate(day.date)}: ${total} exercise${total === 1 ? '' : 's'}`}>
                     <div className="statistics-timeline-bar" aria-label={`${formatTimelineDate(day.date)}: ${total} exercises`}>
@@ -160,7 +200,181 @@ function StatisticsTimeline({ exerciseSummaries }: { exerciseSummaries: Exercise
                         />
                       ))}
                     </div>
+                    {averageTimeDay ? (
+                      <span
+                        className="statistics-average-time-point"
+                        style={{ '--average-time-position': averageTimeDay.averageSeconds / maximumAverage } as React.CSSProperties}
+                        title={`${formatDuration(Math.round(averageTimeDay.averageSeconds))} average time`}
+                        aria-label={`${formatTimelineDate(day.date)}: ${formatDuration(Math.round(averageTimeDay.averageSeconds))} average time`}
+                      />
+                    ) : null}
                     <span className="statistics-timeline-date">{formatTimelineDate(day.date)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        <div className="statistics-timeline-right-axis" aria-label="Average time per exercise">
+          {averageTimeTicks.map((tick) => (
+            <span
+              key={tick}
+              className="statistics-timeline-axis-label"
+              style={{ '--average-time-position': tick / maximumAverage } as React.CSSProperties}
+            >
+              {formatDuration(tick)}
+            </span>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type TimeDistributionBucket = {
+  minute: number;
+  easy: number;
+  medium: number;
+  difficult: number;
+};
+
+type LogbookDistributionBucket = {
+  createFragment: number;
+  link: number;
+  mergeFragments: number;
+};
+
+const LOGBOOK_BIN_COUNT = 20;
+
+function parseLogbookTimestamp(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const milliseconds = Math.abs(value) < 1e11 ? value * 1000 : value;
+    return Number.isFinite(milliseconds) ? milliseconds : null;
+  }
+  if (typeof value === 'string') {
+    const numericValue = Number(value);
+    if (Number.isFinite(numericValue)) {
+      return Math.abs(numericValue) < 1e11 ? numericValue * 1000 : numericValue;
+    }
+    const parsedDate = Date.parse(value);
+    return Number.isNaN(parsedDate) ? null : parsedDate;
+  }
+  return null;
+}
+
+function buildLogbookDistribution(
+  exerciseSummaries: ExerciseSummary[],
+  logbooks: Record<string, { entries_json: string }>,
+): LogbookDistributionBucket[] {
+  const buckets = Array.from({ length: LOGBOOK_BIN_COUNT }, () => ({
+    createFragment: 0,
+    link: 0,
+    mergeFragments: 0,
+  }));
+  const eventKinds = new Set(['create-fragment', 'link', 'merge-fragments']);
+
+  exerciseSummaries
+    .filter((exercise) => exercise.completed_at != null)
+    .forEach((exercise) => {
+      const startedAt = parseExerciseDate(exercise.started_at);
+      const completedAt = parseExerciseDate(exercise.completed_at);
+      if (!startedAt || !completedAt || completedAt <= startedAt) return;
+
+      const logbook = logbooks[String(exercise.id)] ?? logbooks[`exercise-${exercise.id}`];
+      if (!logbook) return;
+
+      let entries: Array<{ kind?: string; ts?: unknown }> = [];
+      try {
+        const parsed = JSON.parse(logbook.entries_json) as unknown;
+        if (Array.isArray(parsed)) entries = parsed.filter((entry): entry is { kind?: string; ts?: unknown } => typeof entry === 'object' && entry !== null);
+      } catch {
+        return;
+      }
+
+      const duration = completedAt.getTime() - startedAt.getTime();
+      entries.forEach((entry) => {
+        if (!eventKinds.has(entry.kind ?? '')) return;
+        const timestamp = parseLogbookTimestamp(entry.ts);
+        if (timestamp === null || timestamp < startedAt.getTime() || timestamp > completedAt.getTime()) return;
+        const normalizedPosition = (timestamp - startedAt.getTime()) / duration;
+        const bucket = buckets[Math.min(LOGBOOK_BIN_COUNT - 1, Math.floor(normalizedPosition * LOGBOOK_BIN_COUNT))];
+        if (entry.kind === 'create-fragment') bucket.createFragment += 1;
+        if (entry.kind === 'link') bucket.link += 1;
+        if (entry.kind === 'merge-fragments') bucket.mergeFragments += 1;
+      });
+    });
+
+  return buckets;
+}
+
+function LogbookDistributionGraph({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
+  const [logbooks, setLogbooks] = useState<Record<string, { entries_json: string }>>({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let isCurrent = true;
+    setIsLoading(true);
+    fetchAllLogbooks()
+      .then((data) => {
+        if (isCurrent) setLogbooks(data);
+      })
+      .catch(() => {
+        if (isCurrent) setLogbooks({});
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoading(false);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [exerciseSummaries]);
+
+  if (isLoading) return <p>Loading logbook statistics...</p>;
+
+  const buckets = buildLogbookDistribution(exerciseSummaries, logbooks);
+  const maximumCount = Math.max(
+    1,
+    ...buckets.map((bucket) => bucket.createFragment + bucket.link + bucket.mergeFragments),
+  );
+  const ticks = timelineTicks(maximumCount);
+
+  return (
+    <section className="statistics-timeline-section" aria-label="Logbook events over exercise duration">
+      <div className="statistics-timeline-heading">
+        <h3>Logbook events during completed exercises</h3>
+        <div className="statistics-timeline-legend" aria-label="Logbook event legend">
+          <span className="statistics-timeline-legend-item"><span className="statistics-logbook-swatch is-create" aria-hidden="true" />Create fragment</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-logbook-swatch is-link" aria-hidden="true" />Link</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-logbook-swatch is-merge" aria-hidden="true" />Merge fragments</span>
+        </div>
+      </div>
+      <div className="statistics-timeline-chart statistics-logbook-chart">
+        <div className="statistics-timeline-axis-title">Number of events</div>
+        <div className="statistics-timeline-axis" aria-label="Number of logbook events">
+          {ticks.map((tick) => (
+            <span key={tick} className="statistics-timeline-axis-label" style={{ bottom: `${(tick / maximumCount) * 100}%` }}>
+              {tick}
+            </span>
+          ))}
+        </div>
+        <div className="statistics-timeline-viewport">
+          <div className="statistics-timeline-plot">
+            <div className="statistics-timeline-guides" aria-hidden="true">
+              {ticks.map((tick) => (
+                <span key={tick} style={{ bottom: `${(tick / maximumCount) * 100}%` }} />
+              ))}
+            </div>
+            <div className="statistics-logbook-distribution" style={{ '--timeline-days': buckets.length } as React.CSSProperties}>
+              {buckets.map((bucket, index) => {
+                const total = bucket.createFragment + bucket.link + bucket.mergeFragments;
+                return (
+                  <div key={index} className="statistics-logbook-bin" title={`${index * 5}-${(index + 1) * 5}%: ${total} event${total === 1 ? '' : 's'}`}>
+                    <div className="statistics-timeline-bar" aria-label={`${index * 5}-${(index + 1) * 5}%: ${total} events`}>
+                      <span className="statistics-timeline-segment statistics-logbook-create" style={{ height: `${(bucket.createFragment / maximumCount) * 100}%` }} />
+                      <span className="statistics-timeline-segment statistics-logbook-link" style={{ height: `${(bucket.link / maximumCount) * 100}%` }} />
+                      <span className="statistics-timeline-segment statistics-logbook-merge" style={{ height: `${(bucket.mergeFragments / maximumCount) * 100}%` }} />
+                    </div>
+                    <span className="statistics-logbook-label">{index % 5 === 0 ? `${index * 5}%` : ''}</span>
                   </div>
                 );
               })}
@@ -170,6 +384,131 @@ function StatisticsTimeline({ exerciseSummaries }: { exerciseSummaries: Exercise
       </div>
     </section>
   );
+}
+
+function exerciseTimeMinute(exercise: ExerciseSummary): number {
+  const roundedMinute = Math.round(Math.max(0, exercise.timer_total ?? 0) / 60);
+  return Math.min(60, Math.max(1, roundedMinute));
+}
+
+function exerciseDifficulty(exercise: ExerciseSummary): 'easy' | 'medium' | 'difficult' | null {
+  const difficulty = exercise.difficulty?.trim().charAt(0).toUpperCase();
+  if (difficulty === 'E') return 'easy';
+  if (difficulty === 'M') return 'medium';
+  if (difficulty === 'D') return 'difficult';
+  return null;
+}
+
+function buildTimeDistribution(exerciseSummaries: ExerciseSummary[]): TimeDistributionBucket[] {
+  const completedExercises = exerciseSummaries.filter((exercise) => exercise.completed_at != null);
+  const maximumMinute = Math.min(
+    60,
+    Math.max(1, ...completedExercises.map(exerciseTimeMinute)),
+  );
+  const buckets = Array.from({ length: maximumMinute }, (_, index) => ({
+    minute: index + 1,
+    easy: 0,
+    medium: 0,
+    difficult: 0,
+  }));
+
+  completedExercises.forEach((exercise) => {
+    const difficulty = exerciseDifficulty(exercise);
+    if (!difficulty) return;
+    buckets[exerciseTimeMinute(exercise) - 1][difficulty] += 1;
+  });
+  return buckets;
+}
+
+function TimeDistributionGraph({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
+  const buckets = buildTimeDistribution(exerciseSummaries);
+  const maximumCount = Math.max(
+    1,
+    ...buckets.map((bucket) => bucket.easy + bucket.medium + bucket.difficult),
+  );
+  const ticks = timelineTicks(maximumCount);
+
+  return (
+    <section className="statistics-timeline-section" aria-label="Completed exercise time distribution">
+      <div className="statistics-timeline-heading">
+        <h3>Completed exercises by time</h3>
+        <div className="statistics-timeline-legend" aria-label="Difficulty legend">
+          <span className="statistics-timeline-legend-item"><span className="statistics-contribution-swatch statistics-contribution-status is-green" aria-hidden="true" />Easy</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-contribution-swatch statistics-contribution-status is-blue" aria-hidden="true" />Medium</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-contribution-swatch statistics-contribution-status is-red" aria-hidden="true" />Difficult</span>
+        </div>
+      </div>
+      <div className="statistics-timeline-chart statistics-time-distribution-chart">
+        <div className="statistics-timeline-axis-title">Number of exercises</div>
+        <div className="statistics-timeline-axis" aria-label="Number of exercises">
+          {ticks.map((tick) => (
+            <span key={tick} className="statistics-timeline-axis-label" style={{ bottom: `${(tick / maximumCount) * 100}%` }}>
+              {tick}
+            </span>
+          ))}
+        </div>
+        <div className="statistics-timeline-viewport">
+          <div className="statistics-timeline-plot">
+            <div className="statistics-timeline-guides" aria-hidden="true">
+              {ticks.map((tick) => (
+                <span key={tick} style={{ bottom: `${(tick / maximumCount) * 100}%` }} />
+              ))}
+            </div>
+            <div className="statistics-time-distribution" style={{ '--timeline-days': buckets.length } as React.CSSProperties}>
+              {buckets.map((bucket) => {
+                const total = bucket.easy + bucket.medium + bucket.difficult;
+                return (
+                  <div
+                    key={bucket.minute}
+                    className="statistics-time-distribution-day"
+                    title={`${bucket.minute === 60 ? '60+' : bucket.minute} minute${bucket.minute === 1 ? '' : 's'}: ${total} exercise${total === 1 ? '' : 's'}`}
+                  >
+                    <div className="statistics-timeline-bar" aria-label={`${bucket.minute === 60 ? '60+' : bucket.minute} minutes: ${total} exercises`}>
+                      <span className="statistics-timeline-segment is-green" style={{ height: `${(bucket.easy / maximumCount) * 100}%` }} />
+                      <span className="statistics-timeline-segment is-blue" style={{ height: `${(bucket.medium / maximumCount) * 100}%` }} />
+                      <span className="statistics-timeline-segment is-red" style={{ height: `${(bucket.difficult / maximumCount) * 100}%` }} />
+                    </div>
+                    <span className="statistics-time-distribution-label">{bucket.minute === 60 ? '60+' : bucket.minute}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type AverageTimeDay = {
+  date: Date;
+  averageSeconds: number;
+  exerciseCount: number;
+};
+
+function buildAverageTimeDays(exerciseSummaries: ExerciseSummary[]): AverageTimeDay[] {
+  const timelineDays = buildTimeline(exerciseSummaries);
+  const totalsByDate = new Map<string, { totalSeconds: number; exerciseCount: number }>();
+
+  exerciseSummaries.forEach((exercise) => {
+    const date = parseExerciseDate(exercise.completed_at ?? exercise.started_at);
+    if (!date) return;
+
+    const key = localDateKey(date);
+    const current = totalsByDate.get(key) ?? { totalSeconds: 0, exerciseCount: 0 };
+    current.totalSeconds += Math.max(0, exercise.timer_total ?? 0);
+    current.exerciseCount += 1;
+    totalsByDate.set(key, current);
+  });
+
+  return timelineDays.map(({ date }) => {
+    const totals = totalsByDate.get(localDateKey(date));
+    return {
+      date,
+      averageSeconds: totals ? totals.totalSeconds / totals.exerciseCount : 0,
+      exerciseCount: totals?.exerciseCount ?? 0,
+    };
+  });
 }
 
 function formatDuration(seconds: number | null | undefined): string {
@@ -382,16 +721,15 @@ function ProgressionTab({ exerciseSummaries }: { exerciseSummaries: ExerciseSumm
 }
 
 function ContributionGrid({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
-  const trackedExercises = exerciseSummaries.filter(isTrackedExerciseSet);
   const slotCount = Math.ceil(exerciseSummaries.length / CONTRIBUTION_COLUMNS) * CONTRIBUTION_COLUMNS;
-  const solvedExercises = trackedExercises.filter((exercise) => exercise.completed_at);
+  const solvedExercises = exerciseSummaries.filter((exercise) => exercise.completed_at);
   const fastestExercises = [...solvedExercises]
     .sort((left, right) => (left.timer_total ?? Number.POSITIVE_INFINITY) - (right.timer_total ?? Number.POSITIVE_INFINITY))
     .slice(0, 10);
   const slowestExercises = [...solvedExercises]
     .sort((left, right) => (right.timer_total ?? Number.NEGATIVE_INFINITY) - (left.timer_total ?? Number.NEGATIVE_INFINITY))
     .slice(0, 10);
-  const mostIncorrectExercises = [...trackedExercises]
+  const mostIncorrectExercises = [...exerciseSummaries]
     .filter((exercise) => (exercise.incorrect_count ?? 0) > 0)
     .sort((left, right) => (right.incorrect_count ?? 0) - (left.incorrect_count ?? 0))
     .slice(0, 10);
@@ -406,7 +744,7 @@ function ContributionGrid({ exerciseSummaries }: { exerciseSummaries: ExerciseSu
               <span
                 key={exercise?.id ?? `empty-${index}`}
                 className={`statistics-contribution-cell statistics-contribution-status ${exercise ? contributionStatus(exercise) : 'is-empty'}`}
-                title={exercise ? `${exercise.exercise_set ?? 'Unassigned'} / ${exercise.name ?? `Exercise ${exercise.id}`}` : undefined}
+                title={exercise ? `${exercise.exercise_set ?? 'Unassigned'} / ${exercise.name ?? `Exercise ${exercise.id}`}${(exercise.timer_total ?? 0) > 0 ? ` (${formatDuration(exercise.timer_total)})` : ''}` : undefined}
                 aria-hidden="true"
               />
             );
@@ -427,7 +765,7 @@ function ContributionGrid({ exerciseSummaries }: { exerciseSummaries: ExerciseSu
           <RankedExerciseList title="Slowest solved exercises" exercises={slowestExercises} includeTime />
           <div className="statistics-ranking-list-column">
             <RankedExerciseList title="Most incorrect answers" exercises={mostIncorrectExercises} includeIncorrectCount />
-            <StatisticsSummary exerciseSummaries={trackedExercises} />
+            <StatisticsSummary exerciseSummaries={exerciseSummaries} />
           </div>
         </div>
       </div>
@@ -437,7 +775,6 @@ function ContributionGrid({ exerciseSummaries }: { exerciseSummaries: ExerciseSu
 
 export function StatisticsPanel({ isOpen, onClose, exerciseSummaries }: StatisticsPanelProps) {
   const [activeTab, setActiveTab] = useState<StatisticsTabId>('1');
-  const trackedExerciseSummaries = exerciseSummaries.filter(isTrackedExerciseSet);
 
   if (!isOpen) {
     return null;
@@ -473,7 +810,7 @@ export function StatisticsPanel({ isOpen, onClose, exerciseSummaries }: Statisti
 
         <div className="settings-panel-content">
           <div className="settings-tab-content" id={`statisticstab-${activeTab}`}>
-            {activeTab === '1' ? <ProgressionTab exerciseSummaries={trackedExerciseSummaries} /> : <ContributionGrid exerciseSummaries={exerciseSummaries} />}
+            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <TimeDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '6' ? <LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /> : null}
           </div>
         </div>
       </div>

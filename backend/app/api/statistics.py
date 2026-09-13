@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.db.models import Exercise, LogbookState, Statistics, UserSettings
 from app.db.session import get_db
@@ -27,12 +27,14 @@ class StatisticsOut(BaseModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     difficulty: str = "O0"
+    confidence: int = 0
 
     model_config = {"from_attributes": True}
 
 
 class DifficultyRatingIn(BaseModel):
     rating: Literal["E", "M", "D"]
+    confidence: int = Field(default=3, ge=1, le=5)
 
 
 def _is_reference_exercise(db, exercise_id: int | str) -> bool:
@@ -145,7 +147,8 @@ def mark_exercise_selected(exercise_id: int | str) -> None:
         row, created = _ensure_statistics_row(db, exercise_id)
         if row is None:
             return
-        row.started_at = row.started_at or datetime.now()
+        if created or row.started_at is None:
+            row.started_at = datetime.now()
         if _exercise_is_incomplete(db, exercise_id):
             row.start_counting = datetime.now() + timedelta(seconds=5)
             row.stop_counting = None
@@ -245,7 +248,7 @@ def increment_incorrect_count(exercise_id: int | str) -> None:
 
 def _next_difficulty(current: str | None, rating: str) -> str:
     match = re.fullmatch(r"[EMD](\d+)", current or "")
-    count = int(match.group(1)) if match else 1
+    count = max(1, int(match.group(1))) if match else 1
     return f"{rating}{count}"
 
 
@@ -275,6 +278,7 @@ def rate_exercise_difficulty(
         if row is None:
             row, _ = _ensure_statistics_row(db, exercise_id)
         row.difficulty = _next_difficulty(row.difficulty, body.rating)
+        row.confidence = body.confidence
         db.commit()
         db.refresh(row)
         return StatisticsOut.model_validate(row)

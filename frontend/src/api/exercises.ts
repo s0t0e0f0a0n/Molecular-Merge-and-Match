@@ -3,6 +3,7 @@ export type ExerciseSummary = {
   name: string | null;
   exercise_set: string | null;
   tags: string[];
+  difficulty?: string | null;
   completed?: boolean | null;
   incorrect_count?: number | null;
   timer_total?: number | null;
@@ -216,11 +217,12 @@ export async function resetExercise(exerciseKey: string): Promise<void> {
 export async function validateExerciseSolutionHash(
   exerciseId: number,
   solutionHash: string,
+  confidence: number,
 ): Promise<SolutionValidationResponse> {
   const response = await fetch(`/api/v1/exercises/${exerciseId}/validate-solution`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ solution_hash: solutionHash }),
+    body: JSON.stringify({ solution_hash: solutionHash, confidence }),
   });
 
   const payload = (await response.json().catch(() => null)) as
@@ -275,13 +277,14 @@ export async function fetchExerciseStatistics(
 export async function rateExerciseDifficulty(
   exerciseId: number,
   rating: 'E' | 'M' | 'D',
+  confidence: number,
 ): Promise<ExerciseStatistics> {
   const response = await fetch(
     `/api/v1/statistics/difficulty?exercise_id=${encodeURIComponent(String(exerciseId))}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rating }),
+      body: JSON.stringify({ rating, confidence }),
     },
   );
   if (!response.ok) throw new Error('Failed to save exercise difficulty');

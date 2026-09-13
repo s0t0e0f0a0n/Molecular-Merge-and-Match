@@ -14,6 +14,14 @@ export async function fetchLogbook(exerciseKey: string): Promise<ApiLogbookState
   return (await response.json()) as ApiLogbookState;
 }
 
+export async function fetchAllLogbooks(): Promise<Record<string, ApiLogbookState>> {
+  const response = await fetch('/api/v1/logbook/all');
+  if (!response.ok) {
+    throw new Error(`Failed to load logbooks (${response.status})`);
+  }
+  return (await response.json()) as Record<string, ApiLogbookState>;
+}
+
 export async function saveLogbook(
   exerciseKey: string,
   body: ApiLogbookState,

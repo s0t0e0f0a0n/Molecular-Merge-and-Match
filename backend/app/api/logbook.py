@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Dict
+
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
@@ -21,6 +23,16 @@ class LogbookStateOut(BaseModel):
     links_json: str
 
     model_config = {"from_attributes": True}
+
+
+@router.get("/all", response_model=Dict[str, LogbookStateOut])
+def get_all_logbooks() -> dict[str, LogbookStateOut]:
+    with get_db() as db:
+        rows = db.query(LogbookState).all()
+        return {
+            row.exercise_id: LogbookStateOut.model_validate(row)
+            for row in rows
+        }
 
 
 @router.get("/", response_model=LogbookStateOut)

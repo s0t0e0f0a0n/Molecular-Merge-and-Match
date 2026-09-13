@@ -39,7 +39,7 @@ import type { PeakDef } from '../../types/peak';
 import type { MergeState, NewStereoBond } from '../../types/molecule';
 import WarningPanel from '../warning/WarningPanel'
 import { FullscreenButton } from '../../components/FullscreenButton';
-import { DifficultyRating } from '../../components/DifficultyRating';
+import { ValidationOverlay } from '../../components/DifficultyRating';
 import { LoadingExerciseOverlay, PausedExerciseOverlay } from './LoadingExerciseOverlay';
 import { LinkInheritOptionsPopup, type LinkInheritMode } from '../linking/LinkInheritOptionsPopup';
 import { applySettingsPreset, fetchUserSettings, updateUserSettings, type UpdateUserSettingsRequest, type UserSettings } from '../../api/settings';
@@ -1555,18 +1555,9 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
       try {
         const result = await validateExerciseCasAnswer(selectedExerciseId, normalizedCas);
         setCasAnswerIsCorrect(result.is_correct);
-        try {
-          const statistics = await fetchExerciseStatistics(selectedExerciseId);
-          setSelectedExerciseStatistics(statistics);
-          window.dispatchEvent(new CustomEvent('exercise-statistics-updated', {
-            detail: { exerciseId: selectedExerciseId },
-          }));
-        } catch (error) {
-          console.error('statistics refresh failed', error);
-        }
-        if (result.is_correct) {
-          window.dispatchEvent(new CustomEvent('exercise-completed', { detail: { exerciseId: selectedExerciseId } }));
-        }
+        window.dispatchEvent(new CustomEvent('exercise-statistics-updated', {
+          detail: { exerciseId: selectedExerciseId },
+        }));
       } catch {
         setCasAnswerIsCorrect(false);
       } finally {
@@ -2129,9 +2120,6 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
                 >
                   {casAnswerIsCorrect ? 'CAS answer is correct.' : 'CAS answer is incorrect.'}
                 </span>
-                {casAnswerIsCorrect && (
-                  <DifficultyRating exerciseId={selectedExerciseId} resetKey={`${selectedExerciseId}-${casAnswerInput}`} />
-                )}
               </div>
 
               <span style={{ justifyContent: 'center', whiteSpace: 'nowrap', alignItems: 'center', fontSize: 12 }}>Manual validation:</span>
@@ -2241,6 +2229,14 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         
 
       </div>
+
+      {casAnswerIsCorrect && (
+        <ValidationOverlay
+          exerciseId={selectedExerciseId}
+          resetKey={`${selectedExerciseId}-${casAnswerInput}`}
+          onRated={() => setCasAnswerIsCorrect(null)}
+        />
+      )}
       {/* Settingspanel dialog */}
 
       <SettingsPanel
