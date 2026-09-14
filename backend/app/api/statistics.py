@@ -35,6 +35,7 @@ class StatisticsOut(BaseModel):
 class DifficultyRatingIn(BaseModel):
     rating: Literal["E", "M", "D"]
     confidence: int = Field(default=3, ge=1, le=5)
+    iterate: bool = False
 
 
 def _is_reference_exercise(db, exercise_id: int | str) -> bool:
@@ -246,9 +247,12 @@ def increment_incorrect_count(exercise_id: int | str) -> None:
         db.refresh(row)
 
 
-def _next_difficulty(current: str | None, rating: str) -> str:
+def _next_difficulty(current: str | None, rating: str, *, increment: bool) -> str:
     match = re.fullmatch(r"[EMD](\d+)", current or "")
-    count = max(1, int(match.group(1))) if match else 1
+    count = int(match.group(1)) if match else 0
+    if increment:
+        count += 1
+    count = max(1, count)
     return f"{rating}{count}"
 
 
@@ -277,7 +281,7 @@ def rate_exercise_difficulty(
         row = _find_statistics_row(db, exercise_id)
         if row is None:
             row, _ = _ensure_statistics_row(db, exercise_id)
-        row.difficulty = _next_difficulty(row.difficulty, body.rating)
+        row.difficulty = _next_difficulty(row.difficulty, body.rating, increment=body.iterate)
         row.confidence = body.confidence
         db.commit()
         db.refresh(row)

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRDKit } from '../../context/RDKitContext';
 import { useExerciseData } from '../../context/ExerciseDataContext';
-import { validateExerciseSolutionHash } from '../../api/exercises';
+import { fetchExerciseStatistics, validateExerciseSolutionHash } from '../../api/exercises';
 import { parseMolBlock } from '../../utils/molParser';
 import { findHighlightedAtomPositions } from '../../utils/svgMergePointLocator';
 import { ExpandedMoleculeView } from '../../components/ExpandedMoleculeView';
@@ -148,6 +148,7 @@ export function WorkingSolutionPanel({
   const {
     selectedExercise,
     loadingSelectedExercise,
+    setSelectedExerciseStatistics,
   } = useExerciseData();
   const molecularFormula = selectedExercise?.molecular_formula ?? undefined;
   const { rdkit } = useRDKit();
@@ -156,6 +157,7 @@ export function WorkingSolutionPanel({
   const [expanded, setExpanded] = useState(false);
   const [validating, setValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<boolean | null>(null);
+  const [shouldIterateDifficulty, setShouldIterateDifficulty] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [confidence, setConfidence] = useState(3);
 
@@ -244,6 +246,7 @@ useEffect(() => {
   useEffect(() => {
     setValidating(false);
     setValidationResult(null);
+    setShouldIterateDifficulty(false);
     setValidationError(null);
     setConfidence(3);
   }, [exerciseId, solution?.smiles]);
@@ -382,6 +385,10 @@ useEffect(() => {
       const hash = await sha256Hex(inchi);
       const result = await validateExerciseSolutionHash(exerciseId, hash, confidence);
       setValidationResult(result.is_correct);
+      setShouldIterateDifficulty(result.should_iterate_difficulty);
+      if (result.is_correct) {
+        setSelectedExerciseStatistics(await fetchExerciseStatistics(exerciseId));
+      }
       window.dispatchEvent(new CustomEvent('exercise-statistics-updated', {
         detail: { exerciseId },
       }));
@@ -624,6 +631,7 @@ useEffect(() => {
           exerciseId={exerciseId}
           resetKey={`${exerciseId}-${solution.smiles}`}
           confidence={confidence}
+          iterateDifficulty={shouldIterateDifficulty}
           onRated={() => setValidationResult(null)}
         />
       )}

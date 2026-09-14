@@ -1,7 +1,7 @@
 [
   {
     "exercise": {
-      "name": "acetone-d6",
+      "name": "acetone-/it{d6}",
       "molecular_formula": "C3[2]H6O",
       "exercise_set": "References",
       "tags_csv": "%tag{8},%tag{9},%tag{10}",
@@ -109,7 +109,7 @@
   },
   {
     "exercise": {
-      "name": "acetonitrile-d3",
+      "name": "acetonitrile-/it{d3}",
       "molecular_formula": "C2[2]H3N",
       "exercise_set": "References",
       "tags_csv": "%tag{8},%tag{9},%tag{10}",
@@ -217,7 +217,7 @@
   },  
   {
     "exercise": {
-      "name": "benzene-d6",
+      "name": "benzene-/it{d6}",
       "molecular_formula": "C6[2]H6",
       "exercise_set": "References",
       "tags_csv": "%tag{8},%tag{9},%tag{10}",
@@ -286,7 +286,7 @@
   },
   {
     "exercise": {
-      "name": "chloroform-d",
+      "name": "chloroform-/it{d}",
       "molecular_formula": "C[2]HCl3",
       "exercise_set": "References",
       "tags_csv": "%tag{8},%tag{9},%tag{10}",
@@ -362,7 +362,7 @@
   },
   {
     "exercise": {
-      "name": "dimethylsulfoxide-d6",
+      "name": "dimethylsulfoxide-/it{d6}",
       "molecular_formula": "C2[2]H6OS",
       "exercise_set": "References",
       "tags_csv": "%tag{8},%tag{9},%tag{10}",
@@ -451,7 +451,7 @@
   },
   {
     "exercise": {
-      "name": "methanol-d4",
+      "name": "methanol-/it{d4}",
       "molecular_formula": "C[2]H4O",
       "exercise_set": "References",
       "tags_csv": "%tag{8},%tag{9},%tag{10}",
@@ -540,7 +540,7 @@
   },
   {
     "exercise": {
-      "name": "water-d2",
+      "name": "water-/it{d2}",
       "molecular_formula": "[2]H2O",
       "exercise_set": "References",
       "tags_csv": "%tag{8},%tag{9},%tag{10}",
@@ -691,7 +691,7 @@
       "c13_frequency_mhz": 126.0,
       "c13_solvent": "%solv{5}",
       "c13_apt": true,
-      "completed": true,
+      "completed": false,
       "solution_inchi_hash": "f55c3ff3ff10c1cead53ca1dd27cf9cb91e33f5787251b1e4dd34405d834c4a8",
       "solution_cas_hash": "f9d2c5db3a58b02126616c5c939890387bf51b1b135c32fdff04cf2fb2d5b699",
       "h1_data_source": "av500/Stefan1811biosyn/29",

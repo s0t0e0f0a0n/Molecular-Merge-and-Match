@@ -1,9 +1,9 @@
 import { deleteExercise } from './exercises';
 
-export type ResetLevel = 'logbook' | 'workspace' | 'completion' | 'progression' | 'remove';
+export type ResetLevel = 'logbook' | 'workspace' | 'completion' | 'progression' | 'exercise';
 
 export async function resetExercises(exerciseIds: number[], level: ResetLevel): Promise<void> {
-  if (level === 'remove') {
+  if (level === 'exercise') {
     await Promise.all(exerciseIds.map((exerciseId) => deleteExercise(exerciseId)));
     return;
   }

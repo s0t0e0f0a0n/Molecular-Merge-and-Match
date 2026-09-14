@@ -11,10 +11,11 @@ type DifficultyRatingProps = {
   resetKey: string;
   exerciseId: number | null;
   confidence?: number;
+  iterateDifficulty: boolean;
   onRated?: () => void;
 };
 
-export function DifficultyRating({ resetKey, exerciseId, confidence = 3, onRated }: DifficultyRatingProps) {
+export function DifficultyRating({ resetKey, exerciseId, confidence = 3, iterateDifficulty, onRated }: DifficultyRatingProps) {
   const [selectedRating, setSelectedRating] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -30,6 +31,7 @@ export function DifficultyRating({ resetKey, exerciseId, confidence = 3, onRated
         exerciseId,
         rating.value === 'easy' ? 'E' : rating.value === 'medium' ? 'M' : 'D',
         confidence,
+        iterateDifficulty,
       );
       setSelectedRating(rating.value);
       onRated?.();
@@ -75,6 +77,7 @@ type ValidationOverlayProps = {
   exerciseId: number | null;
   resetKey: string;
   confidence?: number;
+  iterateDifficulty: boolean;
   onRated: () => void;
 };
 
@@ -82,6 +85,7 @@ export function ValidationOverlay({
   exerciseId,
   resetKey,
   confidence = 3,
+  iterateDifficulty,
   onRated,
 }: ValidationOverlayProps) {
   return (
@@ -125,6 +129,7 @@ export function ValidationOverlay({
             exerciseId={exerciseId}
             resetKey={resetKey}
             confidence={confidence}
+            iterateDifficulty={iterateDifficulty}
             onRated={onRated}
           />
         </div>

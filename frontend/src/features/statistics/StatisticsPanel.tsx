@@ -6,7 +6,7 @@ import { resetExercises, type ResetLevel } from '../../api/reset';
 import { fetchTags, type Tag } from '../../api/tags';
 import '../../panelStyles.css';
 
-type StatisticsTabId = '1' | '2' | '3' | '4' | '5' | '6' | '7';
+type StatisticsTabId = '1' | '2' | '3' | '4' | '5';
 
 type StatisticsPanelProps = {
   isOpen: boolean;
@@ -23,10 +23,8 @@ const TABS: Array<{ id: StatisticsTabId; label: string }> = [
   { id: '1', label: 'Progression' },
   { id: '2', label: 'Table' },
   { id: '3', label: 'Time distribution' },
-  { id: '4', label: 'Table' },
-  { id: '5', label: 'Table' },
-  { id: '6', label: 'Logbook' },
-  { id: '7', label: 'Reset' },
+  { id: '4', label: 'Advanced' },
+  { id: '5', label: 'Reset' },
 ];
 
 const CONTRIBUTION_STATUSES = [
@@ -895,7 +893,7 @@ export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedEx
 
         <div className="settings-panel-content">
           <div className="settings-tab-content" id={`statisticstab-${activeTab}`}>
-            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <TimeDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '6' ? <LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '7' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} /> : null}
+            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <TimeDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '4' ? <LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} /> : null}
           </div>
         </div>
       </div>

@@ -345,6 +345,7 @@ class CasAnswerValidationIn(BaseModel):
 
 class CasAnswerValidationOut(BaseModel):
     is_correct: bool
+    should_iterate_difficulty: bool = False
 
 
 class SolutionValidationIn(BaseModel):
@@ -354,6 +355,7 @@ class SolutionValidationIn(BaseModel):
 
 class SolutionValidationOut(BaseModel):
     is_correct: bool
+    should_iterate_difficulty: bool = False
 
 class DbeUpdate(BaseModel):
     dbe: float | None
@@ -1024,7 +1026,14 @@ def validate_cas_answer(
             return CasAnswerValidationOut(is_correct=False)
 
         is_correct = any(hmac.compare_digest(c_hash, input_hash) for c_hash in candidate_hashes)
+        should_iterate_difficulty = False
         if is_correct:
+            statistics_row = (
+                db.query(Statistics)
+                .filter(Statistics.exercise_id == str(exercise_id))
+                .first()
+            )
+            should_iterate_difficulty = statistics_row is None or statistics_row.completed_at is None
             was_completed = row.completed is True
             row.completed = True
             db.commit()
@@ -1032,7 +1041,10 @@ def validate_cas_answer(
                 mark_exercise_completed(exercise_id)
         else:
             increment_incorrect_count(exercise_id)
-        return CasAnswerValidationOut(is_correct=is_correct)
+        return CasAnswerValidationOut(
+            is_correct=is_correct,
+            should_iterate_difficulty=should_iterate_difficulty,
+        )
 
 @router.post("/{exercise_id}/validate-solution", response_model=SolutionValidationOut)
 def validate_solution_answer(
@@ -1063,7 +1075,9 @@ def validate_solution_answer(
             return SolutionValidationOut(is_correct=False)
 
         is_correct = hmac.compare_digest(row.solution_inchi_hash, input_hash)
+        should_iterate_difficulty = False
         if is_correct:
+            should_iterate_difficulty = statistics_row.completed_at is None
             was_completed = row.completed is True
             row.completed = True
             db.commit()
@@ -1073,7 +1087,10 @@ def validate_solution_answer(
             if row.completed is not True:
                 statistics_row.incorrect_count += 1
             db.commit()
-        return SolutionValidationOut(is_correct=is_correct)
+        return SolutionValidationOut(
+            is_correct=is_correct,
+            should_iterate_difficulty=should_iterate_difficulty,
+        )
 
 @router.get("/{exercise_id}/dbe", response_model=DbeOut)
 def get_exercise_dbe(exercise_id: int) -> DbeOut:

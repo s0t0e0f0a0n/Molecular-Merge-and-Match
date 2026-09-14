@@ -3,43 +3,50 @@
     "names" : "CDCl3,chloroform-/it{d}",
     "match": "CDCl3",
     "display": "Chloroform",
-    "preference" : 0
+    "preference" : 0,
+    "count": 2
   },
   {
     "names" : "(CD3)2SO,dimethylsulfoxide-/it{d6},DMSO-/it{d6}",
     "match": "DMSO",
     "display": "Dimethyl sulfoxide",
-    "preference" : 2
+    "preference" : 2,
+    "count": 1
   },
   {
     "names" : "CD3CN,acetonitrile-/it{d3},ACN-/it{d3},MeCN-/it{d3}",
     "match": "CD3CN",
     "display": "Acetonitrile",
-    "preference" : 0
+    "preference" : 0,
+    "count": 1
   },
   {
     "names" : "CD3OD,methanol-/it{d4},MeOD",
     "match": "MeOD",
     "display": "Methanol",
-    "preference" : 1
+    "preference" : 1,
+    "count": 1
   },
   {
     "names" : "D2O,water-/it{d2},deuterium oxide",
     "match": "D2O",
     "display": "Water",
-    "preference" : 0
+    "preference" : 0,
+    "count": 2
   },
   {
     "names" : "C6D6,benzene-/it{d6},PhD",
     "match": "C6D6",
     "display": "Benzene",
-    "preference" : 1
+    "preference" : 1,
+    "count": 1
   },
   {
     "names" : "(CD3)2CO,acetone-/it{d6},Me2CO-/it{d6}",
     "match": "Acetone",
     "display": "Acetone",
-    "preference" : 1
+    "preference" : 1,
+    "count": 1
   },
   {
     "names" : "CD2Cl2,dichloromethane-/it{d2},methylene dichloride-/it{d2},DCM-/it{d2}",

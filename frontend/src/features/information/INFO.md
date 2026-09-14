@@ -5,26 +5,27 @@ In this document you will find background information on certain features.
 
 #### Technical
 Most technical information can be found in the <b>Changelog</b> and <b>About</b> tabs.<br/>
-The software is in the form of a 'webapp' meaning it runs in what is in essence `Chromium` web browser, but since everything is bundled with the installer, no internet connection, or any installed browser or specific software is required. <br/>
-Still, there are a few requirements; you can almost run it on a brick, as long as it has a relatively fresh coat of paint.
+The software is in the form of a 'webapp' meaning it runs in what is in essence a `Chromium` web browser, but since everything is bundled with the installer, no internet connection, or any installed browser or specific software is required, with the exeption for flatpack and snap dependencies <br/>
+Still, there are a few requirements; you can almost run it on a brick, as long as it has a relatively fresh coat of paint:
 ```code
 Minimal requirements: 
-- 1080p resolution without scaling. It works fine on 1080p with 125% scaling or 720p, but is not recommended. 
-  The spectra will look grainy with lower resolutions.  
-- Windows 10 / macOS 12 / Ubuntu 24 / Fedora 42  (Older and Arch-based Linux distro's: use the flatpak version for now.)
+- 1080p resolution without scaling. It works fine on 1080p with 125% scaling or on 1366 × 768, but is not recommended. 
+  The spectra will look grainy with lower resolutions.    
+- Windows 10 / macOS 12 / Ubuntu 22 / Fedora 40
 - 2 GB RAM, 1 GB disk space
 ```
 
 #### Goal
 The main purpose of this software is to help students:
 >    1)  familiarize themselves with solving organic structures
->    2) familiarize themselves with certain common patterns (e.q. the ethyl group, 1,2,4-trisubstituted benzene derivatives etc.)
+>    2)  familiarize themselves with certain common patterns (e.q. the ethyl group, 1,2,4-trisubstituted benzene derivatives etc.)
 >    3)  approach the problems in a systematic way
 >    4)  build up their structure from small fragments
 >    5)  use matching and annotation to solidify their suspicions and when combined with the other fragments form irrefutable argumentation for the suggested final structure 
+>    6)  help gain insight into their study progression and difficulties 
 
 The software has several visibility options to increase or decrease the level of difficulty somewhat, even cheats can be used. Note however that the answers to the exercises are encrypted and cannot be decrypted, they are compared against the encrypted user input for validation.<br/>
-You can view your progression over time (still in development) per exercise set and level, and how many times you’ve tried the exercise, the time you spent on the exercise and whether or not you used cheats to complete the exercise. Many of these statistics can be reset.
+You can view your progression over time per exercise set and level, and how many times you’ve tried the exercise, the time you spent on the exercise and whether or not you used cheats to complete the exercise. Many of these statistics can be reset.
 #### Fragments and functional groups
 A set of predefined fragments is made available from which you can choose or build most of the functional groups and common side chains. You can also opt to draw everything yourself with the molecular editor. The editor also has a structure library you can use. <br/>
 Since the software is based on drawing complete molecules, you cannot simply draw ‘fragments’ with missing atoms. When doing such an exercise on paper it is common to display a fragment a certain way, for example with an arrow instead of a bond, to show where the fragment is connected to another fragment. This practice cannot be duplicated in this software.
@@ -76,4 +77,18 @@ Level 0: This level is for the absolute beginner and features by default only ti
 #### Statistics
 
 For each exercise, statistics are stored. This includes when it was first started, halted, and completed; how much time was spent until halt or completion; if any cheats were used; and how often incorrect validation occurred.<br/>
+You can optionally set a confidence level before submitting the answer for validation. You will be asked about how difficult the exercise was. <br />
 In the statistics panel, the collective data is visualized in several different ways to show insight into study behavior and progression.
+
+#### Spaced repetition
+A feuture that will be implemented in the next full release.<br />
+A system widly used and recognised for flashcard learning material, where you need to know answers within seconds. 
+Based on your speed and difficulty and other parameters a calculation takes place to determine at what future point in time revisiting the exercise is optimal.<br />
+This same sort of system, but for macro-length exercises will be incorporated.
+Based on the time it took, the confidence you had, the difficulty you encountered, if it was the first attempt or later atempt and how many incorrect validations have been made, a Mastery Index is calculated.
+This Mastery Index is low for the difficult exercises, but also when you were very confident and still took a very long time and made mistakes along the way.
+Very easy exercises with good confidence and low timings receive a high Mastery Score.
+A high score will lead to a calculated repetion time which will be far in the future (over a month), while a very low score will give you the exercise much sooner again.
+What will happen: the exercises that have been completed and are eligle to be repeated by the mastery score, will become available again. You will see a different green checkmark in the exercise menu.
+You can manually redo exercises by resetting the completion status (NOT the progression). This also clears clears the timer. When resubmitting exercises this way, the difficulty counter is incremented and a new Mastery Index score is calculated.
+Revisioned exercises will be seperately displayed in statistics graphs.

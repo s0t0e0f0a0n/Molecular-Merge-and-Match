@@ -6,7 +6,7 @@ Students select molecular fragments, match them to peaks in <sup>1</sup>H-NMR an
 > Contact information: **dr. S. van der Vorm** – [s.van.der.vorm@chem.leidenuniv.nl](mailto:s.van.der.vorm@chem.leidenuniv.nl)
  
 In the following sections technical information is shared. You can find more about the instrumentation used to measure the data as well as the development of this software.
-> Current version: **1.3.0**     Available as  .exe .deb .rpm .AppImage .flatpak .pacman .apk .snap (.dmg only for Intel systems)
+> Current version: **1.4.0**     Available as  .exe .deb .rpm .AppImage .flatpak .pacman .snap .dmg
 ### About this software
 
 Software is subject to the MIT license.
@@ -264,9 +264,7 @@ Credits go to the LUDev student team for their efforts in the app’s developmen
   <span>Ksenia Shileeva</span>
 </div>
 
-
-
-Following the initial release of version 1.0.0, the software is developed further (offline) by the teacher. See the Changelog for implemented features, fixes and changes. 
+Following the initial release of version 1.0.0, the software is developed further by the teacher with the help of AI agents in VSCode. See the Changelog for implemented features, fixes and changes. 
 
 
 ### Original implementations
@@ -365,7 +363,10 @@ Desktop deployment:
 The frontend is organized as a split-screen structure elucidation workspace. The left side of the interface is dedicated to spectral analysis, displaying stacked ¹H and ¹³C NMR spectra together with peak lists and spectral navigation controls. The right side contains the structure-building workspace, including the current solution, working fragments, and validation tools. A top bar provides access to exercise management functions, validation actions, and warning indicators which provide feedback during the structure elucidation process.
 
 ### Releases: building and testing
-The hardware and operating systems used to build the installers are listed below.
+The main installers are build through GitHub Actions using the `windows-latest`, `macos-latest`, and `ubuntu-22.04` runners.  
+The alternative CPU architectures are build using `windows-11-arm`, `macos-15-intel`, and `ubuntu-22.04-arm` runners.  
+The Ubuntu runner Virtual Machine is set to 22.04 for glibc compatibility with slightly older Linux distributions.  
+Only .flatpak (using Freedesktop 24.08 as runtime) is provided as a locally build installer. Upon request .snap can be provided (Snap is the least recommended format).
 
 <ascii>
 $yThis software is build for:  
@@ -392,30 +393,30 @@ $z         Microsoft Windows                        Linux                       
 $y
 $zThe build and test systems are without any major tweaking.
 $zStandard versions of the different Desktop environments, window manager and the supplied kernel with that OS.
-$zCurrently, there is NO build system natively running on mobile (ARM64) chips, so macOS users have to run the older
-$zsoftware version v1.0.0 or try their luck with an Intel build file or virtual machine.
 $z____________________________________________________________________________________________________________________________________
 $z
-$yWindows Build System (x86_64):
+$yWindows and Linux local build and test system (x86_64):
 $x
-$1/////////////////  /////////////////
-$1/////////////////  /////////////////
-$1/////////////////  /////////////////
-$1/////////////////  /////////////////
-$1/////////////////  /////////////////
-$1/////////////////  /////////////////
-$1/////////////////  /////////////////
-$1/////////////////  /////////////////
-$1
-$1/////////////////  /////////////////
-$1/////////////////  /////////////////
-$1/////////////////  /////////////////
-$1/////////////////  /////////////////
-$1/////////////////  /////////////////
-$1/////////////////  /////////////////
-$1/////////////////  /////////////////
-$1/////////////////  /////////////////
-$yOS: $zWindows 11 Enterprise (25H2)
+$1                                                          $0                       _.-ppOOOOOOqq-._    
+$1               /////////////////  /////////////////       $0                    .oOOOOPPPPPPPPPPOOOOo.      
+$1               /////////////////  /////////////////       $0                 .oOOOO$9.=oOOOOOOOOOOo=.$0OOOOo.  
+$1               /////////////////  /////////////////       $0               .:OOO$9.=oOOOOOOOOOOOOOOOOo=.$0OOO:.  
+$1               /////////////////  /////////////////       $0              .OOO$9.OOOOOOOOOOOOOOOOOOOOOOOO.$0OOO. 
+$1               /////////////////  /////////////////       $0             .OOO$9.OO    OOO:´   `::´    `:OOO.$0OO: 
+$1               /////////////////  /////////////////       $0            .OOO$9.OOO    OO                OOO.$0OOO: 
+$1               /////////////////  /////////////////       $0            OOO$9.OOOO    OO    oo    oo    OOOO.$0OOO  
+$1               /////////////////  /////////////////       $0           :OOO$9:OOOO    OO    OO    OO    OOOO:$0OOO: 
+$1                                                          $0           :OOO$9:OOOO    OO    OO    OO    OOOO:$0OOO: 
+$1               /////////////////  /////////////////       $0           'OOO$9'OOOO    OO    OO    OO    OOOO'$0OOO' 
+$1               /////////////////  /////////////////       $0            OOO$9'OOOO    OO____OO____OO    OOOO'$0OOO' 
+$1               /////////////////  /////////////////       $0            'OOO$9'OOO    'OOOOOOOOOOOO'    OOOO'$0OOO 
+$1               /////////////////  /////////////////       $0             'OOO$9'OOO                    .OOO'$0OOO' 
+$1               /////////////////  /////////////////       $0              'OOO$9'OOOO:ooooooooooooooo:OOOO'$0OOO'
+$1               /////////////////  /////////////////       $0               ':OOOo$9'=OOOOOOOOOOOOOOOOO='$0oOOO:'
+$1               /////////////////  /////////////////       $0                 ':OOOOo$9'=OOOOOOOOOOO='$0oOOOO:'
+$1               /////////////////  /////////////////       $0                    ``-OOOOooooooooooOOOO-´´ 
+$1                                                          $0                        ```-=:OOOO:=-´´´ 
+$yOS: $zWindows 11 Enterprise (25H2)         Linux Mint 22.3    
 $yHost: $zLatitude 3540
 $yCPU: $z13th Gen Intel(R) Core(TM) i5-1335U (4+8) @ 4.60 GHz
 $yGPU: $zIntel(R) UHD Graphics (128.00 MiB) [Integrated]
@@ -423,31 +424,31 @@ $yMemory: $z16 GiB 3200 MT/s DDR4
 $yDisplay (LGD0764): $z1920x1080 in 16", 60 Hz [Built-in]
 $z____________________________________________________________________________________________________________________________________
 $z
-$yLinux / macOS build and test system (x86_64):
-$zCurrent build OS is Linux Mint and an Hackintosh Ventura.
+$yLinux / macOS local build and test system (x86_64):
+$zCurrent build OS is Ubuntu 22 and an Hackintosh Ventura.
 $zNobara is used to test .rpm and .flatpak and Windows 10 to test on the last non-horrible Microsoft OS.
-$0
-$0                             _.-ppOOOOOOqq-._                                 $8                                 ..,
-$0                          .oOOOOPPPPPPPPPPOOOOo.                              $8                     ....,,:;+ccllll                        $0                      ..'                     $x    ⢀⣤⣴⣶⣶⣦⣤⡀⠀⣀⣠⣤⣴⣶⣶⣶⣶⣶⣶⣶⣶⣤⣤⣀⡀
-$0                       .oOOOO$9.=oOOOOOOOOOOo=.$0OOOOo.                           $8       ...,,+:;  cllllllllllllllllll                        $0                  ,xNMM.                      $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣤⡀
-$0                     .:OOO$9.=oOOOOOOOOOOOOOOOOo=.$0OOO:.                         $8 ,cclllllllllll  lllllllllllllllllll                        $0                .OMMMMo                       $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣄
-$0                    .OOO$9.OOOOOOOOOOOOOOOOOOOOOOOO.$0OOO.                        $8 llllllllllllll  lllllllllllllllllll                        $0                lMM"                          $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣄
-$0                   .OOO$9.OO    OOO:´   `::´    `:OOO.$0OO:                       $8 llllllllllllll  lllllllllllllllllll                        $0      .;loddo:.  .olloddol;.                  $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧
-$0                  .OOO$9.OOO    OO                OOO.$0OOO:                      $8 llllllllllllll  lllllllllllllllllll                        $0    cKMMMMMMMMMMNWMMMMMMMMMM0:                $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠟⠋⠉⠁⠀⠀⠉⠉⠛⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧
-$0                  OOO$9.OOOO    OO    oo    oo    OOOO.$0OOO                      $8 llllllllllllll  lllllllllllllllllll                        $0  .KMMMMMMMMMMMMMMMMMMMMMMMWd.                $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠟⠁⠀⠀⠀⢀⣀⣀⡀⠀⠀⠀⠈⢻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇
-$0                 :OOO$9:OOOO    OO    OO    OO    OOOO:$0OOO:                     $8 llllllllllllll  lllllllllllllllllll                        $0  XMMMMMMMMMMMMMMMMMMMMMMMX.                  $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡏⠀⠀⠀⢠⣾⣿⣿⣿⣿⣷⡄⠀⠀⠀⠻⠿⢿⣿⣿⣿⣿⣿⣿⣿⣿
-$0                 :OOO$9:OOOO    OO    OO    OO    OOOO:$0OOO:                                                                                 $0 ;MMMMMMMMMMMMMMMMMMMMMMMM:                   $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠁⠀⠀⠀⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠀⠀⠀⣀⣀⣬⣽⣿⣿⣿⣿⣿
-$0                 'OOO$9'OOOO    OO    OO    OO    OOOO'$0OOO'                     $8 llllllllllllll  lllllllllllllllllll                        $0 :MMMMMMMMMMMMMMMMMMMMMMMM:                   $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠈⠻⢿⣿⣿⡿⠟⠁⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-$0                  OOO$9'OOOO    OO____OO____OO    OOOO'$0OOO'                     $8 llllllllllllll  lllllllllllllllllll                        $0 .MMMMMMMMMMMMMMMMMMMMMMMMX.                  $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-$0                  'OOO$9'OOO    'OOOOOOOOOOOO'    OOOO'$0OOO                      $8 llllllllllllll  lllllllllllllllllll                        $0  kMMMMMMMMMMMMMMMMMMMMMMMMWd.                $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣤⣤⣄⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-$0                   'OOO$9'OOO                    .OOO'$0OOO'                      $8 llllllllllllll  lllllllllllllllllll                        $0  'XMMMMMMMMMMMMMMMMMMMMMMMMMMk               $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣄⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-$0                    'OOO$9'OOOO:ooooooooooooooo:OOOO'$0OOO'                       $8 llllllllllllll  lllllllllllllllllll                        $0   'XMMMMMMMMMMMMMMMMMMMMMMMMK.               $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-$0                     ':OOOo$9'=OOOOOOOOOOOOOOOOO='$0oOOO:'                        $8 `'ccllllllllll  lllllllllllllllllll                        $0     kMMMMMMMMMMMMMMMMMMMMMMd                 $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠟⠛⠉⠉⠛⠛⢿⣿⣿⠀⠀⠀⠀⠀⠸⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿
-$0                       ':OOOOo$9'=OOOOOOOOOOO='$0oOOOO:'                          $8        `' \*::  :ccllllllllllllllll                        $0      ;KMMMMMMMWXXWMMMMMMMk.                  $x   ⠘⢿⣿⣿⣿⣿⣿⣿⡿⠋⠀⠀⠀⠀⠀⠀⠀⠀⠈⢿⠀⠀⠀⠀⠀⠀⠙⢿⣿⣿⣿⣿⣿⣿⠟⠁
-$0                          ``-OOOOooooooooooOOOO-´´                            $8                        ````''*::cll                        $0        "cooc*"    "*coo'"                    $x     ⠈⠙⠛⠛⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠛⠛⠛⠉⠁
-$0                              ```-=:OOOO:=-´´´                                $8                                  ``
+$2                                         ....                               
+$2                          .',:clooo:  .:looooo:.                          $8                                 ..,
+$2                       .;looooooooc  .oooooooooo'                         $8                     ....,,:;+ccllll                       $0                      ..'                      $x    ⢀⣤⣴⣶⣶⣦⣤⡀⠀⣀⣠⣤⣴⣶⣶⣶⣶⣶⣶⣶⣶⣤⣤⣀⡀
+$2                    .;looooool:,''.  :ooooooooooc                         $8       ...,,+:;  cllllllllllllllllll                       $0                  ,xNMM.                       $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣤⡀
+$2                   ;looool;.         'oooooooooo,                         $8 ,cclllllllllll  lllllllllllllllllll                       $0                .OMMMMo                        $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣄
+$2                  ;clool'             .cooooooc.  ,,                      $8 llllllllllllll  lllllllllllllllllll                       $0                lMM"                           $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣄
+$2                     ...                ......  .:oo,                     $8 llllllllllllll  lllllllllllllllllll                       $0      .;loddo:.  .olloddol;.                   $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧
+$2              .;clol:,.                        .loooo'                    $8 llllllllllllll  lllllllllllllllllll                       $0    cKMMMMMMMMMMNWMMMMMMMMMM0:                 $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠟⠋⠉⠁⠀⠀⠉⠉⠛⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧
+$2             :ooooooooo,                        'ooool                    $8 llllllllllllll  lllllllllllllllllll                       $0  .KMMMMMMMMMMMMMMMMMMMMMMMWd.                 $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠟⠁⠀⠀⠀⢀⣀⣀⡀⠀⠀⠀⠈⢻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇
+$2            'ooooooooooo.                        loooo.                   $8 llllllllllllll  lllllllllllllllllll                       $0  XMMMMMMMMMMMMMMMMMMMMMMMX.                   $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡏⠀⠀⠀⢠⣾⣿⣿⣿⣿⣷⡄⠀⠀⠀⠻⠿⢿⣿⣿⣿⣿⣿⣿⣿⣿
+$2            'ooooooooool                         coooo.                                                                              $0 ;MMMMMMMMMMMMMMMMMMMMMMMM:                    $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠁⠀⠀⠀⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠀⠀⠀⣀⣀⣬⣽⣿⣿⣿⣿⣿
+$2             ,loooooooc.                        .loooo.                   $8 llllllllllllll  lllllllllllllllllll                       $0 :MMMMMMMMMMMMMMMMMMMMMMMM:                    $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠈⠻⢿⣿⣿⡿⠟⠁⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+$2               .,;;;'.                          ;ooooc                    $8 llllllllllllll  lllllllllllllllllll                       $0 .MMMMMMMMMMMMMMMMMMMMMMMMX.                   $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+$2                   ...                         ,ooool.                    $8 llllllllllllll  lllllllllllllllllll                       $0  kMMMMMMMMMMMMMMMMMMMMMMMMWd.                 $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣤⣤⣄⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+$2                .cooooc.              ..',,'.  .cooo.                     $8 llllllllllllll  lllllllllllllllllll                       $0  'XMMMMMMMMMMMMMMMMMMMMMMMMMMk                $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣄⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+$2                  ;ooooo:.           ;oooooooc.  :l.                      $8 llllllllllllll  lllllllllllllllllll                       $0   'XMMMMMMMMMMMMMMMMMMMMMMMMK.                $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+$2                   .coooooc,..      coooooooooo.                          $8 `'ccllllllllll  lllllllllllllllllll                       $0     kMMMMMMMMMMMMMMMMMMMMMMd                  $x   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠟⠛⠉⠉⠛⠛⢿⣿⣿⠀⠀⠀⠀⠀⠸⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿
+$2                     .:ooooooolc:. .ooooooooooo'                          $8        `' \*::  :ccllllllllllllllll                       $0      ;KMMMMMMMWXXWMMMMMMMk.                   $x   ⠘⢿⣿⣿⣿⣿⣿⣿⡿⠋⠀⠀⠀⠀⠀⠀⠀⠀⠈⢿⠀⠀⠀⠀⠀⠀⠙⢿⣿⣿⣿⣿⣿⣿⠟⠁
+$2                       .':loooooo;  ,oooooooooc                           $8                        ````''*::cll                       $0        "cooc*"    "*coo'"                     $x     ⠈⠙⠛⠛⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠛⠛⠛⠉⠁
+$2                           ..';::c'  .;loooo:'                            $8                                  ``
 $x
-$yOS:          $zLinux Mint 22.2              Windows 10 Home (22H2)           macOS Ventura 13.7.8    Nobara Linux 44 (KDE Plasma DE)
+$yOS:    $zUbuntu 22.04 (GNOME DE)          Windows 10 Home (22H2)         macOS Ventura 13.7.8     Nobara Linux 44 (KDE Plasma DE)
 $0$yHost: $zASUS Z87 Pro motherboard
 $yCPU: $zIntel(R) Core(TM) i7-4790K (8) @ 4.40 GHz
 $yGPU 1: $zAMD Radeon RX 5600 XT [Discrete]
@@ -456,8 +457,8 @@ $yMemory: $z16 GiB 1866 MT/s DDR3
 $yDisplay (PHL 242S5L): $z1920x1080 in 24", 60 Hz [External]
 $yDisplay (SE2241): $z1920x1080 in 22", 60 Hz [External]
 $y
-$zIn the near future the Linux build will be made on a stock version of Debain 11, for compatibility with older Linux distributions.
-$zIn addition, the following distro's have at some point been used to test, as either a VirtualBox environment or real installation.
+$zIn addition, the following distro's have at some point been used to test, as a real installed OS or VM.  
+$zIn brackets the tested installers. X11 and Wayland are supported. Distro's should have glibc; musl is not supported.
 $x                                  $8                   '                        $0                                             $8                                              $1                                            
 $x         _,met$$$$$gg.            $8                  'o'                       $0           .;ldkO0000Okdl;.                 $8                                              $1        `osssssssssssssssssssso`            
 $x      ,g$$$$$$$$$$$$$$$P.         $8                 'ooo'                      $0       .;d00xl:^''''''^:ok00d;.             $7                     ./$5o$1.                     $1       .osssssssssssssssssssssso.           
@@ -479,38 +480,33 @@ $x              `""""               $8  'ooooi:'`                `'';ioxxo'     
 $x                                  $8 'i:'`                          '':io'      $0            '^:ldxkkkkxdl:^'                $8                                              $1                                            
 $x                                  $8'`                                   `'     $0                                            $8                                              $1                                            
 $z    Debian 11              Artix                 openSUSE               EndeavourOS                ZorinOS   
-$z____________________________________________________________________________________________________________________________________
+$z   (.flatpak)   (.pacman .AppImage .flatpak)  (.flatpak .rpm)        (.pacman .flatpak)    (.deb .AppImage .flatpak)
 $z
-$yTest System 2:
+$z
 $0
-$2                                 .-/+oooooooo+/-.                                     $1             .',;::::;,'.                 
-$2                             `:+oooooooooooooooooo+:`                                 $1         .';:cccccccccccc:;,.               
-$2                           -+oooooooooooooooooooooooo+-                               $1      .;cccccccccccccccccccccc;.                               $1/////////////////  /////////////////
-$2                         .ooooooooooooooooooo$0:ohNd$2oooooo.                             $1    .:cccccccccccccccccccccccccc:.                             $1/////////////////  /////////////////
-$2                        /oooooooooooo$0:/+oo++:/ohNd$2ooooooo/                            $1  .;ccccccccccccc;$0.:dddl:.$1;ccccccc;.                           $1/////////////////  /////////////////
-$2                       +oooooooooo$0:osNdhyyhdNNh+:+$2oooooooo+                           $1 .:ccccccccccccc;$0OWMKOOXMWd$1;ccccccc:.                          $1/////////////////  /////////////////
-$2                      /ooooooooo$0/dN/$2ooooooooo$0/sNNo$2ooooooooo/                          $1.:ccccccccccccc;$0KMMc$1;cc;$0xMMc$1;ccccccc:.                         $1/////////////////  /////////////////
-$2                     .ooooooooo$0oMd:$2oooooooooooo$0:yMy$2ooooooooo.                         $1,cccccccccccccc;$0MMM.$1;cc;$0;WW:$1;cccccccc,                         $1/////////////////  /////////////////
-$2                     +ooooo$0:+o/Md$2oooooo$0:sm/$2oo/ooo$0yMo$2oooooooo+                         $1:cccccccccccccc;$0MMM.$1;cccccccccccccccc:                         $1/////////////////  /////////////////
-$2                     ooo$0:sdMdosMo$2ooooo$0oNMd$2//$0dMd+$2o$0:so$2ooooooooo                         $1:ccccccc;$0oxOOOo$1;$0MMM000k.$1;cccccccccccc:                         $1/////////////////  /////////////////
-$2                     oooo$0+ymdosMo$2ooo$0+mMm$2+/$0hMMMMMh+hs$2ooooooooo                         $1cccccc;$00MMKxdd:$1;$0MMMkddc.$1;cccccccccccc;      
-$2                     +oooooo$0:$2:$0/Nm:$2/$0hMNo$2:y$0MMMMMMMMMM+$2oooooooo+                         $1ccccc;$0XMO'$1;cccc;$0MM.$1;cccccccccccccccc'                          $1/////////////////  /////////////////
-$2                     .ooooooooo$0/NNMNy$2:o$0NMMMMMMMMMMo$2ooooooooo.                         $1ccccc;$0MMo$1;ccccc;$0MMW.$1;ccccccccccccccc;                          $1/////////////////  /////////////////
-$2                     /oooooooooo$0:yh:$2+m$0MMMMMMMMMMd/$2ooooooooo/                          $1ccccc;$00MNc.$1ccc$0.xMMd$1;ccccccccccccccc;                           $1/////////////////  /////////////////
-$2                       +oooooooooo$0+$2/h$0mMMMMMMNds//o$2oooooooo+                           $1cccccc;$0dNMWXXXWM0:$1;cccccccccccccc:,                            $1/////////////////  /////////////////
-$2                        /oooooooooooo$0+:////:o/ymMd$2ooooooo/                            $1cccccccc;$0.:odl:.$1;cccccccccccccc:,.                             $1/////////////////  /////////////////
-$2                         .oooooooooooooooooooo$0/sdh$2oooooo.                             $1ccccccccccccccccccccccccccccc:'.                               $1/////////////////  /////////////////
-$2                           -+oooooooooooooooooooooooo+-                               $1:ccccccccccccccccccc:;,..                                      $1/////////////////  /////////////////
-$2                             `:+oooooooooooooooooo+:`                                 $1 ':cccccccccccccccc::;,.                                       $1/////////////////  /////////////////
+$2                                 .-/+oooooooo+/-.                                     $1             .',;::::;,'.                                      $9          __wgliliiligw_,
+$2                             `:+oooooooooooooooooo+:`                                 $1         .';:cccccccccccc:;,.                                  $9       _williiiiiiliilililw,
+$2                           -+oooooooooooooooooooooooo+-                               $1      .;cccccccccccccccccccccc;.                               $9     _%iiiiiilililiiiiiiiiiii_
+$2                         .ooooooooooooooooooo$0:ohNd$2oooooo.                             $1    .:cccccccccccccccccccccccccc:.                             $9   .Qliiiililiiiiiiililililiilm.
+$2                        /oooooooooooo$0:/+oo++:/ohNd$2ooooooo/                            $1  .;ccccccccccccc;$0.:dddl:.$1;ccccccc;.                           $9  _iiiiiliiiiiililiiiiiiiiiiliil,
+$2                       +oooooooooo$0:osNdhyyhdNNh+:+$2oooooooo+                           $1 .:ccccccccccccc;$0OWMKOOXMWd$1;ccccccc:.                          $9 .lililiiilililiiiilililililiiiii,
+$2                      /ooooooooo$0/dN/$2ooooooooo$0/sNNo$2ooooooooo/                          $1.:ccccccccccccc;$0KMMc$1;cc;$0xMMc$1;ccccccc:.                         $9_liiiiiiliiiiiiiliiiiiF{iiiiiilili,
+$2                     .ooooooooo$0oMd:$2oooooooooooo$0:yMy$2ooooooooo.                         $1,cccccccccccccc;$0MMM.$1;cc;$0;WW:$1;cccccccc,                         $9jliililiiilililiiili@`  ~ililiiiiiL
+$2                     +ooooo$0:+o/Md$2oooooo$0:sm/$2oo/ooo$0yMo$2oooooooo+                         $1:cccccccccccccc;$0MMM.$1;cccccccccccccccc:                         $9iiiliiiiliiiiiiili>`      ~liililii
+$2                     ooo$0:sdMdosMo$2ooooo$0oNMd$2//$0dMd+$2o$0:so$2ooooooooo                         $1:ccccccc;$0oxOOOo$1;$0MMM000k.$1;cccccccccccc:                         $9liliiiliiilililii`         -9liiiil
+$2                     oooo$0+ymdosMo$2ooo$0+mMm$2+/$0hMMMMMh+hs$2ooooooooo                         $1cccccc;$00MMKxdd:$1;$0MMMkddc.$1;cccccccccccc;                         $9iiiiiliiliiiiii~             "4lili
+$2                     +oooooo$0:$2:$0/Nm:$2/$0hMNo$2:y$0MMMMMMMMMM+$2oooooooo+                         $1ccccc;$0XMO'$1;cccc;$0MM.$1;cccccccccccccccc'                          $94ililiiiiilil~|      -w,       )4lf
+$2                     .ooooooooo$0/NNMNy$2:o$0NMMMMMMMMMMo$2ooooooooo.                         $1ccccc;$0MMo$1;ccccc;$0MMW.$1;ccccccccccccccc;                          $9-liiiiililiF'       _liig,       )'
+$2                     /oooooooooo$0:yh:$2+m$0MMMMMMMMMMd/$2ooooooooo/                          $1ccccc;$00MNc.$1ccc$0.xMMd$1;ccccccccccccccc;                           $9 )iiiliii@`       _QIililig,
+$2                       +oooooooooo$0+$2/h$0mMMMMMMNds//o$2oooooooo+                           $1cccccc;$0dNMWXXXWM0:$1;cccccccccccccc:,                            $9  )iiii>`       .Qliliiiililw
+$2                        /oooooooooooo$0+:////:o/ymMd$2ooooooo/                            $1cccccccc;$0.:odl:.$1;cccccccccccccc:,.                             $9   )<>~       .mliiiiiliiiiiil,
+$2                         .oooooooooooooooooooo$0/sdh$2oooooo.                             $1ccccccccccccccccccccccccccccc:'.                               $9            _gllilililiililii~
+$2                           -+oooooooooooooooooooooooo+-                               $1:ccccccccccccccccccc:;,..                                      $9           giliiiiiiiiiiiiT`
+$2                             `:+oooooooooooooooooo+:`                                 $1 ':cccccccccccccccc::;,.                                       $9          -^~$ililili@~~'
 $2                                 .-/+oooooooo+/-.
 $0
-$yOS: $z    Ubuntu Cinnamon 26.04 LTS          Fedora Linux 44 (KDE Plasma)          Windows 11 Home (24H2)
-$yHost: $zDell OptiPlex 3050
-$yCPU: $zIntel(R) Core(TM) i5-7500 (4) @ 3.80 GHz
-$yGPU: $zIntel HD Graphics 630 @ 1.10 GHz [Integrated]
-$yMemory: $z16 GiB DDR4
-$yDisplay (PHILIPS FTV): $z1360x768 in 29", 60 Hz [External]
-$0
+$z       Ubuntu Cinnamon 26.04 LTS          Fedora Linux 44 (KDE Plasma)              Rocky Linux 9
+$z    (.AppImage .deb .flatpak .Snap)        (.AppImage .rpm. .flatpak)                 (.flatpak)
 </ascii>
 
 #### Fonts

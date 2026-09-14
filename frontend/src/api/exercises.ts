@@ -102,10 +102,12 @@ export type ExerciseDetail = {
 
 export type CasAnswerValidationResponse = {
   is_correct: boolean;
+  should_iterate_difficulty: boolean;
 };
 
 export type SolutionValidationResponse = {
   is_correct: boolean;
+  should_iterate_difficulty: boolean;
 };
 
 export type ExerciseStatistics = {
@@ -278,13 +280,14 @@ export async function rateExerciseDifficulty(
   exerciseId: number,
   rating: 'E' | 'M' | 'D',
   confidence: number,
+  iterate: boolean,
 ): Promise<ExerciseStatistics> {
   const response = await fetch(
     `/api/v1/statistics/difficulty?exercise_id=${encodeURIComponent(String(exerciseId))}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rating, confidence }),
+      body: JSON.stringify({ rating, confidence, iterate }),
     },
   );
   if (!response.ok) throw new Error('Failed to save exercise difficulty');

@@ -271,6 +271,7 @@ export function MolecularBookkeepingPage() {
 
   const [casAnswerInput, setCasAnswerInput] = useState('');
   const [casAnswerIsCorrect, setCasAnswerIsCorrect] = useState<boolean | null>(null);
+  const [casShouldIterateDifficulty, setCasShouldIterateDifficulty] = useState(false);
   const [validatingCasAnswer, setValidatingCasAnswer] = useState(false);
   const [cheatBits, setCheatBits] = useState(DEFAULT_CHEATS);
   const [settingsHover, setSettingsHover] = useState(false);
@@ -551,7 +552,7 @@ useEffect(() => {
     useEffect(() => {
       const handleExerciseReset = (event: Event) => {
         const detail = (event as CustomEvent<{ level?: string }>).detail;
-        if (detail.level === 'remove') void loadSolventPreferences();
+        if (detail.level === 'exercise') void loadSolventPreferences();
       };
       window.addEventListener('exercise-reset', handleExerciseReset);
       return () => window.removeEventListener('exercise-reset', handleExerciseReset);
@@ -568,7 +569,7 @@ useEffect(() => {
         if (detail.level !== 'logbook' && detail.level !== 'workspace') await refetchSolution();
         if (detail.level === 'completion' || detail.level === 'progression') {
           await selectExerciseById(selectedExerciseId);
-        } else if (detail.level === 'remove') {
+        } else if (detail.level === 'exercise') {
           const updatedSummaries = await fetchExerciseSummaries();
           setExerciseSummaries(updatedSummaries);
           const selectedIndex = exerciseSummaries.findIndex((exercise) => exercise.id === selectedExerciseId);
@@ -1597,6 +1598,10 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
       try {
         const result = await validateExerciseCasAnswer(selectedExerciseId, normalizedCas);
         setCasAnswerIsCorrect(result.is_correct);
+        setCasShouldIterateDifficulty(result.should_iterate_difficulty);
+        if (result.is_correct) {
+          setSelectedExerciseStatistics(await fetchExerciseStatistics(selectedExerciseId));
+        }
         window.dispatchEvent(new CustomEvent('exercise-statistics-updated', {
           detail: { exerciseId: selectedExerciseId },
         }));
@@ -1726,7 +1731,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
                   </g> </g> </g>
             </svg>
           </button>
-          
+{ /*         
           <button
             type="button"
             title="Open NMR preview"
@@ -1758,6 +1763,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
               fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
           </button>
+*/}
           {selectedExercise ? (
             <div
               aria-label="Current exercise"
@@ -2276,6 +2282,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         <ValidationOverlay
           exerciseId={selectedExerciseId}
           resetKey={`${selectedExerciseId}-${casAnswerInput}`}
+          iterateDifficulty={casShouldIterateDifficulty}
           onRated={() => setCasAnswerIsCorrect(null)}
         />
       )}

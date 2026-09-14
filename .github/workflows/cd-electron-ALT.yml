@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-11-arm, macos-15-intel, ubuntu-24.04-arm]
+        os: [windows-11-arm, macos-15-intel, ubuntu-22.04-arm]
 
     steps:
       - name: Checkout code
@@ -34,9 +34,9 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           cd backend
-          pip install fastapi==0.115.6 uvicorn==0.30.6 pydantic-settings==2.6.1 python-multipart==0.0.12 SQLAlchemy==2.0.36 rdkit==2025.9.3
+          pip install fastapi==0.115.6 uvicorn==0.30.6 pydantic-settings==2.6.1 python-multipart==0.0.12 SQLAlchemy==2.0.36 rdkit==2025.9.3 nmrglue==0.12 matplotlib==3.11.1
           pip install pyinstaller
-          pyinstaller --noconsole --collect-all rdkit --collect-all fastapi --collect-all uvicorn --name molecular-backend main_electron.py
+          pyinstaller --collect-all rdkit --collect-all fastapi --collect-all uvicorn --name molecular-backend main_electron.py
 
       - name: Build Python Backend (Sidecar) for Windows and Linux (arm)
         if: runner.os != 'macOS'

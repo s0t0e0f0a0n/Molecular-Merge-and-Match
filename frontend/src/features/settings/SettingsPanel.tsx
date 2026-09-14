@@ -3,9 +3,9 @@ import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-import InfoMD from '../../INFO.md?raw';
-import ChangelogMD from '../../CHANGELOG.md?raw';
-import AboutMD from '../../ABOUT.md?raw';
+import InfoMD from '../information/INFO.md?raw';
+import ChangelogMD from '../information/CHANGELOG.md?raw';
+import AboutMD from '../information/ABOUT.md?raw';
 import { DEFAULT_CHEATS, normalizeCheatBits } from '../../hooks/useCheating';
 import type { SolventPreference } from '../../api/solvents';
 import type { LinkInheritMode } from '../linking/LinkInheritOptionsPopup';
@@ -470,7 +470,8 @@ export function SettingsPanel({
                 onChange={(value) => onLinkInheritModeChange(value as LinkInheritMode)}
                 title="Choose what should happen with fragment links after merging two fragments."
               />
-        <SelectRow
+{/*
+              <SelectRow
                 id="setting-theme-select"
                 label="Select theme (NOT WORKING)"
                 value={selectedTheme}
@@ -478,6 +479,7 @@ export function SettingsPanel({
                 onChange={onThemeChange}
                 title="Currently, only a light theme is available."
               />
+*/}
               <SelectRow
                 id="setting-preset-select"
                 label="Presets"
@@ -494,7 +496,7 @@ export function SettingsPanel({
                 <div className="settings-solvent-option" style={{ borderBottom: '1px solid #f1f5f9', padding: '12px 14px' }}>                 
                         You can select your preferred notation for each deuterated solvent. 
                         The selected notation will be used in the spectra titles.
-                        The list is ordered by how often the solvent is used in the exercises and excludes the examples and references.
+                        The list is ordered by how often the solvent is used in the exercises, including the examples and references.
                 </div>
               {solventsLoading && <p className="settings-placeholder-text">Loading solvents...</p>}
               {!solventsLoading && solvents.length === 0 && (
