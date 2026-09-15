@@ -7,13 +7,19 @@ Changes and additions since release version 1.0.0 are grouped by:
 3. Bugfixes
 4. Other
 
+### Versions in this document:  
+[v1.4.0](#v1.4.0)  
+[v1.3.0](#v1.3.0)  
+[v1.2.1](#v1.2.1)  
+[v1.1.2](#v1.1.2)  
+
 
 ## v1.4.0
 Changes since version 1.3.0
 
 ## 1. Style/layout additions and changes
-### i. References contain subscript
-References are processed through formatChemistryText to display subscript in the exercise name.  
+### i. Examples 'references' contain subscript
+The deuterated solvents under exercise set 'references' are processed through formatChemistryText to display subscript in the exercise name.  
 /it{} and /notsub{} can be used but in other parts of the program you will see this as plain text, so only the automatic subscript is useful.
 
 ### ii. Succesfull validation overlay
@@ -22,7 +28,7 @@ The user is asked to answer the difficult question of HOW difficult the exercise
 This overlay also hides some visual otherwise annoying flickering when exercises are reloaded because a lot of data is written and retrieved from the database at this point.
 
 ### iii. Exercise names sorting
-Exercise names are nor listed using natural sorting. So exercise uploaded / created in a strange order, don't seem out of order.
+Exercise names are now listed using natural sorting. So exercises uploaded / created in a strange order, don't seem out of order.
 
 ### iv. Green checkmarks update
 The green checkmark has now an SVG style instead of unicode character U2713. 
@@ -67,7 +73,7 @@ Which cheats a users has turned on when an exercise is completed is now stored i
 ### iv. Visual upload progression bar
 When uploading exercises or patches, you will see the progression visually.
 
-### v. Checkmark en timer functionality
+### v. Checkmark and timer functionality
 Because of the addition of statistics and the future implementation of spaced repetition,
  the database fields used for controll over the visual checkmarks have been changed.
 
@@ -76,7 +82,9 @@ You can partially reset exercises to re-do them.
 When an exercise has been succesfully completed before and is partially reset, the green round checkmark symbol is replaced with the previous unicode U2713.
 
 ## 4. Bugfixes
-### i. Since last version the wrong warning icon was displayed alongside the correct one when too many atoms where used in the answer of linked fragments. This has been corrected.
+
+### i. Double warning icon displayed 
+Since last version the wrong warning icon was displayed alongside the correct one when too many atoms where used in the answer of linked fragments. This has been corrected.
 
 ### ii. Cleanup of API requests
 The data requested from the database and written to the database was carried out in a less sufficient way before because of incremental implementation of statistics features.  
