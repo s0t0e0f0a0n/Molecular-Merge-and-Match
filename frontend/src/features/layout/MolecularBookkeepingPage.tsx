@@ -910,14 +910,14 @@ const handleApplyPreset = useCallback(
   [applyIncomingSettings],
 );
 
-const handleThemeChange = useCallback(
-  (theme: string) => {
-    setSelectedTheme(theme);
-    setSelectedPreset('User');
-    void persistUserSettings({ theme });
-  },
-  [persistUserSettings],
-);
+//const handleThemeChange = useCallback(
+//  (theme: string) => {
+//    setSelectedTheme(theme);
+//    setSelectedPreset('User');
+//    void persistUserSettings({ theme });
+//  },
+//  [persistUserSettings],
+//);
 
 const handleShowCASValidationChange = useCallback(
   (value: boolean) => {
