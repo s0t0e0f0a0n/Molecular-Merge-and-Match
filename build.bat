@@ -33,7 +33,7 @@ call venv\Scripts\activate
 
 :: call python -m pip install --upgrade pip
 call pip install -r requirements.txt
-call pip install pyinstaller tzdata
+call pip install pyinstaller
 :: Force a true fresh rebuild by wiping old PyInstaller cache and distribution outputs
 echo Purging old PyInstaller cache and build artifacts...
 if exist build rmdir /s /q build

@@ -20,9 +20,9 @@ type SettingsPanelProps = {
   onClose: () => void;
   linkInheritMode: LinkInheritMode;
   onLinkInheritModeChange: (value: LinkInheritMode) => void;
-  selectedTheme: string;
-  availableThemes: string[];
-  onThemeChange: (value: string) => void;
+//  selectedTheme: string;
+//  availableThemes: string[];
+//  onThemeChange: (value: string) => void;
   selectedPreset: string;
   availablePresets: string[];
   onPresetChange: (value: string) => void;
@@ -316,9 +316,9 @@ export function SettingsPanel({
   onClose,
   linkInheritMode,
   onLinkInheritModeChange,
-  selectedTheme,
-  availableThemes,
-  onThemeChange,
+//  selectedTheme,
+//  availableThemes,
+//  onThemeChange,
   selectedPreset,
   availablePresets,
   onPresetChange,

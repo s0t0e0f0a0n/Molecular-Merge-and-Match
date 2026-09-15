@@ -138,7 +138,7 @@ def test_reset_batch_remove_deletes_exercise_and_dependents(client):
     exercise_id = _seed_exercise()
     response = client.post(
         "/api/v1/exercises/reset-batch",
-        json={"exercise_ids": [exercise_id], "level": "remove"},
+        json={"exercise_ids": [exercise_id], "level": "exercise"},
     )
     assert response.status_code == 204
     assert _counts(exercise_id) == {key: 0 for key in _counts(exercise_id)}

@@ -12,8 +12,9 @@ Changes and additions since release version 1.0.0 are grouped by:
 Changes since version 1.3.0
 
 ## 1. Style/layout additions and changes
-### i. References contain italics
-References are processed through formatChemistryText to display italics and subscript in the exercise name.
+### i. References contain subscript
+References are processed through formatChemistryText to display subscript in the exercise name.  
+/it{} and /notsub{} can be used but in other parts of the program you will see this as plain text, so only the automatic subscript is useful.
 
 ### ii. Succesfull validation overlay
 When an exercise is validated to be correct, an overlay is displayed which you cannot ignore. 

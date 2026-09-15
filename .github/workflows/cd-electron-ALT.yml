@@ -19,14 +19,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-11-arm, macos-15-intel, ubuntu-22.04-arm]
-
+        os: [macos-15-intel]
+        # also include windows-11-arm and ubuntu-22.04-arm when required
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -53,7 +53,7 @@ jobs:
           mv backend/dist/molecular-backend/* resources/bin/
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
 
@@ -87,7 +87,7 @@ jobs:
 
       - name: Build and Publish with electron-builder
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.VERIFY_ACTIONS_RELEASE }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
         # Passing --${{ matrix.arch }} forces electron-builder to strictly compile for the matrix host's architecture
         run: npm run dist -- -p always

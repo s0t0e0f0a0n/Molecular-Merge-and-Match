@@ -2293,9 +2293,9 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         onClose={() => setSettingsPanelOpen(false)}
         linkInheritMode={linkInheritMode}
         onLinkInheritModeChange={handleChangeLinkInheritMode}
-        selectedTheme={selectedTheme}
-        availableThemes={['Light']}
-        onThemeChange={handleThemeChange}
+       // selectedTheme={selectedTheme}
+       // availableThemes={['Light']}
+       // onThemeChange={handleThemeChange}
         selectedPreset={selectedPreset}
         availablePresets={availablePresets}
         onPresetChange={handleApplyPreset}

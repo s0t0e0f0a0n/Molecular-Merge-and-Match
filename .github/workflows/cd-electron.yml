@@ -46,7 +46,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version: '22'
 
       - name: Install RPM and PACMAN dependencies and tools
         if: runner.os == 'Linux'
@@ -78,7 +78,7 @@ jobs:
 
       - name: Build and Publish with electron-builder
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.VERIFY_ACTIONS_RELEASE }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
         # Passing --${{ matrix.arch }} forces electron-builder to strictly compile for the matrix host's architecture
         run: npm run dist -- -p always

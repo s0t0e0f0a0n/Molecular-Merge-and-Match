@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
-from pathlib import Path, PurePosixPath
 import shutil
 import tempfile
+from datetime import datetime
+from pathlib import Path, PurePosixPath
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
@@ -243,7 +243,7 @@ def _pulse_program_steps(dataset_path: Path, metadata: dict) -> list[dict[str, s
         label = first_token
         channel = "sequence"
         f1_level = 0.0
-        step_f2_level = f2_level
+    #    step_f2_level = f2_level
         if first_token == "d1":
             label = "DELTA (relaxation)"
         elif first_token == "d11":
@@ -268,7 +268,8 @@ def _pulse_program_steps(dataset_path: Path, metadata: dict) -> list[dict[str, s
             f2_level = 0.0
         elif "cpd2:f2" in line:
             f2_level = f2_power or 1.0
-        step_f2_level = f2_level
+
+      #  step_f2_level = f2_level
 
         steps.append({
             "label": label,
@@ -414,8 +415,8 @@ def _envelope_indexes(values, maximum: int):
 def _process_nmr(processing: NmrProcessingIn) -> NmrPreviewOut:
     try:
         import nmrglue as ng
-        from nmrglue.process import proc_autophase, proc_bl
         import numpy as np
+        from nmrglue.process import proc_autophase, proc_bl
     except ModuleNotFoundError as error:
         raise HTTPException(
             status_code=503,

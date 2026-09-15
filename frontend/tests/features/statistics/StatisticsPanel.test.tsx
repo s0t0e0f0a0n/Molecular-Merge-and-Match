@@ -34,7 +34,7 @@ function renderResetPanel() {
   );
 }
 
-const levels = ['logbook', 'workspace', 'completion', 'progression', 'remove'] as const;
+const levels = ['logbook', 'workspace', 'completion', 'progression', 'exercise'] as const;
 
 type User = ReturnType<typeof userEvent.setup>;
 

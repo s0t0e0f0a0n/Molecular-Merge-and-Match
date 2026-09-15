@@ -1,7 +1,7 @@
 [
   {
     "exercise": {
-      "name": "acetone-/it{d6}",
+      "name": "acetone-d6",
       "molecular_formula": "C3[2]H6O",
       "exercise_set": "References",
       "tags_csv": "%tag{8},%tag{9},%tag{10}",
@@ -18,7 +18,7 @@
       "c13_alt_text": "13C-NMR (Acetone, 75 MHz): 206.13 (s, 1), 29.84 (hept, J = 19.4 Hz, 2);",
       "c13_frequency_mhz": 75.0,
       "c13_solvent": "%solv{7}",
-      "c13_apt": true,
+	    "c13_apt": true,
       "completed": true,
       "solution_inchi_hash": "7b3928f4e29c0ca0bb70f04abcacdaa561e057950482dcb1e0b5c7a3612f8378",
       "solution_cas_hash": "c2f4b7b448cfe55bd38667b359c98c1253e519f5bb09cca8ad00944ee40d259c",
@@ -109,7 +109,7 @@
   },
   {
     "exercise": {
-      "name": "acetonitrile-/it{d3}",
+      "name": "acetonitrile-d3",
       "molecular_formula": "C2[2]H3N",
       "exercise_set": "References",
       "tags_csv": "%tag{8},%tag{9},%tag{10}",
@@ -217,7 +217,7 @@
   },  
   {
     "exercise": {
-      "name": "benzene-/it{d6}",
+      "name": "benzene-d6",
       "molecular_formula": "C6[2]H6",
       "exercise_set": "References",
       "tags_csv": "%tag{8},%tag{9},%tag{10}",
@@ -286,7 +286,7 @@
   },
   {
     "exercise": {
-      "name": "chloroform-/it{d}",
+      "name": "chloroform-d",
       "molecular_formula": "C[2]HCl3",
       "exercise_set": "References",
       "tags_csv": "%tag{8},%tag{9},%tag{10}",
@@ -362,7 +362,7 @@
   },
   {
     "exercise": {
-      "name": "dimethylsulfoxide-/it{d6}",
+      "name": "dimethylsulfoxide-d6",
       "molecular_formula": "C2[2]H6OS",
       "exercise_set": "References",
       "tags_csv": "%tag{8},%tag{9},%tag{10}",
@@ -451,7 +451,7 @@
   },
   {
     "exercise": {
-      "name": "methanol-/it{d4}",
+      "name": "methanol-d4",
       "molecular_formula": "C[2]H4O",
       "exercise_set": "References",
       "tags_csv": "%tag{8},%tag{9},%tag{10}",
@@ -540,7 +540,7 @@
   },
   {
     "exercise": {
-      "name": "water-/it{d2}",
+      "name": "water-d2",
       "molecular_formula": "[2]H2O",
       "exercise_set": "References",
       "tags_csv": "%tag{8},%tag{9},%tag{10}",
@@ -691,7 +691,7 @@
       "c13_frequency_mhz": 126.0,
       "c13_solvent": "%solv{5}",
       "c13_apt": true,
-      "completed": false,
+      "completed": true,
       "solution_inchi_hash": "f55c3ff3ff10c1cead53ca1dd27cf9cb91e33f5787251b1e4dd34405d834c4a8",
       "solution_cas_hash": "f9d2c5db3a58b02126616c5c939890387bf51b1b135c32fdff04cf2fb2d5b699",
       "h1_data_source": "av500/Stefan1811biosyn/29",
