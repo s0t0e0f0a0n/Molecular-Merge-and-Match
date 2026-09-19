@@ -1670,7 +1670,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <img
-            src={`${import.meta.env.BASE_URL}atom.png`}
+            src={`${import.meta.env.BASE_URL}logo5.svg`}
             alt="Molecular Merge and Match"
             title="Molecular Merge and Match"
             style={{ width: 36, height: 36, verticalAlign: 'middle' }}

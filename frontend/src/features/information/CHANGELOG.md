@@ -81,6 +81,9 @@ Because of the addition of statistics and the future implementation of spaced re
 You can partially reset exercises to re-do them.  
 When an exercise has been succesfully completed before and is partially reset, the green round checkmark symbol is replaced with the previous unicode U2713.
 
+### vii. Exercise filters
+Exercises can now be filtered with "show only incomplete exercises". This ignores the AND / OR selection of other tags.
+
 ## 4. Bugfixes
 
 ### i. Double warning icon displayed 

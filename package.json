@@ -12,8 +12,7 @@
     "clean:unix": "rm -rf dist-electron frontend/dist",
     "clean": "npm run clean:win 2>nul || npm run clean:unix",
     "dist": "electron-builder",
-    "postinstall": "electron-builder install-app-deps",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "postinstall": "electron-builder install-app-deps"
   },
   "build": {
     "appId": "com.svdv.molecularmergeandmatch",
@@ -123,7 +122,7 @@
   "author": "S. van der Vorm & LUDev <s.van.der.vorm@chem.leidenuniv.nl>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/s0t0e0f0a0n/Molecular-Merge-and-Match"
+    "url": "https://github.com/s0t0e0f0a0n/Molecular-Merge-and-Match/issues"
   },
   "homepage": "https://github.com/s0t0e0f0a0n/Molecular-Merge-and-Match#readme",
   "type": "commonjs"

@@ -51,6 +51,93 @@
 
 }
 
+/* Niet zo doen, de meeste elementen hebben gefixeerde kleuren
+html {
+  color-scheme: light dark
+}
+.markdown-body code:not(pre code) {
+  background-color: rgba(175, 184, 193, 0.2); 
+.markdown-body pre {
+  background-color: #f6f8fa; 
+
+.markdown-body blockquote {
+  background-color:  
+
+.markdown-body table th,
+.markdown-body table td {
+
+  border: 1px solid 
+}
+// eerst alle huidige kleurtjes verzamelen
+// markdown verwerkt
+:root {
+  --bkgr
+  --bkgrhover: #e0e0e0;
+  --bkgrsub: #f6f8fa; ook rgba(175, 184, 193, 0.2); 
+  --textmain: #24292f;
+  --textsub: #555555;
+  --border: #cccccc
+  --border-bottom: #d8dee4;
+  --border-table: #d0d7de;
+  --ketcher-error: #c00;
+  --el-input
+  --el-inputfix
+  --el-selecton
+  --el-selectoff
+  --el-check-and-slide: #2196f3;
+  --el-delete-hover
+  --el-svg: #111111;
+  --el-chkmark-complete
+  --el-chkmark-incomplete
+  --el-chkmark-incorrect
+  --el-bluebut-txt: #1565C0;
+  --el-greenbut-txt: #2E7D32;
+  --el-orangebut-txt: #E65100;
+  --el-yellowbut-txt
+  --el-bluebut-bkgr: #E3F2FD;
+  --el-greenbut-bkgr: #E8F5E9;
+  --el-orangebut-bkgr: #FFF3E0;
+  --el-yellowbut-bkgr
+  --el-bluebut-bor: #2196F3;
+  --el-greenbut-bor: #4CAF50;
+  --el-orangebut-bor: #FF5722;
+  --el-yellowbut-bor
+  --el-redbut
+  --el-slideon
+  --el-slideoff
+  --el-slidenone
+  --spec-integral
+  --spec-bkgr
+  --spec-text
+  --spec-hover
+  --titlebkgr
+  --frag-hover
+  --frag-select
+  --logo-fix
+  --logo-gradient
+  --stat-complete
+  --stat-cheat
+  --stat-incorrect
+  --stat-incomplete
+  --stat-refset
+  --stat-log1
+  --stat-log2
+  --stat-log3
+
+  Overgeslagen: stereochoicedialog, rdkitviewer, fragmentlist
+Borderbottom van Header.tsx is #4000ff maar waar is dat ooit zichtbaar?
+
+Groene titel ='#0f5f0f
+Grijze velden zijn vaak ook zo:
+rgba(0, 0, 0, 0.50) voor border
+rgba(0, 0, 0, 0.25) voor shadow / achtergrond, ook andere opacity (0.14)
+
+*/
+
+
+
+
+
 /* ==========================================================================
    2. Font Face Declarations (Modernized Formats)
    ========================================================================== */

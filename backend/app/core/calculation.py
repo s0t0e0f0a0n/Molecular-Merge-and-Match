@@ -10,7 +10,7 @@ def calculate_dbe(atom_counts: dict[str, int]) -> float:
     n = sum(atom_counts.get(symbol, 0) for symbol in ["N", "P", "B"])
     x = sum(
         atom_counts.get(symbol, 0)
-        for symbol in ["F", "Cl", "Br", "I", "D", "[2]H", "[2H]"]
+        for symbol in ["F", "Cl", "Br", "I", "D", "[2]H", "[2H]", "K", "Na"]
     )
 
     return c + 1 - (h + x - n) / 2

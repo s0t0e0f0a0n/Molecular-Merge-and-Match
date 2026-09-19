@@ -136,7 +136,7 @@ def _finalize_timer(row: Statistics, stopped_at: datetime, *, count_short_elapse
 
     row.stop_counting = stopped_at
     elapsed_seconds = (row.stop_counting - row.start_counting).total_seconds()
-    if count_short_elapsed or elapsed_seconds >= 20:
+    if count_short_elapsed or elapsed_seconds >= 10:
         row.timer_total += int(max(0, elapsed_seconds))
 
 
@@ -151,7 +151,7 @@ def mark_exercise_selected(exercise_id: int | str) -> None:
         if created or row.started_at is None:
             row.started_at = datetime.now()
         if _exercise_is_incomplete(db, exercise_id):
-            row.start_counting = datetime.now() + timedelta(seconds=5)
+            row.start_counting = datetime.now() + timedelta(seconds=3)
             row.stop_counting = None
         db.commit()
         db.refresh(row)
