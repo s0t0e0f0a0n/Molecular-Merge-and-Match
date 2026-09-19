@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Query
@@ -21,7 +22,14 @@ def reset_exercises(body: ResetExercisesRequest) -> None:
     with get_db() as db:
         for exercise_id in set(body.exercise_ids):
             keys = (str(exercise_id), f"exercise-{exercise_id}")
-            db.query(LogbookState).filter(LogbookState.exercise_id.in_(keys)).delete(synchronize_session=False)
+            if body.level in {"logbook", "workspace", "completion"}:
+                # Keep the logbook data, but mark it as archived.
+                db.query(LogbookState).filter(LogbookState.exercise_id.in_(keys)).update(
+                    {LogbookState.archived: datetime.now()},
+                    synchronize_session=False,
+                )
+            if body.level in {"progression", "exercise"}:
+                db.query(LogbookState).filter(LogbookState.exercise_id.in_(keys)).delete(synchronize_session=False)
             if body.level in {"workspace", "completion", "progression", "exercise"}:
                 db.query(Fragment).filter(Fragment.exercise_id.in_(keys)).delete(synchronize_session=False)
                 db.query(WorkingSolution).filter(WorkingSolution.exercise_id.in_(keys)).delete(synchronize_session=False)

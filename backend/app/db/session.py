@@ -18,6 +18,7 @@ from app.db.models import (
     ExerciseC13Peak,
     ExerciseH1Peak,
     Fragment,
+    LogbookState,
     PredefinedFragment,
     SolventsUsed,
     TagsUsed,
@@ -588,6 +589,13 @@ def _migrate_add_missing_columns() -> None:
         existing_fragment = {row[1] for row in result_fragment}
         if "annotation" not in existing_fragment:
             conn.execute(text("ALTER TABLE fragments ADD COLUMN annotation TEXT"))
+            conn.commit()
+
+        # Update Logbook model
+        result_fragment = conn.execute(text("PRAGMA table_info(logbook_states)"))
+        existing_fragment = {row[1] for row in result_fragment}
+        if "archived" not in existing_fragment:
+            conn.execute(text("ALTER TABLE logbook_states ADD COLUMN archived DATETIME"))
             conn.commit()
 
         # Update C13 peaks model for older database versions

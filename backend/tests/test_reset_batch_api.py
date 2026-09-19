@@ -73,6 +73,10 @@ def _counts(exercise_id: int) -> dict[str, int]:
             "fragment": db.query(Fragment).filter(Fragment.exercise_id == f"exercise-{exercise_id}").count(),
             "solution": db.query(WorkingSolution).filter(WorkingSolution.exercise_id == f"exercise-{exercise_id}").count(),
             "logbook": db.query(LogbookState).filter(LogbookState.exercise_id == f"exercise-{exercise_id}").count(),
+            "logbook_archived": db.query(LogbookState).filter(
+                LogbookState.exercise_id == f"exercise-{exercise_id}",
+                LogbookState.archived.isnot(None),
+            ).count(),
             "statistics": db.query(Statistics).filter(Statistics.exercise_id == str(exercise_id)).count(),
         }
     finally:
@@ -96,7 +100,13 @@ def test_reset_batch_escalation_levels(client, level):
     assert counts["alt"] == 1
     assert counts["additional"] == 1
 
-    assert counts["logbook"] == 0
+    if level in {"logbook", "workspace", "completion"}:
+        # Logbook data is kept, but marked as archived.
+        assert counts["logbook"] == 1
+        assert counts["logbook_archived"] == 1
+    else:
+        assert counts["logbook"] == 0
+        assert counts["logbook_archived"] == 0
     if level == "logbook":
         assert counts["fragment"] == 1
         assert counts["solution"] == 1

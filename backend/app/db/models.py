@@ -264,6 +264,9 @@ class LogbookState(Base):
     entries_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     cursor: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     links_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    archived: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=False), nullable=True, default=None
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,
