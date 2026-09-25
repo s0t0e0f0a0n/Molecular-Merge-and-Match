@@ -9,7 +9,7 @@ cd backend
 python -m venv venv
 
 # macOS / Linux
-source venv/bin/activate
+. venv/bin/activate
 # Windows
 venv\Scripts\activate
 
@@ -30,14 +30,6 @@ Spectrum SVGs and additional spectra are stored under `data/uploads/` and served
 | `data/uploads/exercises/h1/` | 1H-NMR SVGs |
 | `data/uploads/exercises/c13/` | 13C-NMR SVGs |
 | `data/uploads/exercises/additional/` | Additional spectra (IR, MS, …) |
-
-## One-off scripts
-
-**`import_ir_spectra.py`** — matches exercises in the DB to their CSV problem numbers via formula + ppm-overlap scoring, then copies `{N}_IR.svg` files into `data/uploads/exercises/additional/` and registers them in `exercise_additional_spectra`. Run once after placing the Base Set SVGs in `data/uploads/`.
-
-```bash
-python import_ir_spectra.py
-```
 
 ## Tests & linting
 

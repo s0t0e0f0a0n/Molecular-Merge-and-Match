@@ -21,10 +21,11 @@ Built for the Software Engineering course at Leiden University (2026).
 ## Project Structure
 
 ```
-2026-18-Molecular_Bookkeeping_for_structural_analysis/
+Molecular Merge and Match
 ├── .github/
 │   └── workflows/
 │       ├── cd-backend.yml           # CD: build & publish backend Docker image (triggers on backend/** changes)
+│       ├── cd-electron-ALT.yml      # CD: build & publish alternative installers (manual trigger or *alt in tags)
 │       ├── cd-electron.yml          # CD: build & publish app installers (triggers on version tags or manually in github actions)
 │       ├── cd-frontend.yml          # CD: build & publish frontend Docker image (triggers on frontend/** changes)
 │       ├── ci.yml                   # CI: lint + typecheck + tests on every PR and relevant push to main
@@ -32,27 +33,36 @@ Built for the Software Engineering course at Leiden University (2026).
 │
 ├── backend/
 │   ├── app/
-│   │   ├── main.py                  # FastAPI application factory, CORS setup, startup events
 │   │   ├── api/
 │   │   │   ├── exercises.py         # GET /api/v1/exercises/ and POST /api/v1/exercises
 │   │   │   ├── fragments.py         # CRUD API for working fragments per exercise
 │   │   │   ├── health.py            # GET /api/v1/health
 │   │   │   ├── info.py              # GET /api/v1/info
 │   │   │   ├── logbook.py           # GET/PUT/DELETE for logbook state
+│   │   │   ├── nmr_preview.py
 │   │   │   ├── predefined_fragments.py # CRUD API for predefined fragment library
 │   │   │   ├── reset.py             # POST to delete fragments, working solution, logbook with current exercise id.
 │   │   │   ├── router.py            # Aggregates all v1 routers under /api/v1
 │   │   │   ├── settings.py          # GET/PUT for changing user settings (the link inheritance behaviour)
-│   │   │   ├── warnings.py             # GET /api/v1/warnings
+│   │   │   ├── solvents.py
+│   │   │   ├── spacedrep.py
+│   │   │   ├── statistics.py
+│   │   │   ├── tags.py
+│   │   │   ├── warnings.py          # GET /api/v1/warnings
 │   │   │   └── working_solution.py  # GET/PUT/DELETE for the working solution per exercise
 │   │   ├── core/
+│   │   │   ├── calculation.py
 │   │   │   └── config.py            # Pydantic-based settings from environment variables
-│   │   └── db/
-│   │       ├── base.py              # SQLAlchemy DeclarativeBase
-│   │       ├── models.py            # ORM models (Fragment, WorkingSolution, PredefinedFragment, Exercise)
-│   │       └── session.py           # Engine, session factory, init_db()
-│   ├── data/
-│   │   ├── examples/                 # Example spectra (SVG)
+│   │   │   ├── solvent_tokens.py
+│   │   │   └── tag_tokens.py
+│   │   ├── db
+│   │   │   ├── base.py              # SQLAlchemy DeclarativeBase
+│   │   │   ├── models.py            # ORM models (Fragment, WorkingSolution, PredefinedFragment, Exercise)
+│   │   │   └── session.py           # Engine, session factory, init_db()
+│   │   └── main.py                  # FastAPI application factory, CORS setup, startup events
+│   ├── data/
+│   │   ├── examples/                # Example spectra (SVG)
+│   │   ├── references/              # Reference spectra (SVG)
 │   │   ├── uploads/
 │   │   │   └── exercises/
 │   │   │       ├── additional/      # Additional spectra (IR, MS, …)
@@ -60,7 +70,11 @@ Built for the Software Engineering course at Leiden University (2026).
 │   │   │       └── h1/              # 1H-NMR SVGs
 │   │   ├── app.db                   # SQLite database (created at runtime)
 │   │   ├── examples_seed.json       # Seed containing example exercises which are imported when the database is created.
-│   │   └── predefined_fragments_seed.json # Seed data for predefined fragment library
+│   │   ├── predefined_fragments_seed.json # Seed data for predefined fragment library
+│   │   ├── preloaded_fragments_seed.json # Seed data for preloaded fragments
+│   │   ├── preloaded_solutions_seed.json # Seed data for preloaded solutions
+│   │   ├── solvent_seed.json        # Seed data for predefined solvents
+│   │   └── tags_seed.json           # Seed data for predefined tags
 │   ├── tests/
 │   │   ├── conftest.py              # TestClient fixture
 │   │   ├── test_exercises_api.py    # Exercises endpoint tests
@@ -69,7 +83,10 @@ Built for the Software Engineering course at Leiden University (2026).
 │   │   ├── test_logbook_api.py      # Logbook testing
 │   │   ├── test_predefined_fragments_api.py # Predefined fragment tests
 │   │   ├── test_reset_api.py        # test resetting a single exercise
-│   │   ├── test_seeded_cas_answers.py # test to confirm that validation through cas hash works
+│   │   ├── test_reset_batch_api.py  # Test resetting multiple exercises
+│   │   ├── test_seeded_cas_answers.py # Test to confirm that validation through cas hash works
+│   │   ├── test_statistics_api.py
+│   │   ├── test_tags_api.py
 │   │   └── test_warnings.py         # Tests on how SMILES are converted to atom count and DBE
 │   ├── Dockerfile                   # Container image for the backend
 │   ├── main_electron.py             # Build entry point for Python sidecar executable
@@ -77,29 +94,39 @@ Built for the Software Engineering course at Leiden University (2026).
 │   ├── README.md                    # Backend readme
 │   ├── requirements.txt             # Python runtime dependencies
 │   └── requirements-dev.txt         # Dev/test dependencies (pytest, ruff)
-│
+|
 ├── build-assets/
-│   ├── icon.icns
-│   └── icon.png                     # Icon for Electron app (min. 256x256px, .png or .ico)
+│   ├── icon.icns                    # Icon for Electron app on Mac
+│   ├── icon_mac.svg                 # Icon for Electron app on Mac
+│   ├── icon.png                     # Icon for Electron app (min. 256x256px, .png or .ico)
+│   └── icon.svg                     # Icon for Electron app (min. 256x256px, .png or .ico)
 │
 ├── docs/
-│   └── architecture-decisions.md     # Technical decision records
-│   └── installation-guide.md        # How to install the application on Windows, MACOS and Linux
-│   └── packaging.md                 # Walkthrough guide for building the app with Electron-builder
+│   ├── architecture-decisions.md    # Technical decision records
+│   ├── installation-guide.md        # How to install the application on Windows, MACOS and Linux
+│   ├── packaging.md                 # Walkthrough guide for building the app with Electron-builder
+│   └── README-tech.md               # Original README.md file for the LUDev project, updated project structure
 │
 ├── frontend/
-│   ├── src/
-│   │   ├── App.tsx                  # Root component
-│   │   ├── index.css                # General style file
-│   │   ├── main.tsx                 # React entry point
-│   │   ├── vite-env.d.ts            # TypeScript declarations for Vite-specific features
+│   ├── public/
+│   │   ├── chemisch_afval.svg
+│   │   ├── coffee.svg
+│   │   ├── logo.svg
+│   │   ├── RDKit_minimal.js*
+│   │   ├── RDKit_minimal.wasm*
+│   │   └── use_cheats.svg
+│   ├── src/
 │   │   ├── api/
 │   │   │   ├── exercises.ts         # Centralized fetch helper for /api/v1/exercises (CRUD + validation + reset)
 │   │   │   ├── logbook.ts           # Handles fetching, saving, and deleting logbook data through the API
-│   │   │   └── settings.ts          # Centrelized GET/PUT helper for /api/v1
+│   │   │   ├── reset.ts
+│   │   │   ├── settings.ts          # Centrelized GET/PUT helper for /api/v1
+│   │   │   ├── solvents.ts
+│   │   │   └── tags.ts
 │   │   ├── components/
 │   │   │   ├── ApiStatus.tsx        # Backend connectivity indicator
 │   │   │   ├── Container.tsx        # Content container
+│   │   │   ├── DifficultyRating.tsx
 │   │   │   ├── ExpandedMoleculeView.tsx # Popup window to enlarge the molecule during merging
 │   │   │   ├── FragmentList.tsx     # Shared fragment list with atom merge overlays
 │   │   │   ├── fragmentTypes.ts     # Shared fragment type definitions
@@ -110,94 +137,133 @@ Built for the Software Engineering course at Leiden University (2026).
 │   │   │   ├── RDKitViewer.tsx      # RDKit molecule viewer with descriptor computation
 │   │   │   └── StereoChoiceDialog.tsx # Cis/trans configuration dialog after merge
 │   │   ├── context/
-│   │   │   ├── ExerciseDataContext.tsx    # React context provider for data of the selected exercise
-│   │   │   ├── HistoryContext.tsx      # React context provider for the logbook
-│   │   │   ├── RDKitContext.tsx        # React context provider for RDKit WASM instance
-│   │   │   └── WarningContext.tsx      # React context provider for data of the warnings
+│   │   │   ├── ExerciseDataContext.tsx # React context provider for data of the selected exercise
+│   │   │   ├── HistoryContext.tsx   # React context provider for the logbook
+│   │   │   ├── RDKitContext.tsx     # React context provider for RDKit WASM instance
+│   │   │   └── WarningContext.tsx   # React context provider for data of the warnings
 │   │   ├── features/
 │   │   │   ├── exercises/
-│   │   │   │   ├── ExerciseCreationForm.tsx       # Form for creating exercises
-│   │   │   │   ├── ExerciseImportUtils.ts           # Parsing of the data, both from ZIP and manual input
-│   │   │   │   └── ExerciseZipImport.tsx          # ZIP-based bulk exercise import (CSV manifest + spectra)
+│   │   │   │   ├── ExerciseCreationForm.tsx # Form for creating exercises
+│   │   │   │   ├── ExerciseImportUtils.ts   # Parsing of the data, both from ZIP and manual input
+│   │   │   │   ├── ExerciseMenu.tsx
+│   │   │   │   └── ExerciseZipImport.tsx    # ZIP-based bulk exercise import (CSV manifest + spectra)
 │   │   │   ├── history/
-│   │   │   │   └── LogbookPanel.tsx               # Collapsible logbook panel
+│   │   │   │   └── LogbookPanel.tsx         # Collapsible logbook panel
+│   │   │   ├── information/
+│   │   │   │   ├── ABOUT.md
+│   │   │   │   ├── CHANGELOG.md
+│   │   │   │   ├── INFO.md
+│   │   │   │   └── InfoPanel.tsx
 │   │   │   ├── layout/
 │   │   │   │   ├── LoadingExerciseOverlay.tsx     # Loading screen, when loading an exercise
 │   │   │   │   └── MolecularBookkeepingPage.tsx   # Main dashboard layout, merge orchestration. 
 │   │   │   ├── linking/
-│   │   │   │   ├── LinkInheritOptionsPopup.tsx       # Popup to change link inheritance settings
+│   │   │   │   ├── LinkInheritOptionsPopup.tsx    # Popup to change link inheritance settings
 │   │   │   │   ├── PeakTableColumn.tsx            # Peak list component
 │   │   │   │   └── WorkingFragmentsStrip.tsx      # Bottom fragment strip with merge/link controls
 │   │   │   ├── molecule/
 │   │   │   │   ├── MoleculeEditorPopup.tsx        # Draggable floating editor popup
 │   │   │   │   ├── MoleculeWorkspace.tsx          # Toggle between Ketcher editor and RDKit viewer
 │   │   │   │   └── PredefinedFragmentMenu.tsx     # Dropdown overlay for browsing/adding predefined fragments
+│   │   │   ├── settings/
+│   │   │   │   └── SettingsPanel.tsx
 │   │   │   ├── solution/
 │   │   │   │   └── WorkingSolutionPanel.tsx       # Working solution display with merge atom overlays
+│   │   │   ├── statistics/
+│   │   │   │   ├── StatisticsPanel.tsx
+│   │   │   │   └── TimingPanel.tsx
 │   │   │   ├── viewingSpectra/
 │   │   │   │   ├── AdditionalSpectraPopup.tsx     # Modal popup with tabs for additional spectra (IR, MS, …)
-│   │   │   │   └── SpectraPrototype.tsx           # Interactive 1H/13C-NMR spectrum display
+│   │   │   │   ├── SpectraPrototype.tsx           # Interactive 1H/13C-NMR spectrum display
+│   │   │   │   └── svgFontOverride.ts
 │   │   │   └── warning/
-│   │   │       ├── atom_count.svg                   # warning icon to be displayed when there are to many atoms or DBE
-│   │   │       ├── double_assignment.svg           # warning icon to be displayed when more than one fragment is linked to a peak
+│   │   │       ├── atom_count.svg                 # warning icon to be displayed when there are to many atoms or DBE
+│   │   │       ├── double_assignment.svg          # warning icon to be displayed when more than one fragment is linked to a peak
 │   │   │       └── WarningPanel.tsx               # Warnings are shown is this box
-│   │   ├── hooks/
+|   |   |
+│   │   ├── fonts/
+│   │   │   ├── NotoSansMono-VariableFont_wdth,wght.ttf
+│   │   │   ├── NotoSansMono-VariableFont_wdth,wght.woff2
+│   │   │   ├── UbuntuSans-Italic-VarFont_wdth_wght.ttf
+│   │   │   ├── UbuntuSans-Italic-VarFont.woff2
+│   │   │   ├── UbuntuSans-VarFont_wdth_wght.ttf
+│   │   │   └── UbuntuSans-VarFont.woff2
+│   │   ├── hooks/
+│   │   │   ├── useCheating.ts
 │   │   │   ├── useFragments.ts      # CRUD hook for working fragments
+│   │   │   ├── useHighlighting.ts
 │   │   │   ├── useLinkedFragmentWarnings.ts # fragment and linking information is send to the backend here and warning information is send to the warning context
 │   │   │   ├── useLinking.ts        # Peak-to-fragment linking state machine
 │   │   │   ├── usePredefinedFragments.ts # Fetches predefined fragment library from backend
 │   │   │   └── useWorkingSolution.ts # Hook for working solution API
-│   │   ├── test/
-│   │   │   └── setup.ts             # Vitest setup (SVG mocks)
-│   │   ├── types/
+│   │   ├── test/
+│   │   │   └── setup.ts             # Vitest setup (SVG mocks)
+│   │   ├── types/
 │   │   │   ├── molecule.ts          # MolGraph, MergeState, NewStereoBond type definitions
 │   │   │   └── peak.ts              # PeakDef type definition
-│   │   └── utils/
-│   │       ├── formatChemistryText.tsx # Formatting text above spectra, uses subscript for numbers and allows for italic using /it{} and numbers without subscript using /notsub{}
-│   │       ├── mergeFragments.ts    # Atom-to-atom merge algorithm for MolGraphs
-│   │       ├── molParser.ts         # V2000 MOL block parser/serializer
-│   │       ├── stereoDetection.ts   # Cis/trans stereo bond detection and toggling
-│   │       └── svgMergePointLocator.ts # Locates atom positions in RDKit SVGs
-│   ├── tests/
-│   │   ├── components/
-│   │   │   ├── KetcherEditor.smoke.test.tsx
-│   │   │   └── KetcherEditor.test.tsx
-│   │   ├── context/
-│   │   │   └── HistoryContext.test.tsx
-│   │   ├── features/
-│   │   │   ├── exercises/
-│   │   │   │   └── ExerciseCreationForm.test.tsx
-│   │   │   ├── layout/
-│   │   │   │   ├── LoadingExerciseOverlay.test.tsx
-│   │   │   │   ├── MockExercises.ts
-│   │   │   │   └── MolecularBookkeepingPage.test.tsx
-│   │   │   ├── molecule/
-│   │   │   │   ├── MoleculeEditorPopup.test.tsx
-│   │   │   │   └── MoleculeWorkspace.test.tsx
-│   │   │   ├── solution/
-│   │   │   │   └── WorkingSolutionPanel.test.tsx
-│   │   │   └── viewingSpectra/ 
-│   │   │       └── SpectrumTitle.test.tsx
-│   │   └── utils/
-│   │       ├── formatChemistryText.test.tsx
-│   │       ├── mergeFragments.test.ts
-│   │       ├── molParser.test.ts
-│   │       ├── stereoDetection.test.ts
-│   │       └── svgMergePointLocator.test.ts
+│   │   ├── utils/
+│   │   |   ├── formatChemistryText.tsx # Formatting text above spectra, uses subscript for numbers and allows for italic using /it{} and numbers without subscript using /notsub{}
+│   │   |   ├── mergeFragments.ts    # Atom-to-atom merge algorithm for MolGraphs
+│   │   |   ├── molParser.ts         # V2000 MOL block parser/serializer
+│   │   |   ├── stereoDetection.ts   # Cis/trans stereo bond detection and toggling
+│   │   |   └── svgMergePointLocator.ts # Locates atom positions in RDKit SVGs
+|   |   |
+│   │   ├── App.tsx                  # Root component
+│   │   ├── index.css                # General style file
+│   │   ├── main.tsx                 # React entry point
+│   │   ├── nmrglueGUI.css
+│   │   ├── nmrglueGUI.tsx
+│   │   ├── panelStyles.css
+│   │   └── vite-env.d.ts            # TypeScript declarations for Vite-specific features
+│   ├── tests/
+│   │   ├── components/
+│   │   │   ├── KetcherEditor.smoke.test.tsx
+│   │   │   └── KetcherEditor.test.tsx
+│   │   ├── context/
+│   │   │   └── HistoryContext.test.tsx
+│   │   ├── features/
+│   │   │   ├── exercises/
+│   │   │   │   └── ExerciseCreationForm.test.tsx
+│   │   │   ├── layout/
+│   │   │   │   ├── LoadingExerciseOverlay.test.tsx
+│   │   │   │   ├── MockExercises.ts
+│   │   │   │   └── MolecularBookkeepingPage.test.tsx
+│   │   │   ├── molecule/
+│   │   │   │   ├── MoleculeEditorPopup.test.tsx
+│   │   │   │   └── MoleculeWorkspace.test.tsx
+│   │   │   ├── solution/
+│   │   │   │   └── WorkingSolutionPanel.test.tsx
+│   │   │   ├── statistics/
+│   │   │   │   └── StatisticsPanel.test.tsx
+│   │   │   └── viewingSpectra/
+│   │   │       └── SpectrumTitle.test.tsx
+│   │   └── utils/
+│   │       ├── formatChemistryText.test.tsx
+│   │       ├── mergeFragments.test.ts
+│   │       ├── molParser.test.ts
+│   │       ├── stereoDetection.test.ts
+│   │       └── svgMergePointLocator.test.ts
 │   ├── Dockerfile                   # Multi-stage image: Node build → nginx serve
 │   ├── eslint.config.js             # ESLint v9 flat config (TypeScript + React rules)
-│   ├── index.html                      # html which is used during the built
+│   ├── index.html                   # html which is used during the built
 │   ├── nginx.conf                   # nginx: SPA fallback + /api/ reverse-proxy to backend
-│   ├── package.json
-│   ├── package-lock.json            
+│   ├── nmrglueGUI.html
+│   ├── package.json
+│   ├── package-lock.json
 │   ├── README.md                     # Frontend README
-│   ├── tsconfig.json
-│   ├── tsconfig.node.json
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
 │   └── vite.config.ts               # Build config + dev proxy + Node polyfills for Ketcher
-│
-├── .gitignore
+|
+├── build.bat
+├── build_mac.sh
+├── build.sh
 ├── docker-compose.yml               # One-command full-stack startup
-├── LICENSE                            # MIT License
+├── .gitattributes
+├── .gitignore
+├── LICENSE                          # MIT License
+├── local_dev.bat
+├── local_dev.sh
 ├── main.js                          # Main entry point of Electron
 ├── package.json                     # Specifies Electron build configuration
 ├── preload.js                       # Preload script

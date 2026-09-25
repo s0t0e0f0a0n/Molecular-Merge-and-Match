@@ -466,8 +466,8 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
 }, [src, type, showSolventText, showExchangeText])
 
   const highlightWidthPPM = useMemo(() => {
-    if (type === 'H') return 0.18; // 0.18 ppm
-    if (type === 'C') return 2.00;  // 2.00 ppm
+    if (type === 'H') return 0.21; // was 0.18 ppm
+    if (type === 'C') return 2.40;  // was 2.00 ppm
     return 0;
   }, [type]);
 

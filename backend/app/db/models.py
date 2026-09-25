@@ -281,9 +281,15 @@ class Statistics(Base):
     exercise_id: Mapped[str] = mapped_column(String(50), nullable=False, default="ex1")
     incorrect_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     cheats_used: Mapped[str] = mapped_column(String(15), nullable=False, default="000000000000")
+    cheats_off: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=False), nullable=True, default=None,
+    )
     merges_done: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
     matches_done: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
     fragments_drawn: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
+    dbe_set: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=False), nullable=True, default=None,
+    )
     difficulty: Mapped[str] = mapped_column(String(10), nullable=False, default="O0")
     confidence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     start_counting: Mapped[datetime | None] = mapped_column(
@@ -299,9 +305,14 @@ class Statistics(Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True, default=None,
     )
+    mastery_index: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
     eligible_purge_time: Mapped[datetime | None] = mapped_column(
             DateTime(timezone=False), nullable=True, default=None,
         )
+    pauzed_at: Mapped[datetime | None] = mapped_column(
+            DateTime(timezone=False), nullable=True, default=None,
+        )
+    pauze_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 class UserSettings(Base):
     __tablename__ = "user_settings"
@@ -324,6 +335,7 @@ class UserSettings(Base):
     show_creation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     show_timer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     cheats: Mapped[str] = mapped_column(String(15), nullable=False, default="000000000000")
+    SR_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,
