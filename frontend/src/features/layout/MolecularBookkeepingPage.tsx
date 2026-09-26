@@ -1670,7 +1670,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <img
-            src={`${import.meta.env.BASE_URL}logo.svg`}
+            src={`${import.meta.env.BASE_URL}logo5.svg`}
             alt="Molecular Merge and Match"
             title="Molecular Merge and Match"
             style={{ width: 36, height: 36, verticalAlign: 'middle' }}
@@ -1807,11 +1807,88 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
                   cursor: 'pointer',
                 }}
               >
-                <img
-                  src={`${import.meta.env.BASE_URL}use_cheats.svg`}
-                  alt="Cheats enabled"
-                  style={{ width: 32, height: 32 }}
-                />
+                <svg
+                style={{ verticalAlign: 'middle' }}
+                width="32px"
+                height="32px"
+                viewBox="0 0 512 512"
+                xmlns="http://w3.org"
+                >
+                <defs>
+
+                <filter id="warning-glow" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="15" result="blur" />
+                <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+                </feMerge>
+                </filter>
+
+                <style>{`
+                  @keyframes pulseWarning {
+                    0% {
+                      transform: scale(0.96);
+                      filter: url(#warning-glow) drop-shadow(0 0 10px rgba(255, 200, 0, 0.5));
+                      fill: #e60000; /* Darker, intense red */
+                    }
+                    50% {
+                      transform: scale(1.04);
+                      filter: url(#warning-glow) drop-shadow(0 0 40px rgba(255, 255, 0, 1));
+                      fill: #ff3333; /* Bright, luminous red fill */
+                    }
+                    100% {
+                      transform: scale(0.96);
+                      filter: url(#warning-glow) drop-shadow(0 0 10px rgba(255, 200, 0, 0.5));
+                      fill: #e60000;
+                    }
+                  }
+                  @keyframes pulseYellowFill {
+                    0%, 100% { fill: #ffcc00; }
+                    50% { fill: #ffff33; }
+                  }
+
+                  .pulsing-warning-group {
+                    transform-origin: 256px 256px;
+                    animation: pulseWarning 2s infinite ease-in-out;
+                  }
+                  .yellow-exclamation-fill {
+                    animation: pulseYellowFill 2s infinite ease-in-out;
+                  }
+                  `}</style>
+                  </defs>
+
+                  {/* Outer animated group handling scale, glowing aura, and the red diamond pulsing */}
+                  <g className="pulsing-warning-group">
+
+                  {/* LAYER 1: Thick Black Border (Rendered underneath the fill) */}
+                  <g fill="none" stroke="#000000" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round">
+                  {/* Original Diamond Shape Path */}
+                  <path fillRule="evenodd" d="M253.617407,12.4967773 L434.398258,193.277628 C451.060628,209.939998 451.060628,236.955037 434.398258,253.617407 L253.617407,434.398258 C236.955037,451.060628 209.939998,451.060628 193.277628,434.398258 L12.4967773,253.617407 C-4.16559245,236.955037 -4.16559245,209.939998 12.4967773,193.277628 L193.277628,12.4967773 C209.939998,-4.16559245 236.955037,-4.16559245 253.617407,12.4967773 Z" transform="translate(32.552 32.552)"></path>
+
+                  {/* Heavy-Set Bold Exclamation Outline Layer */}
+                  <g transform="translate(32.552 32.552)">
+                  <path d="M195.45,126.8 C195.45,111.8 207.45,99.8 223.45,99.8 C239.45,99.8 251.45,111.8 251.45,126.8 C251.45,170.8 244.45,225.8 238.45,255.8 C236.45,263.8 231.45,268.8 223.45,268.8 C215.45,268.8 210.45,263.8 208.45,255.8 C202.45,225.8 195.45,170.8 195.45,126.8 Z" fill="#000000" />
+                  <circle cx="223.45" cy="324.8" r="27" fill="#000000" />
+                  </g>
+                  </g>
+
+                  {/* LAYER 2: Colored Fills (Rendered cleanly on top) */}
+                  <g>
+                  {/* Original Diamond Shape Path Background */}
+                  <path fillRule="evenodd" d="M253.617407,12.4967773 L434.398258,193.277628 C451.060628,209.939998 451.060628,236.955037 434.398258,253.617407 L253.617407,434.398258 C236.955037,451.060628 209.939998,451.060628 193.277628,434.398258 L12.4967773,253.617407 C-4.16559245,236.955037 -4.16559245,209.939998 12.4967773,193.277628 L193.277628,12.4967773 C209.939998,-4.16559245 236.955037,-4.16559245 253.617407,12.4967773 Z" transform="translate(32.552 32.552)"></path>
+
+                  {/* Heavy-Set Bold Exclamation (Yellow Fill Layer) */}
+                  <g className="yellow-exclamation-fill" transform="translate(32.552 32.552)">
+                  {/* Widened, heavy top teardrop that smoothly narrows toward the base */}
+                  <path d="M195.45,126.8 C195.45,111.8 207.45,99.8 223.45,99.8 C239.45,99.8 251.45,111.8 251.45,126.8 C251.45,170.8 244.45,225.8 238.45,255.8 C236.45,263.8 231.45,268.8 223.45,268.8 C215.45,268.8 210.45,263.8 208.45,255.8 C202.45,225.8 195.45,170.8 195.45,126.8 Z" />
+                  {/* Large bold circular dot component */}
+                  <circle cx="223.45" cy="324.8" r="27" />
+                  </g>
+                  </g>
+
+                  </g>
+                  </svg>
+
               </button>
               {cheatMenuOpen && (
                 <div
