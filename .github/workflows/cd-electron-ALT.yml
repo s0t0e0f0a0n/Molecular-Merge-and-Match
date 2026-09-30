@@ -90,4 +90,12 @@ jobs:
           GH_TOKEN: ${{ secrets.VERIFY_ACTIONS_RELEASE }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
         # Passing --${{ matrix.arch }} forces electron-builder to strictly compile for the matrix host's architecture
-        run: npm run dist -- -p always
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "Echte release tag gedetecteerd. Installers worden gepubliceerd."
+            npm run dist -- -p always
+          else
+            echo "Handmatige run (workflow_dispatch) gedetecteerd."
+            echo "Installers worden alleen gebouwd om te testen, NIET gepubliceerd naar GitHub."
+            npm run dist -- -p never
+          fi

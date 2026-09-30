@@ -30,7 +30,7 @@ echo "[2/4] Initializing Python Virtual Environment and PyInstaller..."
 cd backend
 if [ ! -d "venv" ]; then
     echo "Creating virtual environment..."
-    python3 -m venv venv
+    python -m venv venv
 fi
 . venv/bin/activate
 pip install --upgrade pip

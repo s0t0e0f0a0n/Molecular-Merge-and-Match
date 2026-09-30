@@ -435,6 +435,8 @@ def _migrate_add_missing_columns() -> None:
         if "solution_cas_hash" not in existing_exercise:
             conn.execute(text("ALTER TABLE exercises ADD COLUMN solution_cas_hash TEXT"))
             conn.commit()
+
+
         # Update UserSettings model
         result_settings = conn.execute(text("PRAGMA table_info(user_settings)"))
         existing_settings = {row[1] for row in result_settings}
@@ -462,10 +464,14 @@ def _migrate_add_missing_columns() -> None:
         if "show_timer" not in existing_settings:
             conn.execute(text("ALTER TABLE user_settings ADD COLUMN show_timer BOOLEAN"))
             conn.commit()
+        if "SR_mode" not in existing_settings:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN SR_mode BOOLEAN NOT NULL DEFAULT 0"))
+            conn.commit()
         conn.execute(text("UPDATE user_settings SET name = 'user' WHERE name IS NULL OR TRIM(name) = ''"))
         conn.commit()
         conn.execute(text("DELETE FROM user_settings WHERE name = 'user' AND id NOT IN (SELECT MIN(id) FROM user_settings WHERE name = 'user')"))
         conn.commit()
+
 
         # Update SolventsUsed model
         result_solvents = conn.execute(text("PRAGMA table_info(solvents_used)"))
@@ -523,6 +529,12 @@ def _migrate_add_missing_columns() -> None:
             conn.execute(
                 text("ALTER TABLE statistics ADD COLUMN cheats_used VARCHAR(15) NOT NULL DEFAULT '000000000000'")
             )
+        if "cheats_off" not in existing_statistics:
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN cheats_off DATETIME"))
+            conn.commit()
+        if "dbe_set" not in existing_statistics:
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN dbe_set DATETIME"))
+            conn.commit()
         if "difficulty" not in existing_statistics:
             conn.execute(text("ALTER TABLE statistics ADD COLUMN difficulty VARCHAR(10) NOT NULL DEFAULT 'O0'"))
             conn.commit()
@@ -530,16 +542,25 @@ def _migrate_add_missing_columns() -> None:
             conn.execute(text("ALTER TABLE statistics ADD COLUMN confidence INTEGER NOT NULL DEFAULT 0"))
             conn.commit()
         if "merges_done" not in existing_statistics:
-            conn.execute(text("ALTER TABLE statistics ADD COLUMN merges_done INTEGER NOT NULL DEFAULT 0"))
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN merges_done INTEGER DEFAULT 0"))
             conn.commit()
         if "matches_done" not in existing_statistics:
-            conn.execute(text("ALTER TABLE statistics ADD COLUMN matches_done INTEGER NOT NULL DEFAULT 0"))
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN matches_done INTEGER DEFAULT 0"))
             conn.commit()
         if "fragments_drawn" not in existing_statistics:
-            conn.execute(text("ALTER TABLE statistics ADD COLUMN fragments_drawn INTEGER NOT NULL DEFAULT 0"))
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN fragments_drawn INTEGER DEFAULT 0"))
             conn.commit()
         if "eligible_purge_time" not in existing_statistics:
             conn.execute(text("ALTER TABLE statistics ADD COLUMN eligible_purge_time DATETIME"))
+            conn.commit()
+        if "pauzed_at" not in existing_statistics:
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN pauzed_at DATETIME"))
+            conn.commit()
+        if "pauze_total" not in existing_statistics:
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN pauze_total INTEGER NOT NULL DEFAULT 0"))
+            conn.commit()
+        if "mastery_index" not in existing_statistics:
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN mastery_index INTEGER DEFAULT 0"))
             conn.commit()
         elif next(row[2] for row in statistics_columns if row[1] == "cheats_used").upper() != "VARCHAR(15)":
             conn.execute(text("ALTER TABLE statistics RENAME TO statistics_legacy"))

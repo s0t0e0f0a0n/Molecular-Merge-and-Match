@@ -93,6 +93,9 @@ Since last version the wrong warning icon was displayed alongside the correct on
 The data requested from the database and written to the database was carried out in a less sufficient way before because of incremental implementation of statistics features.  
 Also one on the data fetching process was redundant and was deleted.  
 
+### iii. Fullscreen toggling
+The F11 key and fullscreen toggle button were not mutually usable: meaning when pressing the toggle button to go into fullscreen, F11 couldn´t get you out of it. Now it can.
+
 ## 5. Other changes
 ### Relocation of code
 Some of the code, like the exercise Menu, now has its own file.

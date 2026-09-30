@@ -19,12 +19,42 @@ type StatisticsPanelProps = {
 // tab 3 contains timing graphs
 // tab 4 contains advanced statistics 
 // tab 5 conatins the reset functions
-const TABS: Array<{ id: StatisticsTabId; label: string }> = [
-  { id: '1', label: 'Progression' },
-  { id: '2', label: 'Table' },
-  { id: '3', label: 'Time distribution' },
-  { id: '4', label: 'Advanced' },
-  { id: '5', label: 'Reset' },
+const TABS: Array<{ id: StatisticsTabId; label: React.ReactNode }> = [
+  { id: '1', label: <>
+    {/* @ts-expect-error legacy SVG uses an HTML class attribute spelling */}
+      <svg fill="currentColor" style={{ verticalAlign: 'middle' }} width="18px" height="18px" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" class="icon"><g stroke-width="0"></g><g stroke-linecap="round" stroke-linejoin="round"></g><g> <path d="M483.2 790.3L861.4 412c1.7-1.7 2.5-4 2.3-6.3l-25.5-301.4c-.7-7.8-6.8-13.9-14.6-14.6L522.2 64.3c-2.3-.2-4.7.6-6.3 2.3L137.7 444.8a8.03 8.03 0 0 0 0 11.3l334.2 334.2c3.1 3.2 8.2 3.2 11.3 0zm62.6-651.7l224.6 19 19 224.6L477.5 694 233.9 450.5l311.9-311.9zm60.16 186.23a48 48 0 1 0 67.88-67.89 48 48 0 1 0-67.88 67.89zM889.7 539.8l-39.6-39.5a8.03 8.03 0 0 0-11.3 0l-362 361.3-237.6-237a8.03 8.03 0 0 0-11.3 0l-39.6 39.5a8.03 8.03 0 0 0 0 11.3l243.2 242.8 39.6 39.5c3.1 3.1 8.2 3.1 11.3 0l407.3-406.6c3.1-3.1 3.1-8.2 0-11.3z"></path> </g>
+      </svg>&nbsp;<span>Progression</span></> },
+  { id: '2', label: <>
+    {/* @ts-expect-error legacy SVG uses an HTML class attribute spelling */}
+      <svg fill="currentColor" style={{ verticalAlign: 'middle' }} width="18px" height="18px" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" class="icon"><g stroke-width="0"></g><g stroke-linecap="round" stroke-linejoin="round"></g><g> <path d="M483.2 790.3L861.4 412c1.7-1.7 2.5-4 2.3-6.3l-25.5-301.4c-.7-7.8-6.8-13.9-14.6-14.6L522.2 64.3c-2.3-.2-4.7.6-6.3 2.3L137.7 444.8a8.03 8.03 0 0 0 0 11.3l334.2 334.2c3.1 3.2 8.2 3.2 11.3 0zm62.6-651.7l224.6 19 19 224.6L477.5 694 233.9 450.5l311.9-311.9zm60.16 186.23a48 48 0 1 0 67.88-67.89 48 48 0 1 0-67.88 67.89zM889.7 539.8l-39.6-39.5a8.03 8.03 0 0 0-11.3 0l-362 361.3-237.6-237a8.03 8.03 0 0 0-11.3 0l-39.6 39.5a8.03 8.03 0 0 0 0 11.3l243.2 242.8 39.6 39.5c3.1 3.1 8.2 3.1 11.3 0l407.3-406.6c3.1-3.1 3.1-8.2 0-11.3z"></path> </g>
+      </svg>&nbsp;<span>Exercise overview</span></> },
+  { id: '3', label: <>
+
+      <svg fill="currentColor" style={{ verticalAlign: 'middle' }} width="18px" height="18px" viewBox="6 8 35 35" xmlns="http://www.w3.org/2000/svg">
+    <g strokeLinecap="round" strokeLinejoin="round"></g>
+    <g> 
+      <g style={{ display: 'inline' }}> 
+        <path 
+          d="M7.854 33.546 16 22.893l7.52 16.293 6.267-27.572 3.76 8.773 5.64-6.893 3.76 8.146" 
+          style={{
+            fill: 'none',
+            stroke: 'currentColor',
+            strokeWidth: '2.50658px',
+            strokeLinecap: 'round',
+            strokeLinejoin: 'round'
+          }}
+        />
+      </g> 
+    </g>
+  </svg>&nbsp;<span>Time distribution</span></> },
+  { id: '4', label: <>
+    {/* @ts-expect-error legacy SVG uses an HTML class attribute spelling */}
+      <svg fill="currentColor" style={{ verticalAlign: 'middle' }} width="18px" height="18px" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" class="icon"><g stroke-width="0"></g><g stroke-linecap="round" stroke-linejoin="round"></g><g> <path d="M483.2 790.3L861.4 412c1.7-1.7 2.5-4 2.3-6.3l-25.5-301.4c-.7-7.8-6.8-13.9-14.6-14.6L522.2 64.3c-2.3-.2-4.7.6-6.3 2.3L137.7 444.8a8.03 8.03 0 0 0 0 11.3l334.2 334.2c3.1 3.2 8.2 3.2 11.3 0zm62.6-651.7l224.6 19 19 224.6L477.5 694 233.9 450.5l311.9-311.9zm60.16 186.23a48 48 0 1 0 67.88-67.89 48 48 0 1 0-67.88 67.89zM889.7 539.8l-39.6-39.5a8.03 8.03 0 0 0-11.3 0l-362 361.3-237.6-237a8.03 8.03 0 0 0-11.3 0l-39.6 39.5a8.03 8.03 0 0 0 0 11.3l243.2 242.8 39.6 39.5c3.1 3.1 8.2 3.1 11.3 0l407.3-406.6c3.1-3.1 3.1-8.2 0-11.3z"></path> </g>
+      </svg>&nbsp;<span>Advanced</span></> },
+  { id: '5', label: <>
+
+      <svg fill="currentColor" style={{ verticalAlign: 'middle' }} width="18px" height="18px" viewBox="7 8 26 26" xmlns="http://www.w3.org/2000/svg"><g stroke-linecap="round" stroke-linejoin="round"></g><g><path d="M10 16.682l5.69 5.685 1.408-1.407-3.283-3.28h10.131c1.147 0 2.19.467 2.943 1.222a4.157 4.157 0 011.225 2.946 4.18 4.18 0 01-4.168 4.168h-5.628V28h5.522c3.387 0 6.16-2.77 6.16-6.157a6.117 6.117 0 00-1.81-4.343 6.143 6.143 0 00-4.35-1.805H13.815l3.283-3.285L15.69 11 10 16.682z" fill-rule="nonzero"></path></g>
+      </svg>&nbsp;<span>Reset</span></> },
 ];
 
 const CONTRIBUTION_STATUSES = [

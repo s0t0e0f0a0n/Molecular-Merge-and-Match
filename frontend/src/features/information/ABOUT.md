@@ -6,7 +6,7 @@ Students select molecular fragments, match them to peaks in <sup>1</sup>H-NMR an
 > Contact information: **dr. S. van der Vorm** – [s.van.der.vorm@chem.leidenuniv.nl](mailto:s.van.der.vorm@chem.leidenuniv.nl)
  
 In the following sections technical information is shared. You can find more about the instrumentation used to measure the data as well as the development of this software.
-> Current version: **1.4.0**     Available as  .exe .deb .rpm .AppImage .flatpak .pacman .snap .dmg
+> Current version: **1.4.1**     Available as  .exe .deb .rpm .AppImage .flatpak .pacman .snap .dmg
 ### About this software
 
 Software is subject to the MIT license.

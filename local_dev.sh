@@ -14,7 +14,7 @@ if [ -z "$1" ]; then
 
     # Wacht 10 seconden totdat de processen (zoals Uvicorn) zijn opgestart
     echo "Waiting for local servers to start..."
-    sleep 10
+    sleep 4
     
     # Start the browser (1. Edge -> 2. Falkon Flatpak -> 3. Standard browser)
     if command -v microsoft-edge >/dev/null 2>&1; then
@@ -45,7 +45,7 @@ case "$1" in
         
         if [ ! -d "venv" ]; then
             echo "Creating virtual environment..."
-            python3 -m venv venv
+            python -m venv venv
         fi
         
         # Gebruik . in plaats van source (source is specifiek voor Bash/Zsh, . werkt in ELKE shell)
@@ -55,9 +55,9 @@ case "$1" in
         # Wildcards (*) werken in POSIX-shells soms anders in IF-statements, daarom gebruiken we find of test
         if [ ! -d "venv/lib" ] || [ -z "$(find venv/lib -type d -name fastapi 2>/dev/null)" ]; then
             echo "Installing dependencies..."
-            python3 -m pip install -r requirements.txt
-            python3 -m pip install -r requirements-dev.txt
-            python3 -m pip install tzdata pyinstaller fonttools brotli
+            python -m pip install -r requirements.txt
+            python -m pip install -r requirements-dev.txt
+            python -m pip install tzdata pyinstaller fonttools brotli
         fi
         echo ""
 
