@@ -66,12 +66,15 @@
         "dmg"
       ],
       "artifactName": "${name}-Setup-${version}-${arch}.${ext}",
-      "icon": "build-assets/icon.icns",
+      "icon": "build-assets/icon_mac.icns",
       "category": "public.app-category.education"
     },
     "linux": {
       "target": [
-        "AppImage"
+        "AppImage",
+        "deb",
+        "rpm",
+        "pacman"
       ],
       "executableName": "molecularmergeandmatch",
       "artifactName": "${name}-Setup-${version}-x86_64.${ext}",

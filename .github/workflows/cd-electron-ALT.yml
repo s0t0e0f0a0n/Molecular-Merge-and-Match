@@ -32,6 +32,7 @@ jobs:
 
       - name: Build Python Backend (Sidecar) for macOS (Intel)
         if: runner.os == 'macOS'
+        shell: bash
         run: |
           cd backend
           pip install fastapi==0.115.6 uvicorn==0.30.6 pydantic-settings==2.6.1 python-multipart==0.0.12 SQLAlchemy==2.0.36 rdkit==2025.9.3 nmrglue==0.12 matplotlib==3.11.1
@@ -40,6 +41,7 @@ jobs:
 
       - name: Build Python Backend (Sidecar) for Windows and Linux (arm)
         if: runner.os != 'macOS'
+        shell: bash
         run: |
           cd backend
           pip install -r requirements.txt
@@ -90,12 +92,5 @@ jobs:
           GH_TOKEN: ${{ secrets.VERIFY_ACTIONS_RELEASE }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
         # Passing --${{ matrix.arch }} forces electron-builder to strictly compile for the matrix host's architecture
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "Echte release tag gedetecteerd. Installers worden gepubliceerd."
-            npm run dist -- -p always
-          else
-            echo "Handmatige run (workflow_dispatch) gedetecteerd."
-            echo "Installers worden alleen gebouwd om te testen, NIET gepubliceerd naar GitHub."
-            npm run dist -- -p never
-          fi
+        shell: bash
+        run: npm run dist -- -p always

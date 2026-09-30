@@ -18,7 +18,6 @@ from app.db.models import (
     ExerciseC13Peak,
     ExerciseH1Peak,
     Fragment,
-    LogbookState,
     PredefinedFragment,
     SolventsUsed,
     TagsUsed,

@@ -25,12 +25,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Create GitHub Release Pre-emptively
+        if: runner.os == 'Linux' && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.VERIFY_ACTIONS_RELEASE }}
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: true  
+          prerelease: false
+
+
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
       - name: Build Python Backend (Sidecar)
+        shell: bash
         run: |
           cd backend
           pip install -r requirements.txt
@@ -81,12 +93,6 @@ jobs:
           GH_TOKEN: ${{ secrets.VERIFY_ACTIONS_RELEASE }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
         # Passing --${{ matrix.arch }} forces electron-builder to strictly compile for the matrix host's architecture
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "Echte release tag gedetecteerd. Installers worden gepubliceerd."
-            npm run dist -- -p always
-          else
-            echo "Handmatige run (workflow_dispatch) gedetecteerd."
-            echo "Installers worden alleen gebouwd om te testen, NIET gepubliceerd naar GitHub."
-            npm run dist -- -p never
-          fi
+        shell: bash
+        run: npm run dist -- -p always
+
