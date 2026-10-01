@@ -193,17 +193,13 @@ export function ExerciseMenu({
     const exerciseIds = new Set(
       exercisesBySet.find((set) => set.setName === setName)?.exercises.map((exercise) => `ex-${exercise.id}`) ?? [],
     );
-    const setId = `set-${setName}`;
     setSelectedForDeletion((previous) => {
       const next = new Set(previous);
       const allSelected = exerciseIds.size > 0
-        && Array.from(exerciseIds).every((id) => next.has(id))
-        && next.has(setId);
+        && Array.from(exerciseIds).every((id) => next.has(id));
       if (allSelected) {
-        next.delete(setId);
         exerciseIds.forEach((id) => next.delete(id));
       } else {
-        next.add(setId);
         exerciseIds.forEach((id) => next.add(id));
       }
       return next;
@@ -333,7 +329,7 @@ export function ExerciseMenu({
         <div style={{ display: creationFormOpen ? 'none' : 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 12 }}>
           <div style={{ border: '1px solid #e5e5e5', borderRadius: 12, padding: 10, background: '#fafafa', display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 }}>
             <div style={{ fontSize: 12, fontWeight: 700 }}>Exercise sets</div>
-            <div style={{ flex: 1, minHeight: 0, maxHeight: '52vh', overflowY: 'auto', paddingRight: 4 }}>
+            <div style={{ flex: 1, minHeight: 0, maxHeight: '52vh', overflowY: 'auto', scrollbarGutter: 'stable', paddingRight: 4 }}>
               {loadingExerciseSummaries ? (
                 <div style={{ fontSize: 12, opacity: 0.7 }}>Loading exercises...</div>
               ) : exerciseSummariesError ? (
@@ -346,6 +342,11 @@ export function ExerciseMenu({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {exercisesBySet.map(({ setName, exercises }) => {
                     const expanded = expandedExerciseSets.includes(setName);
+                    const selectedExerciseCount = exercises.filter((exercise) => (
+                      selectedForDeletion.has(`ex-${exercise.id}`)
+                    )).length;
+                    const allExercisesSelected = exercises.length > 0
+                      && selectedExerciseCount === exercises.length;
                     const allSetExercisesCompleted = exerciseSummaries
                       .filter((exercise) => normalizeExerciseSet(exercise.exercise_set) === setName)
                       .every((exercise) => exercise.completed === true);
@@ -353,19 +354,37 @@ export function ExerciseMenu({
                       <div key={setName} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           {deletionMode && (
-                            <input type="checkbox" checked={selectedForDeletion.has(`set-${setName}`)} onChange={() => toggleSetForDeletion(setName)} style={{ cursor: 'pointer' }} />
+                            <input
+                              type="checkbox"
+                              checked={allExercisesSelected}
+                              ref={(input) => {
+                                if (input) input.indeterminate = selectedExerciseCount > 0 && !allExercisesSelected;
+                              }}
+                              onChange={() => toggleSetForDeletion(setName)}
+                              style={{ cursor: 'pointer' }}
+                            />
                           )}
-                          <button
-                            type="button"
-                            onClick={() => deletionMode ? toggleSetForDeletion(setName) : toggleExpandedSet(setName)}
-                            style={{ flex: 1, textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: '1px solid #d8d8d8', background: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
-                          >
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span>{setName}</span>
-                              {allSetExercisesCompleted ? <span aria-label="Exercise set completed" style={{ color: '#238636', fontWeight: 700 }}>{'\u2714'}</span> : null}
-                            </span>
-                            <span style={{ fontSize: 11 }}>{expanded ? '▲' : '▼'}</span>
-                          </button>
+                          <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
+                            <button
+                              type="button"
+                              onClick={() => deletionMode ? toggleSetForDeletion(setName) : toggleExpandedSet(setName)}
+                              style={{ flex: 1, minWidth: 0, textAlign: 'left', padding: '8px 10px', borderRadius: '8px 0 0 8px', border: '1px solid #d8d8d8', borderRight: 0, background: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}
+                            >
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span>{setName}</span>
+                                {allSetExercisesCompleted ? <span aria-label="Exercise set completed" style={{ color: '#238636', fontWeight: 700 }}>{'\u2714'}</span> : null}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`${expanded ? 'Collapse' : 'Expand'} ${setName}`}
+                              aria-expanded={expanded}
+                              onClick={() => toggleExpandedSet(setName)}
+                              style={{ padding: '8px 10px', borderRadius: '0 8px 8px 0', border: '1px solid #d8d8d8', background: 'white', cursor: 'pointer', fontSize: 11 }}
+                            >
+                              {expanded ? '▲' : '▼'}
+                            </button>
+                          </div>
                         </div>
                         {expanded ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 10 }}>
@@ -434,7 +453,7 @@ export function ExerciseMenu({
             </div>
           </div>
 
-          <div style={{ border: '1px solid #e5e5e5', borderRadius: 12, padding: 10, background: '#fafafa', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ border: '1px solid #e5e5e5', borderRadius: 12, padding: 10, background: '#fafafa', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, maxHeight: 'calc(52vh + 48px)', boxSizing: 'border-box', alignSelf: 'start' }}>
             <div style={{ fontSize: 12, fontWeight: 700 }}>Filters</div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
               <input type="checkbox" checked={showOnlyIncomplete} onChange={(event) => setShowOnlyIncomplete(event.target.checked)} />
@@ -455,7 +474,7 @@ export function ExerciseMenu({
                 </div>
               )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minHeight: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>Tags</div>
                 <button type="button" onClick={() => setTagFilterMode((mode) => mode === 'AND' ? 'OR' : 'AND')} style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid #ccc', background: '#f0f0f0', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>{tagFilterMode}</button>
@@ -463,7 +482,7 @@ export function ExerciseMenu({
               {tagOptions.length === 0 ? (
                 <div style={{ fontSize: 12, opacity: 0.7 }}>No tags available.</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto', paddingRight: 4 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minHeight: 0, overflowY: 'auto', scrollbarGutter: 'stable', paddingRight: 4 }}>
                   {tagOptions.map((tag) => (
                     <label key={`tag-${tag}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
                       <input type="checkbox" checked={activeTagFilters.includes(tag)} onChange={() => toggleTagFilter(tag)} />

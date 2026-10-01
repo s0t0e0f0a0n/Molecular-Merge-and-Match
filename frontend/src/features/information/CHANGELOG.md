@@ -32,6 +32,7 @@ Tags included in statistics is fixed
 
 Changed tags from "hide" option, to "show" option.
 
+Exercisemenu now correctly handles deleting visually, the tags list is expanded equally and the annoying dynamic scrollbar and div change behaviour is fixed.
 
 ## v1.4.0
 Changes since version 1.3.0
