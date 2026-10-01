@@ -2,8 +2,10 @@ import base64
 import hashlib
 from pathlib import Path
 
+import pytest
+
 from app.core.config import settings
-from app.db.models import Exercise, ExerciseAdditionalSpectrum, TagsUsed
+from app.db.models import Exercise, ExerciseAdditionalSpectrum, SolventsUsed, TagsUsed
 from app.db.session import SessionLocal
 
 INCHI_CCO = "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3"
@@ -49,6 +51,101 @@ def test_list_exercises_empty_initially(client):
     response = client.get("/api/v1/exercises/")
     assert response.status_code == 200
     assert response.json() == []
+
+
+@pytest.mark.parametrize("deletion_api", ["single", "batch"])
+def test_exercise_deletion_recounts_usage(client, deletion_api):
+    db = SessionLocal()
+    try:
+        tag_a = TagsUsed(tag_name="usage-recount-a", tag_count=50)
+        tag_b = TagsUsed(tag_name="usage-recount-b", tag_count=50)
+        solvent_a = SolventsUsed(
+            names="usage-recount-solvent-a",
+            match="usage-recount-solvent-a",
+            display="Usage recount solvent A",
+            count=50,
+        )
+        solvent_b = SolventsUsed(
+            names="usage-recount-solvent-b",
+            match="usage-recount-solvent-b",
+            display="Usage recount solvent B",
+            count=50,
+        )
+        db.add_all([tag_a, tag_b, solvent_a, solvent_b])
+        db.flush()
+
+        removed = Exercise(
+            name="Removed usage-count exercise",
+            tags_csv=f"%tag{{{tag_a.id}}},%tag{{{tag_a.id}}},%tag{{{tag_b.id}}}",
+            h1_svg_path="/uploads/removed-h1.svg",
+            h1_axis_start=10,
+            h1_axis_end=0,
+            c13_svg_path="/uploads/removed-c13.svg",
+            c13_axis_start=200,
+            c13_axis_end=0,
+            h1_nmr_text="h1",
+            c13_nmr_text="c13",
+            h1_solvent=f"%solv{{{solvent_a.id}}}",
+            c13_solvent=f"%solv{{{solvent_b.id}}}",
+        )
+        survivor = Exercise(
+            name="Surviving usage-count exercise",
+            tags_csv=f"%tag{{{tag_a.id}}}",
+            h1_svg_path="/uploads/survivor-h1.svg",
+            h1_axis_start=10,
+            h1_axis_end=0,
+            c13_svg_path="/uploads/survivor-c13.svg",
+            c13_axis_start=200,
+            c13_axis_end=0,
+            h1_nmr_text="h1",
+            c13_nmr_text="c13",
+            h1_solvent=f"%solv{{{solvent_a.id}}}",
+            c13_solvent=f"%solv{{{solvent_a.id}}}",
+        )
+        removed_again = Exercise(
+            name="Second removed usage-count exercise",
+            tags_csv=f"%tag{{{tag_b.id}}}",
+            h1_svg_path="/uploads/removed-again-h1.svg",
+            h1_axis_start=10,
+            h1_axis_end=0,
+            c13_svg_path="/uploads/removed-again-c13.svg",
+            c13_axis_start=200,
+            c13_axis_end=0,
+            h1_nmr_text="h1",
+            c13_nmr_text="c13",
+            h1_solvent=f"%solv{{{solvent_b.id}}}",
+            c13_solvent=f"%solv{{{solvent_b.id}}}",
+        )
+        db.add_all([removed, removed_again, survivor])
+        db.commit()
+        removed_ids = [removed.id, removed_again.id]
+        tag_a_id, tag_b_id = tag_a.id, tag_b.id
+        solvent_a_id, solvent_b_id = solvent_a.id, solvent_b.id
+    finally:
+        db.close()
+
+    if deletion_api == "single":
+        for exercise_id in removed_ids:
+            response = client.delete(f"/api/v1/exercises/{exercise_id}")
+            assert response.status_code == 204
+    else:
+        response = client.post(
+            "/api/v1/exercises/reset-batch",
+            json={"exercise_ids": removed_ids, "level": "exercise"},
+        )
+        assert response.status_code == 204
+
+    db = SessionLocal()
+    try:
+        assert db.query(TagsUsed).filter(TagsUsed.id == tag_a_id).one().tag_count == 1
+        assert db.query(TagsUsed).filter(TagsUsed.id == tag_b_id).one().tag_count == 0
+        assert db.query(SolventsUsed).filter(SolventsUsed.id == solvent_a_id).one().count == 1
+        assert db.query(SolventsUsed).filter(SolventsUsed.id == solvent_b_id).one().count == 0
+    finally:
+        db.query(TagsUsed).filter(TagsUsed.id.in_([tag_a_id, tag_b_id])).delete(synchronize_session=False)
+        db.query(SolventsUsed).filter(SolventsUsed.id.in_([solvent_a_id, solvent_b_id])).delete(synchronize_session=False)
+        db.commit()
+        db.close()
 
 
 def test_hidden_tags_are_included_for_statistics_summaries(client):

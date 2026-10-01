@@ -6,6 +6,7 @@ from typing import Literal
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
+from app.core.usage_counts import recount_exercise_usage
 from app.db.models import Exercise, Fragment, LogbookState, Statistics, WorkingSolution
 from app.db.session import get_db
 
@@ -49,6 +50,9 @@ def reset_exercises(body: ResetExercisesRequest) -> None:
                 db.query(Statistics).filter(Statistics.exercise_id.in_(keys)).delete(synchronize_session=False)
             if body.level == "exercise" and exercise is not None:
                 db.delete(exercise)
+        if body.level == "exercise":
+            db.flush()
+            recount_exercise_usage(db)
         db.commit()
 
 
