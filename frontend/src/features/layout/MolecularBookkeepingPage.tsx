@@ -605,6 +605,12 @@ useEffect(() => {
     void loadActiveTags();
   }, [loadActiveTags, loadExerciseSummaries]);
 
+  const handleTagVisibilityUpdated = useCallback((updatedTag: Tag) => {
+    setActiveTags((previous) => previous.map((tag) => (
+      tag.id === updatedTag.id ? updatedTag : tag
+    )));
+  }, []);
+
   const handleDeleteExercises = useCallback(async (exerciseIds: number[]): Promise<number[]> => {
     const failed: number[] = [];
 
@@ -2409,6 +2415,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         solventsLoading={solventsLoading}
         onSolventPreferenceChange={handleSolventPreferenceChange}
         onTagsUpdated={handleTagsUpdated}
+        onTagVisibilityUpdated={handleTagVisibilityUpdated}
       />
       <StatisticsPanel
         isOpen={statisticsPanelOpen}

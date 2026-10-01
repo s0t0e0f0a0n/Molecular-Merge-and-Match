@@ -118,13 +118,17 @@ export function ExerciseMenu({
   }, [exerciseSummaries, normalizeExerciseSet]);
 
   const tagOptions = useMemo(() => {
-    const activeTagNames = new Set(activeTags.map((tag) => tag.tag_name.toLocaleLowerCase()));
+    const activeTagNames = new Set(
+      activeTags
+        .filter((tag) => !tag.is_hidden)
+        .map((tag) => tag.tag_name.toLocaleLowerCase()),
+    );
     const cheatTagNames = new Set(
       activeTags.filter((tag) => tag.is_cheat).map((tag) => tag.tag_name.toLocaleLowerCase()),
     );
     const tags = new Set<string>();
     for (const exercise of exerciseSummaries) {
-      for (const tag of exercise.tags) {
+      for (const tag of exercise.statistics_tags ?? exercise.tags) {
         const normalizedTag = tag.toLocaleLowerCase();
         if (activeTagNames.has(normalizedTag) && (showCheatTags || !cheatTagNames.has(normalizedTag))) {
           tags.add(tag);
@@ -137,7 +141,7 @@ export function ExerciseMenu({
   useEffect(() => {
     const allowedTagNames = new Set(
       activeTags
-        .filter((tag) => showCheatTags || !tag.is_cheat)
+        .filter((tag) => !tag.is_hidden && (showCheatTags || !tag.is_cheat))
         .map((tag) => tag.tag_name.toLocaleLowerCase()),
     );
     setActiveTagFilters((previous) =>

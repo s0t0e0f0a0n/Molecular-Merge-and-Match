@@ -46,6 +46,7 @@ type SettingsPanelProps = {
   solventsLoading: boolean;
   onSolventPreferenceChange: (solventId: number, preference: number) => void;
   onTagsUpdated?: () => void;
+  onTagVisibilityUpdated?: (tag: Tag) => void;
 };
 
 type ToggleRowProps = {
@@ -178,10 +179,11 @@ function SelectRow({ id, label, value, options, onChange, title }: SelectRowProp
 
 type TagsTabProps = {
   onTagsUpdated?: () => void;
+  onTagVisibilityUpdated?: (tag: Tag) => void;
   showCheatTags: boolean;
 };
 
-function TagsTab({ onTagsUpdated, showCheatTags }: TagsTabProps) {
+function TagsTab({ onTagsUpdated, onTagVisibilityUpdated, showCheatTags }: TagsTabProps) {
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleted, setDeleted] = useState<Record<number, boolean>>({});
@@ -234,9 +236,9 @@ function TagsTab({ onTagsUpdated, showCheatTags }: TagsTabProps) {
   }
 
   async function handleShow(t: Tag, value: boolean) {
-    await setTagHidden(t.id, !value);
-    setTags((prev) => prev.map((tag) => (tag.id === t.id ? { ...tag, is_hidden: !value } : tag)));
-    onTagsUpdated?.();
+    const updatedTag = await setTagHidden(t.id, !value);
+    setTags((prev) => prev.map((tag) => (tag.id === t.id ? updatedTag : tag)));
+    onTagVisibilityUpdated?.(updatedTag);
   }
 
   async function handleStatistics(t: Tag, value: boolean) {
@@ -339,6 +341,7 @@ export function SettingsPanel({
   solventsLoading,
   onSolventPreferenceChange,
   onTagsUpdated,
+  onTagVisibilityUpdated,
 }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<SettingsTabId>('settingstab');
   const normalizedCheatBits = useMemo(
@@ -566,7 +569,11 @@ export function SettingsPanel({
                         Tags that are not hideable are always shown. Tags marked as cheats are normally excluded from this list unless the cheat toggle is enabled in the Cheats tab.
                         Deleting tags can only be undone in the current active window: close this settings panel and deletion is irreversible.
                 </div>
-              <TagsTab onTagsUpdated={onTagsUpdated} showCheatTags={readCheatBit(normalizedCheatBits, 9)} />
+              <TagsTab
+                onTagsUpdated={onTagsUpdated}
+                onTagVisibilityUpdated={onTagVisibilityUpdated}
+                showCheatTags={readCheatBit(normalizedCheatBits, 9)}
+              />
             </div>
           )}
 
