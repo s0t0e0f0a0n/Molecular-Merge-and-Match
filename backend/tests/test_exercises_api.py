@@ -3,9 +3,10 @@ import hashlib
 from pathlib import Path
 
 import pytest
+from sqlalchemy import text
 
 from app.core.config import settings
-from app.db.models import Exercise, ExerciseAdditionalSpectrum, SolventsUsed, TagsUsed
+from app.db.models import Exercise, ExerciseAdditionalSpectrum, SolventsUsed, Statistics, TagsUsed
 from app.db.session import SessionLocal
 
 INCHI_CCO = "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3"
@@ -51,6 +52,53 @@ def test_list_exercises_empty_initially(client):
     response = client.get("/api/v1/exercises/")
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_dbe_input_counter_increments_for_each_value_submission(client):
+    response = client.put("/api/v1/exercises/701/dbe", json={"dbe": 2.5})
+    assert response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        statistics = db.query(Statistics).filter_by(exercise_id="701").one()
+        assert statistics.dbe_set == 1
+        dbe_column = next(row for row in db.execute(text("PRAGMA table_info(statistics)")) if row[1] == "dbe_set")
+        assert dbe_column[2].upper() == "INTEGER"
+    finally:
+        db.close()
+
+    response = client.put("/api/v1/exercises/701/dbe", json={"dbe": 2.5})
+    assert response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        statistics = db.query(Statistics).filter_by(exercise_id="701").one()
+        assert statistics.dbe_set == 2
+    finally:
+        db.close()
+
+    response = client.put(
+        "/api/v1/exercises/701/dbe",
+        json={"dbe": 3.0, "count_input": False},
+    )
+    assert response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        statistics = db.query(Statistics).filter_by(exercise_id="701").one()
+        assert statistics.dbe_set == 2
+    finally:
+        db.close()
+
+    response = client.put("/api/v1/exercises/701/dbe", json={"dbe": None})
+    assert response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        statistics = db.query(Statistics).filter_by(exercise_id="701").one()
+        assert statistics.dbe_set == 2
+    finally:
+        db.close()
 
 
 @pytest.mark.parametrize("deletion_api", ["single", "batch"])

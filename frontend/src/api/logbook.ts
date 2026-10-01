@@ -2,6 +2,8 @@ export type ApiLogbookState = {
   entries_json: string;
   cursor: number;
   links_json: string;
+  restarts?: string;
+  timer_checkpointed?: boolean;
 };
 
 export async function fetchLogbook(exerciseKey: string): Promise<ApiLogbookState> {
@@ -24,8 +26,8 @@ export async function fetchAllLogbooks(): Promise<Record<string, ApiLogbookState
 
 export async function saveLogbook(
   exerciseKey: string,
-  body: ApiLogbookState,
-): Promise<void> {
+  body: Pick<ApiLogbookState, 'entries_json' | 'cursor' | 'links_json'>,
+): Promise<ApiLogbookState> {
   const response = await fetch(
     `/api/v1/logbook/?exercise_id=${encodeURIComponent(exerciseKey)}`,
     {
@@ -38,6 +40,7 @@ export async function saveLogbook(
   if (!response.ok) {
     throw new Error(`Failed to save logbook (${response.status})`);
   }
+  return (await response.json()) as ApiLogbookState;
 }
 
 export async function clearLogbook(exerciseKey: string): Promise<void> {

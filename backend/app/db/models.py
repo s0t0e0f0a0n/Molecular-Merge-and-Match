@@ -264,6 +264,7 @@ class LogbookState(Base):
     entries_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     cursor: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     links_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    restarts: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     archived: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True, default=None
     )
@@ -287,9 +288,7 @@ class Statistics(Base):
     merges_done: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
     matches_done: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
     fragments_drawn: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
-    dbe_set: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=False), nullable=True, default=None,
-    )
+    dbe_set: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     difficulty: Mapped[str] = mapped_column(String(10), nullable=False, default="O0")
     confidence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     start_counting: Mapped[datetime | None] = mapped_column(
@@ -309,10 +308,10 @@ class Statistics(Base):
     eligible_purge_time: Mapped[datetime | None] = mapped_column(
             DateTime(timezone=False), nullable=True, default=None,
         )
-    pauzed_at: Mapped[datetime | None] = mapped_column(
+    paused_at: Mapped[datetime | None] = mapped_column(
             DateTime(timezone=False), nullable=True, default=None,
         )
-    pauze_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    pause_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 class UserSettings(Base):
     __tablename__ = "user_settings"

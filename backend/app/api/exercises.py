@@ -18,6 +18,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 
 from app.api.statistics import (
+    _ensure_statistics_row,
     increment_incorrect_count,
     mark_exercise_completed,
     mark_exercise_selected,
@@ -321,6 +322,7 @@ class ExerciseSummaryOut(BaseModel):
     fragments_drawn: int | None = None
     merges_done: int | None = None
     matches_done: int | None = None
+    dbe_set: int = 0
     has_saved_progress: bool = False
 
     model_config = {"from_attributes": True}
@@ -346,6 +348,7 @@ class SolutionValidationOut(BaseModel):
 
 class DbeUpdate(BaseModel):
     dbe: float | None
+    count_input: bool = True
 
 class DbeOut(BaseModel):
     dbe: float | None
@@ -787,6 +790,7 @@ def _to_summary_response(
         fragments_drawn=statistics.fragments_drawn if statistics is not None else None,
         merges_done=statistics.merges_done if statistics is not None else None,
         matches_done=statistics.matches_done if statistics is not None else None,
+        dbe_set=statistics.dbe_set if statistics is not None else 0,
         has_saved_progress=has_saved_progress,
     )
 
@@ -1110,6 +1114,11 @@ def update_exercise_dbe(exercise_id: int, payload: DbeUpdate) -> DbeOut:
             db.add(ws)
         else:
             ws.dbe = payload.dbe
+
+        if payload.count_input and payload.dbe is not None:
+            statistics, _ = _ensure_statistics_row(db, exercise_id)
+            if statistics is not None:
+                statistics.dbe_set += 1
 
         db.commit()
         db.refresh(ws)

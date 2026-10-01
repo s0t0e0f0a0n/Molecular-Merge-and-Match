@@ -14,6 +14,7 @@ export type ExerciseSummary = {
   fragments_drawn?: number | null;
   merges_done?: number | null;
   matches_done?: number | null;
+  dbe_set?: number | null;
   has_saved_progress?: boolean | null;
 };
 
@@ -255,12 +256,13 @@ export async function fetchExerciseDbe(
 
 export async function saveExerciseDbe(
   exerciseId: number,
-  dbe: number | null
+  dbe: number | null,
+  countInput = true,
 ): Promise<void> {
   const r = await fetch(`/api/v1/exercises/${exerciseId}/dbe`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dbe }),
+    body: JSON.stringify({ dbe, count_input: countInput }),
   });
   if (!r.ok) throw new Error('Failed to save DBE');
 }

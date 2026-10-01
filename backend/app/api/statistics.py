@@ -12,6 +12,7 @@ from app.db.models import Exercise, LogbookState, Statistics, UserSettings
 from app.db.session import get_db
 
 router = APIRouter(prefix="/statistics", tags=["statistics"])
+MIN_TIMER_SECONDS_TO_PERSIST = 10
 
 
 class StatisticsOut(BaseModel):
@@ -130,14 +131,150 @@ def _exercise_is_completed(db, exercise_id: int | str) -> bool:
     return _exercise_is_incomplete(db, exercise_id) is False
 
 
-def _finalize_timer(row: Statistics, stopped_at: datetime, *, count_short_elapsed: bool) -> None:
+def _find_or_create_logbook_state(db, exercise_id: int | str) -> LogbookState:
+    key = str(exercise_id)
+    bare_key = key.removeprefix("exercise-")
+    keys = [key]
+    if bare_key.isdigit():
+        keys = [f"exercise-{bare_key}", bare_key]
+
+    for storage_key in keys:
+        row = (
+            db.query(LogbookState)
+            .filter(LogbookState.exercise_id == storage_key)
+            .first()
+        )
+        if row is not None:
+            return row
+
+    row = LogbookState(
+        exercise_id=f"exercise-{bare_key}" if bare_key.isdigit() else key,
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
+def _load_restart_intervals(logbook: LogbookState) -> list[dict[str, str | None]]:
+    try:
+        intervals = json.loads(logbook.restarts or "[]")
+    except (TypeError, json.JSONDecodeError):
+        return []
+    if not isinstance(intervals, list):
+        return []
+    return [
+        interval for interval in intervals
+        if isinstance(interval, dict) and isinstance(interval.get("start"), str)
+    ]
+
+
+def _record_timer_start(db, exercise_id: int | str, started_at: datetime) -> None:
+    logbook = _find_or_create_logbook_state(db, exercise_id)
+    intervals = _load_restart_intervals(logbook)
+    if intervals and intervals[-1].get("stop") is None:
+        intervals[-1]["stop"] = started_at.isoformat()
+    intervals.append({"start": started_at.isoformat(), "stop": None})
+    logbook.restarts = json.dumps(intervals)
+
+
+def _record_timer_stop(db, row: Statistics, stopped_at: datetime) -> None:
+    logbook = _find_or_create_logbook_state(db, row.exercise_id)
+    intervals = _load_restart_intervals(logbook)
+    active_interval = next(
+        (interval for interval in reversed(intervals) if interval.get("stop") is None),
+        None,
+    )
+    if active_interval is None:
+        if row.start_counting is None:
+            return
+        active_interval = {"start": row.start_counting.isoformat(), "stop": None}
+        intervals.append(active_interval)
+    active_interval["stop"] = stopped_at.isoformat()
+    logbook.restarts = json.dumps(intervals)
+
+
+def _finalize_timer(
+    db,
+    row: Statistics,
+    stopped_at: datetime,
+    *,
+    count_short_elapsed: bool,
+) -> None:
     if row.start_counting is None or row.stop_counting is not None:
         return
 
     row.stop_counting = stopped_at
+    _record_timer_stop(db, row, stopped_at)
     elapsed_seconds = (row.stop_counting - row.start_counting).total_seconds()
-    if count_short_elapsed or elapsed_seconds >= 10:
+    if count_short_elapsed or elapsed_seconds >= MIN_TIMER_SECONDS_TO_PERSIST:
         row.timer_total += int(max(0, elapsed_seconds))
+
+
+def _parse_logbook_entry_timestamp(value: object) -> datetime | None:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        timestamp = float(value)
+        if abs(timestamp) >= 1e11:
+            timestamp /= 1000
+        try:
+            return datetime.fromtimestamp(timestamp)
+        except (OverflowError, OSError, ValueError):
+            return None
+    if isinstance(value, str):
+        try:
+            timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if timestamp.tzinfo is not None:
+                return timestamp.astimezone().replace(tzinfo=None)
+            return timestamp
+        except ValueError:
+            return None
+    return None
+
+
+def checkpoint_short_timer_for_logbook_entry(
+    db,
+    exercise_id: int | str,
+    previous_entries_json: str,
+    entries_json: str,
+) -> bool:
+    try:
+        previous_entries = json.loads(previous_entries_json or "[]")
+        entries = json.loads(entries_json or "[]")
+    except (TypeError, json.JSONDecodeError):
+        return False
+    if not isinstance(previous_entries, list) or not isinstance(entries, list):
+        return False
+
+    previous_ids = {
+        str(entry["id"])
+        for entry in previous_entries
+        if isinstance(entry, dict) and entry.get("id") is not None
+    }
+    new_entry_timestamps = [
+        _parse_logbook_entry_timestamp(entry.get("ts"))
+        for entry in entries
+        if isinstance(entry, dict)
+        and entry.get("id") is not None
+        and str(entry["id"]) not in previous_ids
+    ]
+    new_entry_timestamps = [timestamp for timestamp in new_entry_timestamps if timestamp is not None]
+    if not new_entry_timestamps:
+        return False
+
+    row = _find_statistics_row(db, str(exercise_id))
+    if row is None or row.start_counting is None or row.stop_counting is not None:
+        return False
+    now = datetime.now()
+    elapsed_seconds = (now - row.start_counting).total_seconds()
+    if not 0 <= elapsed_seconds < MIN_TIMER_SECONDS_TO_PERSIST:
+        return False
+    if not any(row.start_counting <= timestamp <= now for timestamp in new_entry_timestamps):
+        return False
+
+    _finalize_timer(db, row, now, count_short_elapsed=True)
+    row.start_counting = now
+    row.stop_counting = None
+    _record_timer_start(db, row.exercise_id, now)
+    return True
 
 
 def mark_exercise_selected(exercise_id: int | str) -> None:
@@ -151,8 +288,12 @@ def mark_exercise_selected(exercise_id: int | str) -> None:
         if created or row.started_at is None:
             row.started_at = datetime.now()
         if _exercise_is_incomplete(db, exercise_id):
-            row.start_counting = datetime.now() + timedelta(seconds=3)
+            now = datetime.now()
+            if row.start_counting is not None and row.stop_counting is None:
+                _finalize_timer(db, row, now, count_short_elapsed=True)
+            row.start_counting = now + timedelta(seconds=3)
             row.stop_counting = None
+            _record_timer_start(db, row.exercise_id, row.start_counting)
         db.commit()
         db.refresh(row)
 
@@ -161,11 +302,10 @@ def mark_exercise_closed(exercise_id: int | str) -> None:
     with get_db() as db:
         row, _ = _ensure_statistics_row(db, exercise_id)
         if row is None or row.start_counting is None or row.stop_counting is not None:
-            db.refresh(row)
             return
 
         is_completed = _exercise_is_completed(db, exercise_id)
-        _finalize_timer(row, datetime.now(), count_short_elapsed=is_completed)
+        _finalize_timer(db, row, datetime.now(), count_short_elapsed=is_completed)
 
         db.commit()
         db.refresh(row)
@@ -184,7 +324,7 @@ def mark_exercise_paused(exercise_id: int | str) -> None:
             return
 
         # A user-initiated pause should always flush the elapsed segment.
-        _finalize_timer(row, datetime.now(), count_short_elapsed=True)
+        _finalize_timer(db, row, datetime.now(), count_short_elapsed=True)
 
         db.commit()
         db.refresh(row)
@@ -209,7 +349,7 @@ def mark_exercise_completed(exercise_id: int | str) -> None:
         completed_at = row.completed_at or datetime.now()
         row.completed_at = completed_at
         row.fragments_drawn, row.matches_done, row.merges_done = _logbook_event_counts(db, exercise_id)
-        _finalize_timer(row, completed_at, count_short_elapsed=True)
+        _finalize_timer(db, row, completed_at, count_short_elapsed=True)
         db.commit()
         db.refresh(row)
 
@@ -229,6 +369,7 @@ def mark_exercise_resumed(exercise_id: int | str) -> None:
         now = datetime.now()
         row.start_counting = now
         row.stop_counting = None
+        _record_timer_start(db, row.exercise_id, now)
 
         db.commit()
         db.refresh(row)

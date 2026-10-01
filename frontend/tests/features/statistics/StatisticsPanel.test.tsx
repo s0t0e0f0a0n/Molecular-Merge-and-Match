@@ -3,9 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StatisticsPanel } from '../../../src/features/statistics/StatisticsPanel';
 import { resetExercises } from '../../../src/api/reset';
+import { fetchAllLogbooks } from '../../../src/api/logbook';
 
 vi.mock('../../../src/api/reset', () => ({
   resetExercises: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../../src/api/logbook', () => ({
+  fetchAllLogbooks: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock('../../../src/api/tags', () => ({
@@ -137,5 +142,75 @@ describe('Statistics tag progression', () => {
     expect(progressionRow).not.toBeNull();
     expect(progressionRow?.querySelector('progress')).toHaveProperty('value', 1);
     expect(progressionRow?.querySelector('.statistics-progression-count.is-black')).toHaveTextContent('1');
+  });
+});
+
+describe('Exercise overview DBE input totals', () => {
+  it('shows total DBE submissions and the average per completed exercise', async () => {
+    const user = userEvent.setup();
+    render(
+      <StatisticsPanel
+        isOpen
+        onClose={() => undefined}
+        exerciseSummaries={[
+          { id: 81, name: 'Completed one', exercise_set: 'set-a', tags: [], completed_at: '2026-09-01T00:00:00Z', dbe_set: 2 },
+          { id: 82, name: 'Completed two', exercise_set: 'set-a', tags: [], completed_at: '2026-09-02T00:00:00Z', dbe_set: 3 },
+          { id: 83, name: 'Incomplete', exercise_set: 'set-a', tags: [], dbe_set: 20 },
+        ]}
+        selectedExerciseId={81}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Exercise overview/ }));
+
+    expect(await screen.findByRole('heading', { name: 'Number of DBE inputs' })).toBeInTheDocument();
+    expect(screen.getByText('total: 25 inputs')).toBeInTheDocument();
+    expect(screen.getByText('average: 12.5 per completed exercise')).toBeInTheDocument();
+  });
+});
+
+describe('Advanced logbook distribution', () => {
+  it('normalizes event positions across active intervals and excludes multi-day pauses', async () => {
+    vi.mocked(fetchAllLogbooks).mockResolvedValue({
+      '71': {
+        entries_json: JSON.stringify([
+          { kind: 'link', ts: Date.parse('2026-08-01T00:00:30Z') },
+          { kind: 'set-dbe', before: null, after: 2.5, ts: Date.parse('2026-08-01T00:00:30Z') },
+          { kind: 'merge-fragments', ts: Date.parse('2026-08-03T00:00:30Z') },
+        ]),
+        cursor: 2,
+        links_json: '[]',
+        restarts: JSON.stringify([
+          { start: '2026-08-01T00:00:00Z', stop: '2026-08-01T00:01:00Z' },
+          { start: '2026-08-03T00:00:00Z', stop: '2026-08-03T00:01:00Z' },
+        ]),
+      },
+    });
+    const user = userEvent.setup();
+    render(
+      <StatisticsPanel
+        isOpen
+        onClose={() => undefined}
+        exerciseSummaries={[
+          {
+            id: 71,
+            name: 'Long pause',
+            exercise_set: 'set-a',
+            tags: [],
+            started_at: '2026-08-01T00:00:00Z',
+            completed_at: '2026-08-03T00:01:00Z',
+          },
+        ]}
+        selectedExerciseId={71}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Advanced/ }));
+
+    expect(await screen.findByTitle('25-30%: 2 events')).toBeInTheDocument();
+    expect(screen.getByTitle('75-80%: 1 event')).toBeInTheDocument();
+    expect(screen.getByTitle('95-100%: 0 events')).toBeInTheDocument();
+    expect(screen.getByTitle('25-30%: 2 events').querySelector('.statistics-logbook-dbe'))
+      .toHaveStyle({ height: '50%' });
   });
 });

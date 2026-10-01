@@ -382,6 +382,14 @@ def _migrate_add_missing_columns() -> None:
         conn.execute(text("DROP TABLE IF EXISTS exercise_cas_answers"))
         conn.commit()
 
+        result_logbooks = conn.execute(text("PRAGMA table_info(logbook_states)"))
+        existing_logbook_columns = {row[1] for row in result_logbooks}
+        if "restarts" not in existing_logbook_columns:
+            conn.execute(
+                text("ALTER TABLE logbook_states ADD COLUMN restarts TEXT NOT NULL DEFAULT '[]'")
+            )
+            conn.commit()
+
         # Update Exercise model
         result_exercise = conn.execute(text("PRAGMA table_info(exercises)"))
         existing_exercise = {row[1] for row in result_exercise}
@@ -532,7 +540,7 @@ def _migrate_add_missing_columns() -> None:
             conn.execute(text("ALTER TABLE statistics ADD COLUMN cheats_off DATETIME"))
             conn.commit()
         if "dbe_set" not in existing_statistics:
-            conn.execute(text("ALTER TABLE statistics ADD COLUMN dbe_set DATETIME"))
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN dbe_set INTEGER NOT NULL DEFAULT 0"))
             conn.commit()
         if "difficulty" not in existing_statistics:
             conn.execute(text("ALTER TABLE statistics ADD COLUMN difficulty VARCHAR(10) NOT NULL DEFAULT 'O0'"))
@@ -552,11 +560,11 @@ def _migrate_add_missing_columns() -> None:
         if "eligible_purge_time" not in existing_statistics:
             conn.execute(text("ALTER TABLE statistics ADD COLUMN eligible_purge_time DATETIME"))
             conn.commit()
-        if "pauzed_at" not in existing_statistics:
-            conn.execute(text("ALTER TABLE statistics ADD COLUMN pauzed_at DATETIME"))
+        if "paused_at" not in existing_statistics:
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN paused_at DATETIME"))
             conn.commit()
-        if "pauze_total" not in existing_statistics:
-            conn.execute(text("ALTER TABLE statistics ADD COLUMN pauze_total INTEGER NOT NULL DEFAULT 0"))
+        if "pause_total" not in existing_statistics:
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN pause_total INTEGER NOT NULL DEFAULT 0"))
             conn.commit()
         if "mastery_index" not in existing_statistics:
             conn.execute(text("ALTER TABLE statistics ADD COLUMN mastery_index INTEGER DEFAULT 0"))
@@ -575,6 +583,7 @@ def _migrate_add_missing_columns() -> None:
                     merges_done INTEGER NOT NULL DEFAULT 0,
                     matches_done INTEGER NOT NULL DEFAULT 0,
                     fragments_drawn INTEGER NOT NULL DEFAULT 0,
+                    dbe_set INTEGER NOT NULL DEFAULT 0,
                     start_counting DATETIME,
                     stop_counting DATETIME,
                     timer_total INTEGER NOT NULL DEFAULT 0,
@@ -587,14 +596,38 @@ def _migrate_add_missing_columns() -> None:
             conn.execute(text(
                 """
                 INSERT INTO statistics
-                    (id, exercise_id, incorrect_count, cheats_used, difficulty, confidence, merges_done, matches_done, fragments_drawn, start_counting,
+                    (id, exercise_id, incorrect_count, cheats_used, difficulty, confidence, merges_done, matches_done, fragments_drawn, dbe_set, start_counting,
                      stop_counting, timer_total, started_at, completed_at, eligible_purge_time)
-                SELECT id, exercise_id, incorrect_count, CAST(cheats_used AS TEXT), difficulty, confidence, merges_done, matches_done, fragments_drawn, start_counting,
+                SELECT id, exercise_id, incorrect_count, CAST(cheats_used AS TEXT), difficulty, confidence, merges_done, matches_done, fragments_drawn,
+                       CASE WHEN dbe_set IS NULL THEN 0 ELSE 1 END, start_counting,
                        stop_counting, timer_total, started_at, completed_at, eligible_purge_time
                 FROM statistics_legacy
                 """
             ))
             conn.execute(text("DROP TABLE statistics_legacy"))
+            conn.commit()
+
+        dbe_set_column = next(
+            row for row in conn.execute(text("PRAGMA table_info(statistics)"))
+            if row[1] == "dbe_set"
+        )
+        if dbe_set_column[2].upper() != "INTEGER":
+            conn.execute(text(
+                "CREATE TEMP TABLE statistics_dbe_set_migration AS "
+                "SELECT id, CASE WHEN dbe_set IS NULL THEN 0 ELSE 1 END AS dbe_set "
+                "FROM statistics"
+            ))
+            conn.commit()
+            conn.execute(text("ALTER TABLE statistics DROP COLUMN dbe_set"))
+            conn.commit()
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN dbe_set INTEGER NOT NULL DEFAULT 0"))
+            conn.commit()
+            conn.execute(text(
+                "UPDATE statistics SET dbe_set = ("
+                "SELECT dbe_set FROM statistics_dbe_set_migration "
+                "WHERE statistics_dbe_set_migration.id = statistics.id)"
+            ))
+            conn.execute(text("DROP TABLE statistics_dbe_set_migration"))
             conn.commit()
 
         # Update WorkingSolution model

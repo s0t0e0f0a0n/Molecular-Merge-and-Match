@@ -11,6 +11,7 @@ import {
 import type { WorkingSolution } from '../hooks/useWorkingSolution';
 import { useExerciseData } from './ExerciseDataContext';
 import { clearLogbook, fetchLogbook, saveLogbook } from '../api/logbook';
+import { fetchExerciseStatistics } from '../api/exercises';
 
 export type Link = { fragmentId: string; peakId: string };
 
@@ -28,6 +29,7 @@ export type LogbookEntry = Common &
         after: { smiles: string; mol_file: string };
       }
     | { kind: 'set-solution'; before: WorkingSolution | null; after: WorkingSolution }
+    | { kind: 'set-dbe'; before: number | null; after: number | null }
     | { kind: 'clear-solution'; before: WorkingSolution }
     | {
         kind: 'send-to-fragments';
@@ -58,6 +60,8 @@ export function describeEntry(entry: LogbookEntry): string {
       return `Edited fragment "${entry.fragLabel}"`;
     case 'set-solution':
       return entry.before ? 'Updated working solution' : 'Set working solution';
+    case 'set-dbe':
+      return `Set DBE to ${entry.after ?? 'unset'}`;
     case 'clear-solution':
       return 'Cleared working solution';
     case 'send-to-fragments':
@@ -87,6 +91,7 @@ type HistoryHandlers = {
   updateFragment: (id: number, smiles: string, molFile: string) => Promise<void>;
   setSolution: (smiles: string, molFile: string) => Promise<void>;
   clearSolution: () => Promise<void>;
+  setDbe: (value: number | null) => Promise<void>;
 };
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
@@ -117,7 +122,9 @@ function makeId(): string {
 }
 
 export function HistoryProvider({ children }: { children: ReactNode }) {
-  const { selectedExerciseId } = useExerciseData();
+  const { selectedExerciseId, setSelectedExerciseStatistics } = useExerciseData();
+  const selectedExerciseIdRef = useRef(selectedExerciseId);
+  selectedExerciseIdRef.current = selectedExerciseId;
   const exerciseKey = selectedExerciseId !== null ? `exercise-${selectedExerciseId}` : 'none';
 
   const [allHistories, setAllHistories] = useState<Record<string, ExerciseHistory>>({});
@@ -174,10 +181,15 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         entries_json: JSON.stringify(state.entries),
         cursor: state.cursor,
         links_json: JSON.stringify(state.links),
+      }).then(async (savedState) => {
+        const exerciseId = Number(exerciseKey.replace(/^exercise-/, ''));
+        if (savedState.timer_checkpointed && exerciseId === selectedExerciseIdRef.current) {
+          setSelectedExerciseStatistics(await fetchExerciseStatistics(exerciseId));
+        }
       }).catch((err) => console.error('logbook save failed', err));
     }, SAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(t);
-  }, [allHistories, exerciseKey, isJumping]);
+  }, [allHistories, exerciseKey, isJumping, selectedExerciseId, setSelectedExerciseStatistics]);
 
   const current = allHistories[exerciseKey] ?? emptyHistory;
 
@@ -277,6 +289,9 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         if (entry.before) await h.setSolution(entry.before.smiles, entry.before.mol_file);
         else await h.clearSolution();
         return entry;
+      case 'set-dbe':
+        await h.setDbe(entry.before);
+        return entry;
       case 'clear-solution':
         await h.setSolution(entry.before.smiles, entry.before.mol_file);
         return entry;
@@ -364,6 +379,9 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         return entry;
       case 'set-solution':
         await h.setSolution(entry.after.smiles, entry.after.mol_file);
+        return entry;
+      case 'set-dbe':
+        await h.setDbe(entry.after);
         return entry;
       case 'clear-solution':
         await h.clearSolution();

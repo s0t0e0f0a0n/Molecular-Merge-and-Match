@@ -23,6 +23,13 @@ def test_reset_clears_fragments_working_solution_and_logbook(client):
         json={"entries_json": '[{"x":1}]', "cursor": 1, "links_json": "[]"},
         params={"exercise_id": "ex1"},
     )
+    db = SessionLocal()
+    try:
+        logbook = db.query(LogbookState).filter(LogbookState.exercise_id == "ex1").one()
+        logbook.restarts = '[{"start":"2026-09-01T10:00:00","stop":"2026-09-01T10:01:00"}]'
+        db.commit()
+    finally:
+        db.close()
 
     resp = client.post("/api/v1/exercises/reset", params={"exercise_id": "ex1"})
     assert resp.status_code == 204
@@ -34,9 +41,10 @@ def test_reset_clears_fragments_working_solution_and_logbook(client):
             db.query(WorkingSolution).filter(WorkingSolution.exercise_id == "ex1").count()
             == 0
         )
-        assert (
-            db.query(LogbookState).filter(LogbookState.exercise_id == "ex1").count() == 0
-        )
+        logbook = db.query(LogbookState).filter(LogbookState.exercise_id == "ex1").one()
+        assert logbook.entries_json == "[]"
+        assert logbook.cursor == 0
+        assert logbook.restarts == '[{"start":"2026-09-01T10:00:00","stop":"2026-09-01T10:01:00"}]'
     finally:
         db.close()
 

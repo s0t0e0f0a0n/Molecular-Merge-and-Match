@@ -5,6 +5,7 @@ from typing import Dict
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
+from app.api.statistics import checkpoint_short_timer_for_logbook_entry
 from app.db.models import Fragment, LogbookState
 from app.db.session import get_db
 
@@ -21,6 +22,13 @@ class LogbookStateOut(BaseModel):
     entries_json: str
     cursor: int
     links_json: str
+    restarts: str = "[]"
+
+    model_config = {"from_attributes": True}
+
+
+class LogbookStateSaveOut(LogbookStateOut):
+    timer_checkpointed: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -48,16 +56,17 @@ def get_logbook(exercise_id: str = Query(...)) -> LogbookStateOut:
         return LogbookStateOut.model_validate(row)
 
 
-@router.put("/", response_model=LogbookStateOut)
+@router.put("/", response_model=LogbookStateSaveOut)
 def set_logbook(
     body: LogbookStateBody, exercise_id: str = Query(...)
-) -> LogbookState:
+) -> LogbookStateSaveOut:
     with get_db() as db:
         row = (
             db.query(LogbookState)
             .filter(LogbookState.exercise_id == exercise_id)
             .first()
         )
+        previous_entries_json = row.entries_json if row else "[]"
         if row:
             row.entries_json = body.entries_json
             row.cursor = body.cursor
@@ -70,18 +79,30 @@ def set_logbook(
                 links_json=body.links_json,
             )
             db.add(row)
+        timer_checkpointed = checkpoint_short_timer_for_logbook_entry(
+            db,
+            exercise_id,
+            previous_entries_json,
+            body.entries_json,
+        )
         db.commit()
         db.refresh(row)
-        return row
+        return LogbookStateSaveOut.model_validate(row).model_copy(
+            update={"timer_checkpointed": timer_checkpointed}
+        )
 
 
 @router.delete("/", status_code=204, response_model=None)
 def clear_logbook(exercise_id: str = Query(...)) -> None:
     # After clearing, undo should not be able to bring deleted fragments back.
     with get_db() as db:
-        db.query(LogbookState).filter(
+        row = db.query(LogbookState).filter(
             LogbookState.exercise_id == exercise_id
-        ).delete(synchronize_session=False)
+        ).first()
+        if row is not None:
+            row.entries_json = "[]"
+            row.cursor = 0
+            row.links_json = "[]"
         db.query(Fragment).filter(
             Fragment.exercise_id == exercise_id,
             Fragment.deleted_at.isnot(None),

@@ -233,9 +233,9 @@ function TagsTab({ onTagsUpdated, showCheatTags }: TagsTabProps) {
     onTagsUpdated?.();
   }
 
-  async function handleHide(t: Tag, value: boolean) {
-    await setTagHidden(t.id, value);
-    setTags((prev) => prev.map((tag) => (tag.id === t.id ? { ...tag, is_hidden: value } : tag)));
+  async function handleShow(t: Tag, value: boolean) {
+    await setTagHidden(t.id, !value);
+    setTags((prev) => prev.map((tag) => (tag.id === t.id ? { ...tag, is_hidden: !value } : tag)));
     onTagsUpdated?.();
   }
 
@@ -251,7 +251,7 @@ function TagsTab({ onTagsUpdated, showCheatTags }: TagsTabProps) {
           <div className="tag-column-header">
             <span>Tag name</span>
             <span>Count</span>
-            <span style={{ display: 'block', textAlign: 'center' }}>Hide</span>
+            <span style={{ display: 'block', textAlign: 'center' }}>Show</span>
             <span style={{ display: 'block', textAlign: 'center' }}>Statistics</span>
             <span style={{ display: 'block', textAlign: 'center' }}>Delete</span>
             <span>Description</span>
@@ -264,15 +264,13 @@ function TagsTab({ onTagsUpdated, showCheatTags }: TagsTabProps) {
                 Tag used in <b>{t.tag_count}</b> exercises.<br />
               </div>
               <div className="tag-hide" style={{ textAlign: 'center' }}>
-                {t.is_hideable ? (
-                  <input
-                    type="checkbox"
-                    checked={t.is_hidden}
-                    onChange={(e) => handleHide(t, e.target.checked)}
-                  />
-                ) : (
-                  <span />
-                )}
+                <input
+                  type="checkbox"
+                  checked={t.is_persistent || !t.is_hideable ? true : !t.is_hidden}
+                  disabled={t.is_persistent || !t.is_hideable}
+                  aria-label={`Show tag ${t.tag_name}`}
+                  onChange={(e) => handleShow(t, e.target.checked)}
+                />
               </div>
 
               <div className="tag-statistics" style={{ textAlign: 'center' }}>
@@ -357,6 +355,39 @@ export function SettingsPanel({
   const visibleTabs = cheatsEnabled
     ? TABS
     : TABS.filter((tab) => tab.id !== 'cheatstab');
+  const usedSolvents = useMemo(
+    () => solvents.filter((solvent) => solvent.count > 0).sort((a, b) => b.count - a.count || a.id - b.id),
+    [solvents],
+  );
+  const unusedSolvents = useMemo(
+    () => solvents.filter((solvent) => solvent.count === 0).sort((a, b) => a.id - b.id),
+    [solvents],
+  );
+
+  const renderSolvent = (solvent: SolventPreference) => (
+    <div className="settings-solvent-row" key={solvent.id}>
+      <div className="settings-solvent-name">{solvent.display}</div>
+      <div className="settings-solvent-options">
+        {solvent.options.map((option, index) => (
+          <label className="settings-solvent-option" key={`${solvent.id}-${index}`}>
+            <input
+              type="checkbox"
+              checked={solvent.preference === index}
+              onChange={(event) => {
+                if (event.target.checked) {
+                  onSolventPreferenceChange(solvent.id, index);
+                }
+              }}
+            />
+            <span>{formatChemistryText(option)}</span>
+          </label>
+        ))}
+      </div>
+      <p className="settings-solvent-count">
+        There are <b>{solvent.count}</b> exercises using this solvent
+      </p>
+    </div>
+  );
 
   useEffect(() => {
     if (!cheatsEnabled && activeTab === 'cheatstab') {
@@ -501,38 +532,38 @@ export function SettingsPanel({
               {!solventsLoading && solvents.length === 0 && (
                 <p className="settings-placeholder-text">No solvents available.</p>
               )}
-              {!solventsLoading && solvents.map((solvent) => (
-                <div className="settings-solvent-row" key={solvent.id}> 
-                  <div className="settings-solvent-name">{solvent.display}</div>
-                  <div className="settings-solvent-options">
-                    {solvent.options.map((option, index) => (
-                      <label className="settings-solvent-option" key={`${solvent.id}-${index}`}>
-                        <input
-                          type="checkbox"
-                          checked={solvent.preference === index}
-                          onChange={(event) => {
-                            if (event.target.checked) {
-                              onSolventPreferenceChange(solvent.id, index);
-                            }
-                          }}
-                        />
-                        <span>{formatChemistryText(option)}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <p className="settings-solvent-count">
-                    There are <b>{solvent.count}</b> exercises using this solvent
-                  </p>
+              {!solventsLoading && solvents.length > 0 && (
+                <div className="settings-solvent-sections">
+                  <section className="settings-solvent-section" aria-labelledby="used-solvents-heading">
+                    <h3 className="settings-solvent-section-title" id="used-solvents-heading">
+                      Currently used solvents
+                    </h3>
+                    {usedSolvents.length > 0 ? (
+                      <div className="settings-solvent-grid">{usedSolvents.map(renderSolvent)}</div>
+                    ) : (
+                      <p className="settings-placeholder-text">No solvents currently in use.</p>
+                    )}
+                  </section>
+                  <section className="settings-solvent-section" aria-labelledby="unused-solvents-heading">
+                    <h3 className="settings-solvent-section-title" id="unused-solvents-heading">
+                      Currently unused solvents
+                    </h3>
+                    {unusedSolvents.length > 0 ? (
+                      <div className="settings-solvent-grid">{unusedSolvents.map(renderSolvent)}</div>
+                    ) : (
+                      <p className="settings-placeholder-text">All solvents are currently in use.</p>
+                    )}
+                  </section>
                 </div>
-              ))}
+              )}
             </div>
           )}
 
           {activeTab === 'tagstab' && (
             <div className="settings-tab-content" id="tagstab">
                 <div className="settings-solvent-option" style={{ borderBottom: '1px solid #f1f5f9', padding: '12px 14px' }}> 
-                        This is a list of all current tags and how often they occur, including the examples and references. You can choose to hide them, and some can even be deleted.
-                        Hidden tags will not be shown in the exercise selection menu. Tags marked as cheats are normally excluded from this list unless the cheat toggle is enabled in the Cheats tab.
+                        This is a list of all current tags and how often they occur, including the examples and references. You can choose which tags to show, and some can even be deleted.
+                        Tags that are not hideable are always shown. Tags marked as cheats are normally excluded from this list unless the cheat toggle is enabled in the Cheats tab.
                         Deleting tags can only be undone in the current active window: close this settings panel and deletion is irreversible.
                 </div>
               <TagsTab onTagsUpdated={onTagsUpdated} showCheatTags={readCheatBit(normalizedCheatBits, 9)} />

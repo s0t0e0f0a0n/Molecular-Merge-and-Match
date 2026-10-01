@@ -13,6 +13,25 @@ Changes and additions since release version 1.0.0 are grouped by:
 [v1.2.1](#v1.2.1)  
 [v1.1.2](#v1.1.2)  
 
+## v1.5.0
+Changes since version 1.4.0
+
+Logbook states now store when the exercise was openend and closed. That way the statistics panel shows more accurately when an exercise was worked on over multiple days.
+
+DBE setting is logged in logbook and statistics. DBE statistics are included in the statistics panel. 
+
+Solvent and tag counting is restored.
+
+Solvents are displayed in two columns, seperated by if they are used or not and also centralized.
+
+Resetting workspace too harsh is fixed
+
+Logbook graph is fixed
+
+Tags included in statistics is fixed
+
+Changed tags from "hide" option, to "show" option.
+
 
 ## v1.4.0
 Changes since version 1.3.0

@@ -33,9 +33,11 @@ const renderProvider = () => render(
 describe('HistoryProvider talks to logbook api', () => {
   beforeEach(() => {
     vi.mocked(logbookApi.fetchLogbook).mockResolvedValue({
-      entries_json: '[]', cursor: 0, links_json: '[]',
+      entries_json: '[]', cursor: 0, links_json: '[]', restarts: '[]',
     });
-    vi.mocked(logbookApi.saveLogbook).mockResolvedValue(undefined);
+    vi.mocked(logbookApi.saveLogbook).mockResolvedValue({
+      entries_json: '[]', cursor: 0, links_json: '[]', restarts: '[]', timer_checkpointed: false,
+    });
     vi.mocked(logbookApi.clearLogbook).mockResolvedValue(undefined);
   });
 
@@ -56,6 +58,7 @@ describe('HistoryProvider talks to logbook api', () => {
       ]),
       cursor: 1,
       links_json: '[]',
+      restarts: '[]',
     });
 
     renderProvider();

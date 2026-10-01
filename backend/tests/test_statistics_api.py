@@ -1,6 +1,7 @@
 import json
+from datetime import datetime, timedelta
 
-from app.api.statistics import mark_exercise_completed
+from app.api.statistics import mark_exercise_completed, mark_exercise_paused, mark_exercise_resumed
 from app.db.models import Exercise, LogbookState, Statistics, UserSettings
 from app.db.session import SessionLocal
 
@@ -56,6 +57,65 @@ def test_completion_stores_final_logbook_counts(client):
         assert row.fragments_drawn == 1
         assert row.matches_done == 1
         assert row.merges_done == 1
+    finally:
+        db.close()
+
+
+def test_timer_restarts_are_saved_with_the_timer_interval(client):
+    mark_exercise_resumed(45)
+    mark_exercise_paused(45)
+
+    db = SessionLocal()
+    try:
+        statistics = db.query(Statistics).filter(Statistics.exercise_id == "45").one()
+        logbook = db.query(LogbookState).filter(LogbookState.exercise_id == "exercise-45").one()
+        intervals = json.loads(logbook.restarts)
+        assert len(intervals) == 1
+        assert datetime.fromisoformat(intervals[0]["start"]) == statistics.start_counting
+        assert datetime.fromisoformat(intervals[0]["stop"]) == statistics.stop_counting
+    finally:
+        db.close()
+
+
+def test_logbook_entry_checkpoints_short_timer_segment(client):
+    started_at = datetime.now() - timedelta(seconds=4)
+    db = SessionLocal()
+    try:
+        db.add(Statistics(exercise_id="46", start_counting=started_at, timer_total=0))
+        db.add(
+            LogbookState(
+                exercise_id="exercise-46",
+                entries_json="[]",
+                restarts=json.dumps([{"start": started_at.isoformat(), "stop": None}]),
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.put(
+        "/api/v1/logbook/",
+        params={"exercise_id": "exercise-46"},
+        json={
+            "entries_json": json.dumps([{"id": "new", "ts": int(datetime.now().timestamp() * 1000), "kind": "link"}]),
+            "cursor": 1,
+            "links_json": "[]",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["timer_checkpointed"] is True
+
+    db = SessionLocal()
+    try:
+        statistics = db.query(Statistics).filter(Statistics.exercise_id == "46").one()
+        logbook = db.query(LogbookState).filter(LogbookState.exercise_id == "exercise-46").one()
+        intervals = json.loads(logbook.restarts)
+        assert statistics.timer_total >= 4
+        assert statistics.stop_counting is None
+        assert len(intervals) == 2
+        assert intervals[0]["stop"] is not None
+        assert intervals[1]["start"] == intervals[0]["stop"]
+        assert intervals[1]["stop"] is None
     finally:
         db.close()
 

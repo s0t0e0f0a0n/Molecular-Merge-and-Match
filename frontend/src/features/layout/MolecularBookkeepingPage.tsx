@@ -374,8 +374,14 @@ export function MolecularBookkeepingPage() {
       },
       setSolution: rawSetSolution,
       clearSolution: rawClearSolution,
+      setDbe: async (value: number | null) => {
+        if (selectedExerciseId === null) return;
+        await saveExerciseDbe(selectedExerciseId, value, false);
+        setSavedFormulaDbe(value);
+        setFormulaDbeDraft(value === null ? '' : String(value));
+      },
     });
-  }, [history, rawDeleteFragment, rawRestoreFragment, updateFragment, rawSetSolution, rawClearSolution]);
+  }, [history, rawDeleteFragment, rawRestoreFragment, updateFragment, rawSetSolution, rawClearSolution, selectedExerciseId]);
 
   // Wrapped versions used by user-driven UI actions: they record a logbook
   // entry after the underlying API call succeeds.
@@ -1089,13 +1095,20 @@ const cAxisRange: [number, number] | null =
 
   const handleSaveDbe = useCallback(async () => {
     if (selectedExerciseId === null) return;
-    setSavedFormulaDbe(parsedFormulaDbeDraft);
     try {
       await saveExerciseDbe(selectedExerciseId, parsedFormulaDbeDraft);
+      if (savedFormulaDbe !== parsedFormulaDbeDraft) {
+        history.record({
+          kind: 'set-dbe',
+          before: savedFormulaDbe,
+          after: parsedFormulaDbeDraft,
+        });
+      }
+      setSavedFormulaDbe(parsedFormulaDbeDraft);
     } catch (err) {
       console.error('Failed to save DBE:', err);
     }
-  }, [selectedExerciseId, parsedFormulaDbeDraft]);
+  }, [history, selectedExerciseId, parsedFormulaDbeDraft, savedFormulaDbe]);
 
   const showCorrectDbeCheat = cheating.showCorrectDbe;
   const showAltNucleiTablesCheat = cheating.showAltNucleiTables;

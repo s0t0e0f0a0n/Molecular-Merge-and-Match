@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ExerciseSummary } from '../../api/exercises';
-import { fetchAllLogbooks } from '../../api/logbook';
+import { fetchAllLogbooks, type ApiLogbookState } from '../../api/logbook';
 import { resetExercises, type ResetLevel } from '../../api/reset';
 import { fetchTags, type Tag } from '../../api/tags';
 import '../../panelStyles.css';
@@ -273,6 +273,7 @@ type LogbookDistributionBucket = {
   createFragment: number;
   link: number;
   mergeFragments: number;
+  dbe: number;
 };
 
 const LOGBOOK_BIN_COUNT = 20;
@@ -293,16 +294,33 @@ function parseLogbookTimestamp(value: unknown): number | null {
   return null;
 }
 
+function parseLogbookRestarts(value: unknown): Array<{ start: number; stop: number }> {
+  if (typeof value !== 'string') return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((interval) => {
+      if (typeof interval !== 'object' || interval === null) return [];
+      const start = parseLogbookTimestamp((interval as { start?: unknown }).start);
+      const stop = parseLogbookTimestamp((interval as { stop?: unknown }).stop);
+      return start !== null && stop !== null && stop > start ? [{ start, stop }] : [];
+    }).sort((left, right) => left.start - right.start);
+  } catch {
+    return [];
+  }
+}
+
 function buildLogbookDistribution(
   exerciseSummaries: ExerciseSummary[],
-  logbooks: Record<string, { entries_json: string }>,
+  logbooks: Record<string, ApiLogbookState>,
 ): LogbookDistributionBucket[] {
   const buckets = Array.from({ length: LOGBOOK_BIN_COUNT }, () => ({
     createFragment: 0,
     link: 0,
     mergeFragments: 0,
+    dbe: 0,
   }));
-  const eventKinds = new Set(['create-fragment', 'link', 'merge-fragments']);
+  const eventKinds = new Set(['create-fragment', 'link', 'merge-fragments', 'set-dbe']);
 
   exerciseSummaries
     .filter((exercise) => exercise.completed_at != null)
@@ -322,16 +340,32 @@ function buildLogbookDistribution(
         return;
       }
 
+      const restarts = parseLogbookRestarts(logbook.restarts);
+      const activeDuration = restarts.reduce((sum, interval) => sum + interval.stop - interval.start, 0);
       const duration = completedAt.getTime() - startedAt.getTime();
       entries.forEach((entry) => {
         if (!eventKinds.has(entry.kind ?? '')) return;
         const timestamp = parseLogbookTimestamp(entry.ts);
-        if (timestamp === null || timestamp < startedAt.getTime() || timestamp > completedAt.getTime()) return;
-        const normalizedPosition = (timestamp - startedAt.getTime()) / duration;
+        if (timestamp === null) return;
+        let normalizedPosition: number | null = null;
+        if (restarts.length > 0 && activeDuration > 0) {
+          let elapsedBeforeInterval = 0;
+          for (const interval of restarts) {
+            if (timestamp >= interval.start && timestamp <= interval.stop) {
+              normalizedPosition = (elapsedBeforeInterval + timestamp - interval.start) / activeDuration;
+              break;
+            }
+            elapsedBeforeInterval += interval.stop - interval.start;
+          }
+        } else if (timestamp >= startedAt.getTime() && timestamp <= completedAt.getTime()) {
+          normalizedPosition = (timestamp - startedAt.getTime()) / duration;
+        }
+        if (normalizedPosition === null) return;
         const bucket = buckets[Math.min(LOGBOOK_BIN_COUNT - 1, Math.floor(normalizedPosition * LOGBOOK_BIN_COUNT))];
         if (entry.kind === 'create-fragment') bucket.createFragment += 1;
         if (entry.kind === 'link') bucket.link += 1;
         if (entry.kind === 'merge-fragments') bucket.mergeFragments += 1;
+        if (entry.kind === 'set-dbe') bucket.dbe += 1;
       });
     });
 
@@ -339,7 +373,7 @@ function buildLogbookDistribution(
 }
 
 function LogbookDistributionGraph({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
-  const [logbooks, setLogbooks] = useState<Record<string, { entries_json: string }>>({});
+  const [logbooks, setLogbooks] = useState<Record<string, ApiLogbookState>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -365,7 +399,7 @@ function LogbookDistributionGraph({ exerciseSummaries }: { exerciseSummaries: Ex
   const buckets = buildLogbookDistribution(exerciseSummaries, logbooks);
   const maximumCount = Math.max(
     1,
-    ...buckets.map((bucket) => bucket.createFragment + bucket.link + bucket.mergeFragments),
+    ...buckets.map((bucket) => bucket.createFragment + bucket.link + bucket.mergeFragments + bucket.dbe),
   );
   const ticks = timelineTicks(maximumCount);
 
@@ -377,6 +411,7 @@ function LogbookDistributionGraph({ exerciseSummaries }: { exerciseSummaries: Ex
           <span className="statistics-timeline-legend-item"><span className="statistics-logbook-swatch is-create" aria-hidden="true" />Create fragment</span>
           <span className="statistics-timeline-legend-item"><span className="statistics-logbook-swatch is-link" aria-hidden="true" />Link</span>
           <span className="statistics-timeline-legend-item"><span className="statistics-logbook-swatch is-merge" aria-hidden="true" />Merge fragments</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-logbook-swatch is-dbe" aria-hidden="true" />Set DBE</span>
         </div>
       </div>
       <div className="statistics-timeline-chart statistics-logbook-chart">
@@ -397,13 +432,14 @@ function LogbookDistributionGraph({ exerciseSummaries }: { exerciseSummaries: Ex
             </div>
             <div className="statistics-logbook-distribution" style={{ '--timeline-days': buckets.length } as React.CSSProperties}>
               {buckets.map((bucket, index) => {
-                const total = bucket.createFragment + bucket.link + bucket.mergeFragments;
+                const total = bucket.createFragment + bucket.link + bucket.mergeFragments + bucket.dbe;
                 return (
                   <div key={index} className="statistics-logbook-bin" title={`${index * 5}-${(index + 1) * 5}%: ${total} event${total === 1 ? '' : 's'}`}>
                     <div className="statistics-timeline-bar" aria-label={`${index * 5}-${(index + 1) * 5}%: ${total} events`}>
                       <span className="statistics-timeline-segment statistics-logbook-create" style={{ height: `${(bucket.createFragment / maximumCount) * 100}%` }} />
                       <span className="statistics-timeline-segment statistics-logbook-link" style={{ height: `${(bucket.link / maximumCount) * 100}%` }} />
                       <span className="statistics-timeline-segment statistics-logbook-merge" style={{ height: `${(bucket.mergeFragments / maximumCount) * 100}%` }} />
+                      <span className="statistics-timeline-segment statistics-logbook-dbe" style={{ height: `${(bucket.dbe / maximumCount) * 100}%` }} />
                     </div>
                     <span className="statistics-logbook-label">{index % 5 === 0 ? `${index * 5}%` : ''}</span>
                   </div>
@@ -592,6 +628,7 @@ function RankedExerciseList({ title, exercises, includeTime = false, includeInco
 
 function StatisticsSummary({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
   const completedExerciseCount = exerciseSummaries.filter((exercise) => exercise.completed_at != null).length;
+  const dbeInputTotal = exerciseSummaries.reduce((sum, exercise) => sum + (exercise.dbe_set ?? 0), 0);
   const statistics = [
     { label: 'Fragments', field: 'fragments_drawn' as const, unit: 'fragments' },
     { label: 'Merges', field: 'merges_done' as const, unit: 'merges' },
@@ -611,6 +648,11 @@ function StatisticsSummary({ exerciseSummaries }: { exerciseSummaries: ExerciseS
           </div>
         );
       })}
+      <div className="statistics-summary-item">
+        <h3>Number of DBE inputs</h3>
+        <p>total: {dbeInputTotal} inputs</p>
+        <p>average: {(completedExerciseCount > 0 ? dbeInputTotal / completedExerciseCount : 0).toFixed(1)} per completed exercise</p>
+      </div>
     </section>
   );
 }

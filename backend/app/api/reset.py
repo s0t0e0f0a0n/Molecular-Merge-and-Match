@@ -66,7 +66,11 @@ def reset_exercise(exercise_id: str = Query(...)) -> None:
         db.query(WorkingSolution).filter(
             WorkingSolution.exercise_id == exercise_id,
         ).delete(synchronize_session=False)
-        db.query(LogbookState).filter(
+        logbook = db.query(LogbookState).filter(
             LogbookState.exercise_id == exercise_id,
-        ).delete(synchronize_session=False)
+        ).first()
+        if logbook is not None:
+            logbook.entries_json = "[]"
+            logbook.cursor = 0
+            logbook.links_json = "[]"
         db.commit()
