@@ -19,6 +19,7 @@ export type UpdateUserSettingsRequest = {
   link_inherit_mode?: string;
   theme?: string;
   cheats?: string;
+  exercise_id?: number;
   show_CAS?: boolean;
   show_timer?: boolean;
   show_warnings?: boolean;
@@ -54,8 +55,9 @@ export async function updateUserSettings(payload: UpdateUserSettingsRequest): Pr
   return response.json() as Promise<UserSettings>;
 }
 
-export async function applySettingsPreset(presetName: string): Promise<UserSettings> {
-  const response = await fetch(`${BASE_URL}presets/${encodeURIComponent(presetName)}/apply`, {
+export async function applySettingsPreset(presetName: string, exerciseId?: number | null): Promise<UserSettings> {
+  const query = exerciseId == null ? '' : `?exercise_id=${encodeURIComponent(exerciseId)}`;
+  const response = await fetch(`${BASE_URL}presets/${encodeURIComponent(presetName)}/apply${query}`, {
     method: 'POST',
   });
 

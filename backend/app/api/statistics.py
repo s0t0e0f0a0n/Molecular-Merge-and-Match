@@ -19,6 +19,7 @@ class StatisticsOut(BaseModel):
     exercise_id: str
     incorrect_count: int = 0
     cheats_used: str = "000000000000"
+    cheats_off: datetime | None = None
     fragments_drawn: int | None = 0
     merges_done: int | None = 0
     matches_done: int | None = 0

@@ -9,6 +9,7 @@ export type ExerciseSummary = {
   incorrect_count?: number | null;
   timer_total?: number | null;
   cheats_used?: string | null;
+  cheats_off?: string | null;
   started_at?: string | null;
   completed_at?: string | null;
   fragments_drawn?: number | null;

@@ -810,6 +810,9 @@ useEffect(() => {
       if (overrides.link_inherit_mode !== undefined) payload.link_inherit_mode = overrides.link_inherit_mode;
       if (overrides.theme !== undefined) payload.theme = overrides.theme;
       if (overrides.cheats !== undefined) payload.cheats = overrides.cheats;
+      if (overrides.cheats !== undefined && selectedExerciseId !== null) {
+        payload.exercise_id = selectedExerciseId;
+      }
       if (overrides.show_CAS !== undefined) payload.show_CAS = overrides.show_CAS;
       if (overrides.show_timer !== undefined) payload.show_timer = overrides.show_timer;
       if (overrides.show_warnings !== undefined) payload.show_warnings = overrides.show_warnings;
@@ -838,6 +841,7 @@ useEffect(() => {
       showExchangeText,
       showMissingText,
       showCreation,
+      selectedExerciseId,
       applyIncomingSettings,
     ],
   );
@@ -913,13 +917,13 @@ const handleApplyPreset = useCallback(
     setSelectedPreset(presetName);
 
     try {
-      const applied = await applySettingsPreset(presetName);
+      const applied = await applySettingsPreset(presetName, selectedExerciseId);
       applyIncomingSettings(applied);
     } catch (err) {
       console.error('failed to apply settings preset', err);
     }
   },
-  [applyIncomingSettings],
+  [applyIncomingSettings, selectedExerciseId],
 );
 
 //const handleThemeChange = useCallback(

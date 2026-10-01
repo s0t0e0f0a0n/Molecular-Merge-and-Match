@@ -317,6 +317,7 @@ class ExerciseSummaryOut(BaseModel):
     incorrect_count: int | None = None
     timer_total: int | None = None
     cheats_used: str | None = None
+    cheats_off: datetime | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
     fragments_drawn: int | None = None
@@ -785,6 +786,7 @@ def _to_summary_response(
         incorrect_count=statistics.incorrect_count if statistics is not None else None,
         timer_total=statistics.timer_total if statistics is not None else None,
         cheats_used=statistics.cheats_used if statistics is not None else None,
+        cheats_off=statistics.cheats_off if statistics is not None else None,
         started_at=statistics.started_at if statistics is not None else None,
         completed_at=statistics.completed_at if statistics is not None else None,
         fragments_drawn=statistics.fragments_drawn if statistics is not None else None,

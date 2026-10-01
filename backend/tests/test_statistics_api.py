@@ -32,6 +32,41 @@ def test_completion_stores_active_cheats(client):
     assert response.json()["cheats_used"] == "10011110000"
 
 
+def test_disabling_cheats_records_timestamp_in_statistics(client):
+    disabled_at = datetime.now()
+    db = SessionLocal()
+    try:
+        settings = db.query(UserSettings).filter(UserSettings.name == "User").first()
+        if settings is None:
+            settings = UserSettings(name="User")
+            db.add(settings)
+        settings.cheats = "100000000000"
+        db.add_all([Statistics(exercise_id="48"), Statistics(exercise_id="49")])
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.put(
+        "/api/v1/settings/",
+        json={"cheats": "000000000000", "exercise_id": 48},
+    )
+    assert response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        row = db.query(Statistics).filter(Statistics.exercise_id == "48").one()
+        assert row.cheats_off is not None
+        assert row.cheats_off >= disabled_at
+        other_row = db.query(Statistics).filter(Statistics.exercise_id == "49").one()
+        assert other_row.cheats_off is None
+    finally:
+        db.close()
+
+    response = client.get("/api/v1/statistics/", params={"exercise_id": "48"})
+    assert response.status_code == 200
+    assert response.json()["cheats_off"] is not None
+
+
 def test_completion_stores_final_logbook_counts(client):
     entries = [
         {"kind": "create-fragment"},

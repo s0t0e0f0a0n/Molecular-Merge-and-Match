@@ -68,12 +68,23 @@ const CONTRIBUTION_STATUSES = [
 
 const CONTRIBUTION_COLUMNS = 20;
 
+function exerciseUsedCheats(exercise: ExerciseSummary): boolean {
+  const completedAt = parseExerciseDate(exercise.completed_at);
+  const cheatsOffAt = parseExerciseDate(exercise.cheats_off);
+  const completedSoonAfterDisabling = Boolean(
+    completedAt
+      && cheatsOffAt
+      && completedAt.getTime() >= cheatsOffAt.getTime()
+      && completedAt.getTime() - cheatsOffAt.getTime() <= 60_000,
+  );
+  return completedSoonAfterDisabling || (exercise.cheats_used?.startsWith('1') ?? false);
+}
+
 function contributionStatus(exercise: ExerciseSummary): string {
   const exerciseSet = exercise.exercise_set?.trim().toLowerCase();
-  const usedCheats = exercise.cheats_used?.startsWith('1') ?? false;
   if (exerciseSet === 'examples' || exerciseSet === 'references') return 'is-grey';
   if (!exercise.completed_at && (exercise.incorrect_count ?? 0) > 0) return 'is-red';
-  if (exercise.completed_at) return usedCheats ? 'is-yellow' : 'is-green';
+  if (exercise.completed_at) return exerciseUsedCheats(exercise) ? 'is-yellow' : 'is-green';
   if ((exercise.timer_total ?? 0) > 0 && !exercise.completed_at) return 'is-blue';
   return 'is-white';
 }
@@ -608,7 +619,7 @@ function RankedExerciseList({ title, exercises, includeTime = false, includeInco
         <ol>
           {exercises.map((exercise) => (
             <li key={exercise.id}>
-              {exercise.cheats_used?.startsWith('1') ? (
+              {exerciseUsedCheats(exercise) ? (
                 <span
                   className="statistics-cheat-indicator"
                   title="Cheats used"

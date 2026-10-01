@@ -145,6 +145,52 @@ describe('Statistics tag progression', () => {
   });
 });
 
+describe('Statistics cheat status', () => {
+  it('counts a recent cheat disable as used and otherwise falls back to cheats_used', async () => {
+    render(
+      <StatisticsPanel
+        isOpen
+        onClose={() => undefined}
+        exerciseSummaries={[
+          {
+            id: 71,
+            name: 'Recently disabled',
+            exercise_set: 'set-a',
+            tags: [],
+            cheats_used: '000000000000',
+            cheats_off: '2026-09-13T11:59:30',
+            completed_at: '2026-09-13T12:00:00',
+          },
+          {
+            id: 72,
+            name: 'Disabled earlier',
+            exercise_set: 'set-a',
+            tags: [],
+            cheats_used: '000000000000',
+            cheats_off: '2026-09-13T11:58:59',
+            completed_at: '2026-09-13T12:00:00',
+          },
+          {
+            id: 73,
+            name: 'Cheat snapshot fallback',
+            exercise_set: 'set-a',
+            tags: [],
+            cheats_used: '100000000000',
+            completed_at: '2026-09-13T12:00:00',
+          },
+        ]}
+        selectedExerciseId={71}
+      />,
+    );
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /Exercise overview/ }));
+
+    expect(document.body.querySelectorAll('.statistics-contribution-cell.is-yellow')).toHaveLength(2);
+    expect(document.body.querySelectorAll('.statistics-contribution-cell.is-green')).toHaveLength(1);
+    expect(document.body.querySelectorAll('.statistics-cheat-indicator')).toHaveLength(4);
+  });
+});
+
 describe('Exercise overview DBE input totals', () => {
   it('shows total DBE submissions and the average per completed exercise', async () => {
     const user = userEvent.setup();

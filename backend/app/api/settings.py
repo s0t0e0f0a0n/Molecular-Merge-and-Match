@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from datetime import datetime
+
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from app.db.models import UserSettings
+from app.db.models import Statistics, UserSettings
 from app.db.session import get_db
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -49,6 +51,21 @@ def _apply_settings_values(target: UserSettings, source: UserSettings) -> None:
     target.show_creation = bool(getattr(source, "show_creation", True))
 
 
+def _record_cheats_disabled(
+    db,
+    previous_cheats: str,
+    next_cheats: str,
+    exercise_id: int | None,
+) -> None:
+    if exercise_id is None or not previous_cheats.startswith("1") or next_cheats.startswith("1"):
+        return
+
+    db.query(Statistics).filter(Statistics.exercise_id == str(exercise_id)).update(
+        {Statistics.cheats_off: datetime.now()},
+        synchronize_session=False,
+    )
+
+
 class UserSettingsResponse(BaseModel):
     link_inherit_mode: str
     theme: str
@@ -70,6 +87,7 @@ class UpdateUserSettingsRequest(BaseModel):
     link_inherit_mode: str | None = None
     theme: str | None = None
     cheats: str | None = None
+    exercise_id: int | None = None
     show_CAS: bool | None = None
     show_timer: bool | None = None
     show_warnings: bool | None = None
@@ -158,7 +176,9 @@ def update_settings(payload: UpdateUserSettingsRequest) -> UserSettingsResponse:
         if payload.theme is not None:
             settings.theme = payload.theme
         if payload.cheats is not None:
+            previous_cheats = _normalize_cheats(settings.cheats)
             settings.cheats = _normalize_cheats(payload.cheats)
+            _record_cheats_disabled(db, previous_cheats, settings.cheats, payload.exercise_id)
         if payload.show_CAS is not None:
             settings.show_CAS_input = bool(payload.show_CAS)
         if payload.show_timer is not None:
@@ -181,7 +201,10 @@ def update_settings(payload: UpdateUserSettingsRequest) -> UserSettingsResponse:
 
 
 @router.post("/presets/{preset_name}/apply", response_model=UserSettingsResponse)
-def apply_preset(preset_name: str) -> UserSettingsResponse:
+def apply_preset(
+    preset_name: str,
+    exercise_id: int | None = Query(default=None),
+) -> UserSettingsResponse:
     with get_db() as db:
         preset = db.query(UserSettings).filter(UserSettings.name == preset_name).first()
         if preset is None:
@@ -193,7 +216,14 @@ def apply_preset(preset_name: str) -> UserSettingsResponse:
             user_settings = UserSettings(name=_ACTIVE_SETTINGS_NAME)
             db.add(user_settings)
 
+        previous_cheats = _normalize_cheats(user_settings.cheats)
         _apply_settings_values(user_settings, preset)
+        _record_cheats_disabled(
+            db,
+            previous_cheats,
+            _normalize_cheats(user_settings.cheats),
+            exercise_id,
+        )
 
         db.commit()
         db.refresh(user_settings)

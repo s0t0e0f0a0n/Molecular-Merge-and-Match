@@ -1,6 +1,6 @@
 {
   "name": "molecular-merge-and-match",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Molecular Bookkeeping for Structural Analysis",
   "main": "main.js",
   "devDependencies": {
