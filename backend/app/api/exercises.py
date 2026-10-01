@@ -324,6 +324,7 @@ class ExerciseSummaryOut(BaseModel):
     name: str | None
     exercise_set: str | None
     tags: list[str]
+    statistics_tags: list[str] = Field(default_factory=list)
     difficulty: str | None = None
     completed: bool | None = None
     incorrect_count: int | None = None
@@ -745,12 +746,17 @@ def _to_summary_response(
 ) -> ExerciseSummaryOut:
     tags = []
     parts: list[str] = []
+    statistics_parts: list[str] = []
     hidden_names: set[str] = set()
     try:
         with get_db() as _db:
             if row.tags_csv:
                 resolved = resolve_tag_tokens(_db, row.tags_csv, omit_hidden=True)
                 parts.extend([p.strip() for p in (resolved or "").split(",") if p and p.strip()])
+                statistics_resolved = resolve_tag_tokens(_db, row.tags_csv)
+                statistics_parts.extend(
+                    [p.strip() for p in (statistics_resolved or "").split(",") if p and p.strip()]
+                )
             if parts:
                 normalized_names = {p.lower() for p in parts if p}
                 hidden_names = {
@@ -763,6 +769,7 @@ def _to_summary_response(
     except Exception:
         if row.tags_csv:
             parts = [p.strip() for p in row.tags_csv.split(",") if p and p.strip()]
+            statistics_parts = parts.copy()
 
     seen = set()
     for p in parts:
@@ -770,11 +777,20 @@ def _to_summary_response(
             seen.add(p)
             tags.append(p)
 
+    statistics_seen: set[str] = set()
+    statistics_tags = []
+    for tag in statistics_parts:
+        normalized_tag = tag.lower()
+        if normalized_tag not in statistics_seen:
+            statistics_seen.add(normalized_tag)
+            statistics_tags.append(tag)
+
     return ExerciseSummaryOut(
         id=row.id,
         name=row.name,
         exercise_set=row.exercise_set,
         tags=tags,
+        statistics_tags=statistics_tags,
         difficulty=statistics.difficulty if statistics is not None else None,
         completed=row.completed,
         incorrect_count=statistics.incorrect_count if statistics is not None else None,

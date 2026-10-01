@@ -242,7 +242,6 @@ function TagsTab({ onTagsUpdated, showCheatTags }: TagsTabProps) {
   async function handleStatistics(t: Tag, value: boolean) {
     await setTagStatistics(t.id, value);
     setTags((prev) => prev.map((tag) => (tag.id === t.id ? { ...tag, progression_use: value } : tag)));
-    onTagsUpdated?.();
   }
 
   return (

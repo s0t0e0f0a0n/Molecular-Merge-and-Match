@@ -3,7 +3,7 @@ import hashlib
 from pathlib import Path
 
 from app.core.config import settings
-from app.db.models import Exercise, ExerciseAdditionalSpectrum
+from app.db.models import Exercise, ExerciseAdditionalSpectrum, TagsUsed
 from app.db.session import SessionLocal
 
 INCHI_CCO = "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3"
@@ -49,6 +49,32 @@ def test_list_exercises_empty_initially(client):
     response = client.get("/api/v1/exercises/")
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_hidden_tags_are_included_for_statistics_summaries(client):
+    tag_name = "test-hidden-statistics-tag"
+    payload = _exercise_payload()
+    payload["tags"] = [tag_name]
+    create_response = client.post("/api/v1/exercises/", json=payload)
+    assert create_response.status_code == 201
+
+    db = SessionLocal()
+    try:
+        tag = db.query(TagsUsed).filter(TagsUsed.tag_name == tag_name).one()
+        tag.is_hidden = True
+        tag.allowed_stats = True
+        tag.progression_use = True
+        db.commit()
+
+        summaries_response = client.get("/api/v1/exercises/summaries")
+        assert summaries_response.status_code == 200
+        summary = next(item for item in summaries_response.json() if item["id"] == create_response.json()["id"])
+        assert tag_name not in summary["tags"]
+        assert tag_name in summary["statistics_tags"]
+    finally:
+        db.query(TagsUsed).filter(TagsUsed.tag_name == tag_name).delete()
+        db.commit()
+        db.close()
 
 
 def test_no_solution_inchi_disables_hashing(client):

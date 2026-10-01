@@ -10,8 +10,9 @@ vi.mock('../../../src/api/reset', () => ({
 
 vi.mock('../../../src/api/tags', () => ({
   fetchTags: vi.fn().mockResolvedValue([
-    { id: 1, tag_name: 'important' },
-    { id: 2, tag_name: 'review' },
+    { id: 1, tag_name: 'important', progression_use: true },
+    { id: 2, tag_name: 'review', progression_use: true },
+    { id: 3, tag_name: 'hidden-tag', progression_use: true },
   ]),
 }));
 
@@ -113,5 +114,28 @@ describe('Statistics reset controls', () => {
     expect(screen.getByText('This action cannot be undone.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(resetExercises).not.toHaveBeenCalled();
+  });
+});
+
+describe('Statistics tag progression', () => {
+  it('counts hidden assigned tags without exposing them in the regular tag list', async () => {
+    render(
+      <StatisticsPanel
+        isOpen
+        onClose={() => undefined}
+        exerciseSummaries={[
+          ...summaries,
+          { id: 6, name: 'Six', exercise_set: 'set-c', tags: [], statistics_tags: ['hidden-tag'], completed_at: '2026-09-08T01:00:00' },
+        ]}
+        selectedExerciseId={2}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('hidden-tag')).toBeInTheDocument());
+    const progressionRow = screen.getByText('hidden-tag').closest('.statistics-progression-row');
+
+    expect(progressionRow).not.toBeNull();
+    expect(progressionRow?.querySelector('progress')).toHaveProperty('value', 1);
+    expect(progressionRow?.querySelector('.statistics-progression-count.is-black')).toHaveTextContent('1');
   });
 });

@@ -716,7 +716,7 @@ function TagProgression({ exerciseSummaries, tags }: { exerciseSummaries: Exerci
               key={tag.id}
               title={tag.tag_name}
               layout="row"
-              exercises={trackedExercises.filter((exercise) => exercise.tags.includes(tag.tag_name))}
+              exercises={trackedExercises.filter((exercise) => (exercise.statistics_tags ?? exercise.tags).includes(tag.tag_name))}
             />
           ))
         ) : <p>No data</p>}

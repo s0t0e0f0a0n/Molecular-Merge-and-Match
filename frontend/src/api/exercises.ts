@@ -3,6 +3,7 @@ export type ExerciseSummary = {
   name: string | null;
   exercise_set: string | null;
   tags: string[];
+  statistics_tags?: string[];
   difficulty?: string | null;
   completed?: boolean | null;
   incorrect_count?: number | null;
