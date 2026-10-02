@@ -352,6 +352,18 @@
 .statistics-timeline-segment.is-yellow { background: #facc15; }
 .statistics-timeline-segment.is-red { background: #ef4444; }
 .statistics-timeline-segment.is-blue { background: #3b82f6; }
+.statistics-due-segment.is-due { background: #ef4444; }
+.statistics-due-segment.is-upcoming { background: #3b82f6; }
+.statistics-due-segment.is-deep { background: #000000; }
+.statistics-contribution-status.is-black { background: #000000; }
+.statistics-due-label {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    color: #64748b;
+    font-size: 10px;
+    white-space: nowrap;
+}
 
 .statistics-timeline-date {
     overflow: hidden;
@@ -471,6 +483,20 @@
 
 .statistics-time-of-day-chart .statistics-timeline-viewport {
     overflow: visible;
+}
+
+.statistics-spaced-bins {
+    gap: 5px;
+}
+
+.statistics-spaced-bins .statistics-time-of-day-bin {
+    align-items: center;
+}
+
+.statistics-spaced-bins .statistics-time-of-day-bin .statistics-timeline-bar {
+    width: min(100%, 22px);
+    background: #f1f5f9;
+    border-radius: 3px 3px 0 0;
 }
 
 .statistics-time-of-day-end-label {

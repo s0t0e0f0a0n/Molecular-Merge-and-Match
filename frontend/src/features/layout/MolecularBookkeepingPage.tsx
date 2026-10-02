@@ -271,6 +271,7 @@ export function MolecularBookkeepingPage() {
 
   const [casAnswerInput, setCasAnswerInput] = useState('');
   const [casAnswerIsCorrect, setCasAnswerIsCorrect] = useState<boolean | null>(null);
+  const [casAlreadyValidated, setCasAlreadyValidated] = useState(false);
   const [casShouldIterateDifficulty, setCasShouldIterateDifficulty] = useState(false);
   const [validatingCasAnswer, setValidatingCasAnswer] = useState(false);
   const [cheatBits, setCheatBits] = useState(DEFAULT_CHEATS);
@@ -1619,10 +1620,12 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
       const normalizedCas = casAnswerInput.replace(/\s+/g, '');
       setCasAnswerInput(normalizedCas);
       setCasAnswerIsCorrect(null);
+      setCasAlreadyValidated(false);
       setValidatingCasAnswer(true);
 
       try {
         const result = await validateExerciseCasAnswer(selectedExerciseId, normalizedCas);
+        setCasAlreadyValidated(result.already_completed === true);
         setCasAnswerIsCorrect(result.is_correct);
         setCasShouldIterateDifficulty(result.should_iterate_difficulty);
         if (result.is_correct) {
@@ -2266,12 +2269,14 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
                   style={{
                     fontSize: 12,
                     color: casAnswerIsCorrect ? '#0f5f0f' : '#b30000',
-                    whiteSpace: 'nowrap',
+                    whiteSpace: casAlreadyValidated ? 'normal' : 'nowrap',
                     visibility: casAnswerIsCorrect === null ? 'hidden' : 'visible',
                     textAlign: 'center',
                   }}
                 >
-                  {casAnswerIsCorrect ? 'CAS answer is correct.' : 'CAS answer is incorrect.'}
+                  {casAlreadyValidated
+                    ? `You've already successfully validated this exercise. Your current validation is ${casAnswerIsCorrect ? 'correct' : 'incorrect'}.`
+                    : casAnswerIsCorrect ? 'CAS answer is correct.' : 'CAS answer is incorrect.'}
                 </span>
               </div>
 
@@ -2383,7 +2388,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
 
       </div>
 
-      {casAnswerIsCorrect && (
+      {casAnswerIsCorrect && !casAlreadyValidated && (
         <ValidationOverlay
           exerciseId={selectedExerciseId}
           resetKey={`${selectedExerciseId}-${casAnswerInput}`}

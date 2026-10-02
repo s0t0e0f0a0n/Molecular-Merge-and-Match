@@ -23,6 +23,8 @@ from app.api.statistics import (
     increment_incorrect_count,
     mark_exercise_completed,
     mark_exercise_selected,
+    reset_difficulty_counter,
+    reset_exercise_difficulty,
 )
 from app.core.calculation import calculate_dbe, parse_formula
 from app.core.config import settings
@@ -342,6 +344,7 @@ class CasAnswerValidationIn(BaseModel):
 class CasAnswerValidationOut(BaseModel):
     is_correct: bool
     should_iterate_difficulty: bool = False
+    already_completed: bool = False
 
 
 class SolutionValidationIn(BaseModel):
@@ -352,6 +355,7 @@ class SolutionValidationIn(BaseModel):
 class SolutionValidationOut(BaseModel):
     is_correct: bool
     should_iterate_difficulty: bool = False
+    already_completed: bool = False
 
 class DbeUpdate(BaseModel):
     dbe: float | None
@@ -1026,39 +1030,47 @@ def list_exercises() -> list[ExerciseOut]:
         )
         return [_to_response(row, db) for row in rows]
 
+def _exercise_already_validated(db, row: Exercise) -> bool:
+    statistics_row = _find_statistics_row(db, str(row.id))
+    return row.completed is True or (
+        statistics_row is not None and statistics_row.completed_at is not None
+    )
+
+
 @router.post("/{exercise_id}/validate-cas", response_model=CasAnswerValidationOut)
 def validate_cas_answer(
     exercise_id: int, body: CasAnswerValidationIn
 ) -> CasAnswerValidationOut:
     input_hash = _normalize_or_hash_solution_cas(body.cas_number)
-    if input_hash is None:
-        increment_incorrect_count(exercise_id)
-        return CasAnswerValidationOut(is_correct=False)
 
     with get_db() as db:
         row = db.query(Exercise).filter(Exercise.id == exercise_id).first()
         if not row:
+            if input_hash is None:
+                return CasAnswerValidationOut(is_correct=False)
             raise HTTPException(status_code=404, detail="Exercise not found.")
 
         candidate_hashes = [v for v in (row.solution_cas_hash, row.alt1_cas_hash, row.alt2_cas_hash) if v is not None]
-        if not candidate_hashes:
+        is_correct = input_hash is not None and any(
+            hmac.compare_digest(c_hash, input_hash) for c_hash in candidate_hashes
+        )
+
+        # A completed exercise is never revalidated: report only, change nothing.
+        if _exercise_already_validated(db, row):
+            return CasAnswerValidationOut(is_correct=is_correct, already_completed=True)
+
+        if not is_correct:
             increment_incorrect_count(exercise_id)
+            reset_exercise_difficulty(exercise_id)
             return CasAnswerValidationOut(is_correct=False)
 
-        is_correct = any(hmac.compare_digest(c_hash, input_hash) for c_hash in candidate_hashes)
-        should_iterate_difficulty = False
-        if is_correct:
-            statistics_row = _find_statistics_row(db, str(exercise_id))
-            should_iterate_difficulty = statistics_row is None or statistics_row.completed_at is None
-            was_completed = row.completed is True
-            row.completed = True
-            db.commit()
-            if not was_completed:
-                mark_exercise_completed(exercise_id)
-        else:
-            increment_incorrect_count(exercise_id)
+        statistics_row = _find_statistics_row(db, str(exercise_id))
+        should_iterate_difficulty = statistics_row is None or statistics_row.completed_at is None
+        row.completed = True
+        db.commit()
+        mark_exercise_completed(exercise_id)
         return CasAnswerValidationOut(
-            is_correct=is_correct,
+            is_correct=True,
             should_iterate_difficulty=should_iterate_difficulty,
         )
 
@@ -1067,14 +1079,24 @@ def validate_solution_answer(
     exercise_id: int, body: SolutionValidationIn
 ) -> SolutionValidationOut:
     input_hash = _normalize_solution_hash(body.solution_hash)
-    if input_hash is None:
-        increment_incorrect_count(exercise_id)
-        return SolutionValidationOut(is_correct=False)
 
     with get_db() as db:
         row = db.query(Exercise).filter(Exercise.id == exercise_id).first()
         if not row:
+            if input_hash is None:
+                return SolutionValidationOut(is_correct=False)
             raise HTTPException(status_code=404, detail="Exercise not found.")
+
+        is_correct = (
+            input_hash is not None
+            and row.solution_inchi_hash is not None
+            and hmac.compare_digest(row.solution_inchi_hash, input_hash)
+        )
+
+        # A completed exercise is never revalidated: report only, change nothing.
+        if _exercise_already_validated(db, row):
+            return SolutionValidationOut(is_correct=is_correct, already_completed=True)
+
         statistics_row = _find_statistics_row(db, str(exercise_id))
         if statistics_row is None:
             statistics_row = Statistics(
@@ -1082,27 +1104,19 @@ def validate_solution_answer(
             )
             db.add(statistics_row)
         statistics_row.confidence = body.confidence
-        if row.solution_inchi_hash is None:
-            if row.completed is not True:
-                statistics_row.incorrect_count += 1
+
+        if not is_correct:
+            statistics_row.incorrect_count += 1
+            reset_difficulty_counter(statistics_row)
             db.commit()
             return SolutionValidationOut(is_correct=False)
 
-        is_correct = hmac.compare_digest(row.solution_inchi_hash, input_hash)
-        should_iterate_difficulty = False
-        if is_correct:
-            should_iterate_difficulty = statistics_row.completed_at is None
-            was_completed = row.completed is True
-            row.completed = True
-            db.commit()
-            if not was_completed:
-                mark_exercise_completed(exercise_id)
-        else:
-            if row.completed is not True:
-                statistics_row.incorrect_count += 1
-            db.commit()
+        should_iterate_difficulty = statistics_row.completed_at is None
+        row.completed = True
+        db.commit()
+        mark_exercise_completed(exercise_id)
         return SolutionValidationOut(
-            is_correct=is_correct,
+            is_correct=True,
             should_iterate_difficulty=should_iterate_difficulty,
         )
 

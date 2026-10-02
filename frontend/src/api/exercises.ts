@@ -108,11 +108,13 @@ export type ExerciseDetail = {
 export type CasAnswerValidationResponse = {
   is_correct: boolean;
   should_iterate_difficulty: boolean;
+  already_completed?: boolean;
 };
 
 export type SolutionValidationResponse = {
   is_correct: boolean;
   should_iterate_difficulty: boolean;
+  already_completed?: boolean;
 };
 
 export type ExerciseStatistics = {

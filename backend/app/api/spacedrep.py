@@ -56,15 +56,20 @@ def calculate_spaced_repetition_interval(
     is_first_attempt = completion_count <= 1
 
     c_penalty = 0.0 if cheat_used else math.exp(-0.4 * incorrect_tries)
-    c_time = 1.0 - (time_min - 1.0) / 39.0
+    #    c_time = 1.0 - (time_min - 1.0) / 24.0
     c_difficulty = (3.0 - difficulty_level) / 2.0
     c_confidence = (confidence_level - 1.0) / 4.0
+    # sigma = 30.0 (bepaalt de snelheid van de helling)
+    gauss_base = math.exp(-0.5 * (time_min / 25.0)**2)
+    gauss_at_40 = math.exp(-0.5 * (40.0 / 25.0)**2)  
+    # Herschaald zodat t=0 -> 1.0 en t=40 -> -1.0
+    c_time = 1.0 - 2.0 * (1.0 - gauss_base) / (1.0 - gauss_at_40)
 
     mastery = (
-        (0.35 * c_penalty)
-        + (0.25 * c_time)
-        + (0.20 * c_difficulty)
-        + (0.20 * c_confidence)
+        (0.30 * c_penalty)      # Verlaagd van 35% naar 30%
+        + (0.30 * c_time)       # Verhoogd van 25% naar 30%
+        + (0.25 * c_difficulty) # Verhoogd van 20% naar 25%
+        + (0.15 * c_confidence) # Verlaagd van 20% naar 15%
     )
     history_multiplier = (
         1.3

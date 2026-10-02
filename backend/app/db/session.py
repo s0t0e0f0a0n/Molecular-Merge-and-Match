@@ -4,6 +4,7 @@ import json
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import datetime
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -20,6 +21,7 @@ from app.db.models import (
     Fragment,
     PredefinedFragment,
     SolventsUsed,
+    Statistics,
     TagsUsed,
     UserSettings,
     WorkingSolution,
@@ -732,6 +734,31 @@ def _purge_soft_deleted_fragments() -> None:
         db.close()
 
 
+def _reopen_overdue_exercises_for_sr() -> None:
+    """In SR mode, make exercises whose due_time has passed reviewable again."""
+
+    from app.core.statistics_keys import statistics_exercise_id_keys
+
+    db = SessionLocal()
+    try:
+        settings_row = db.query(UserSettings).filter(UserSettings.name == "User").first()
+        if settings_row is None or not settings_row.SR_mode:
+            return
+        overdue = (
+            db.query(Exercise)
+            .filter(Exercise.due_time.isnot(None), Exercise.due_time < datetime.now())
+            .all()
+        )
+        for exercise in overdue:
+            exercise.completed = False
+            db.query(Statistics).filter(
+                Statistics.exercise_id.in_(statistics_exercise_id_keys(exercise.id))
+            ).update({Statistics.completed_at: None}, synchronize_session=False)
+        db.commit()
+    finally:
+        db.close()
+
+
 def init_db() -> None:
     """
     Create tables and seed predefined fragments.
@@ -751,6 +778,7 @@ def init_db() -> None:
     _seed_exercises()
     _seed_preloaded_fragments()
     _seed_preloaded_solutions()
+    _reopen_overdue_exercises_for_sr()
 
 
 @contextmanager

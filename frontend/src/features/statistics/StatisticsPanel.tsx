@@ -427,7 +427,7 @@ function LogbookDistributionGraph({ exerciseSummaries }: { exerciseSummaries: Ex
           <span className="statistics-timeline-legend-item"><span className="statistics-logbook-swatch is-dbe" aria-hidden="true" />Set DBE</span>
         </div>
       </div>
-      <div className="statistics-timeline-chart statistics-logbook-chart">
+      <div className="statistics-timeline-chart statistics-time-of-day-chart">
         <div className="statistics-timeline-axis-title">Number of events</div>
         <div className="statistics-timeline-axis" aria-label="Number of logbook events">
           {ticks.map((tick) => (
@@ -443,18 +443,119 @@ function LogbookDistributionGraph({ exerciseSummaries }: { exerciseSummaries: Ex
                 <span key={tick} style={{ bottom: `${(tick / maximumCount) * 100}%` }} />
               ))}
             </div>
-            <div className="statistics-logbook-distribution" style={{ '--timeline-days': buckets.length } as React.CSSProperties}>
+            <div className="statistics-time-of-day-distribution statistics-spaced-bins" style={{ '--timeline-days': buckets.length } as React.CSSProperties}>
               {buckets.map((bucket, index) => {
                 const total = bucket.createFragment + bucket.link + bucket.mergeFragments + bucket.dbe;
                 return (
-                  <div key={index} className="statistics-logbook-bin" title={`${index * 5}-${(index + 1) * 5}%: ${total} event${total === 1 ? '' : 's'}`}>
+                  <div key={index} className="statistics-time-of-day-bin" title={`${index * 5}-${(index + 1) * 5}%: ${total} event${total === 1 ? '' : 's'}`}>
                     <div className="statistics-timeline-bar" aria-label={`${index * 5}-${(index + 1) * 5}%: ${total} events`}>
                       <span className="statistics-timeline-segment statistics-logbook-create" style={{ height: `${(bucket.createFragment / maximumCount) * 100}%` }} />
                       <span className="statistics-timeline-segment statistics-logbook-link" style={{ height: `${(bucket.link / maximumCount) * 100}%` }} />
                       <span className="statistics-timeline-segment statistics-logbook-merge" style={{ height: `${(bucket.mergeFragments / maximumCount) * 100}%` }} />
                       <span className="statistics-timeline-segment statistics-logbook-dbe" style={{ height: `${(bucket.dbe / maximumCount) * 100}%` }} />
                     </div>
-                    <span className="statistics-logbook-label">{index % 5 === 0 ? `${index * 5}%` : ''}</span>
+                    <span className="statistics-time-distribution-label">{index % 5 === 0 ? `${index * 5}%` : ''}</span>
+                  </div>
+                );
+              })}
+              <span className="statistics-time-of-day-end-label">100%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="statistics-time-of-day-axis-title">normalized time</div>
+    </section>
+  );
+}
+
+const DUE_LABEL_COUNT = 16;
+const DUE_MAX_BINS_PER_LABEL = 6;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+type DueBin = { startDay: number; size: number; count: number; labeled: boolean };
+
+function buildDueDistribution(exerciseSummaries: ExerciseSummary[], now: number): DueBin[] {
+  const days: number[] = [];
+  exerciseSummaries.forEach((exercise) => {
+    const raw = exercise.due_time?.trim();
+    if (!raw || Number(raw) === 0) return;
+    const timestamp = Date.parse(raw);
+    if (!Number.isFinite(timestamp)) return;
+    // Day 0 is the 24 hours starting now; day -1 is the 24 hours before that.
+    days.push(Math.floor((timestamp - now) / DAY_MS));
+  });
+  const minDay = Math.min(0, ...days);
+  const maxDay = Math.max(0, ...days);
+
+  // Smallest whole-day label step whose 16 label slots cover the data, with day 0 on a label.
+  let step = 1;
+  while (Math.ceil(-minDay / step) + Math.ceil((maxDay + 1) / step) > DUE_LABEL_COUNT) step += 1;
+  const negativeSlots = Math.ceil(-minDay / step);
+  let size = 1;
+  while (step % size !== 0 || step / size > DUE_MAX_BINS_PER_LABEL) size += 1;
+  const binsPerLabel = step / size;
+  const firstDay = -negativeSlots * step;
+
+  const bins: DueBin[] = Array.from({ length: DUE_LABEL_COUNT * binsPerLabel }, (_, index) => ({
+    startDay: firstDay + index * size,
+    size,
+    count: 0,
+    labeled: index % binsPerLabel === 0,
+  }));
+  days.forEach((day) => {
+    bins[Math.floor((day - firstDay) / size)].count += 1;
+  });
+  return bins;
+}
+
+function dueBinClass(startDay: number): string {
+  if (startDay < 0) return 'is-due';
+  if (startDay <= 30) return 'is-upcoming';
+  return 'is-deep';
+}
+
+function DueDistributionGraph({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
+  const bins = buildDueDistribution(exerciseSummaries, Date.now());
+  const maximumCount = Math.max(1, ...bins.map((bin) => bin.count));
+  const ticks = timelineTicks(maximumCount);
+
+  return (
+    <section className="statistics-timeline-section" aria-label="Exercises by due date">
+      <div className="statistics-timeline-heading">
+        <h3>Exercises by due date</h3>
+        <div className="statistics-timeline-legend" aria-label="Due date legend">
+          <span className="statistics-timeline-legend-item"><span className="statistics-contribution-swatch statistics-contribution-status is-red" aria-hidden="true" />Due for review</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-contribution-swatch statistics-contribution-status is-blue" aria-hidden="true" />Upcoming reviews</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-contribution-swatch statistics-contribution-status is-black" aria-hidden="true" />In deep knowledge</span>
+        </div>
+      </div>
+      <div className="statistics-timeline-chart statistics-time-of-day-chart">
+        <div className="statistics-timeline-axis-title">Number of exercises</div>
+        <div className="statistics-timeline-axis" aria-label="Number of exercises">
+          {ticks.map((tick) => (
+            <span key={tick} className="statistics-timeline-axis-label" style={{ bottom: `${(tick / maximumCount) * 100}%` }}>
+              {tick}
+            </span>
+          ))}
+        </div>
+        <div className="statistics-timeline-viewport">
+          <div className="statistics-timeline-plot">
+            <div className="statistics-timeline-guides" aria-hidden="true">
+              {ticks.map((tick) => (
+                <span key={tick} style={{ bottom: `${(tick / maximumCount) * 100}%` }} />
+              ))}
+            </div>
+            <div className="statistics-time-of-day-distribution" style={{ '--timeline-days': bins.length } as React.CSSProperties}>
+              {bins.map((bin, index) => {
+                const endDay = bin.startDay + bin.size - 1;
+                const range = bin.size === 1 ? `Day ${bin.startDay}` : `Days ${bin.startDay} to ${endDay}`;
+                const showLabel = bin.labeled;
+                return (
+                  <div key={bin.startDay} className="statistics-time-of-day-bin" title={`${range}: ${bin.count} exercise${bin.count === 1 ? '' : 's'}`}>
+                    <div className="statistics-timeline-bar" aria-label={`${range}: ${bin.count} exercises`}>
+                      <span className={`statistics-timeline-segment statistics-due-segment ${dueBinClass(bin.startDay)}`} style={{ height: `${(bin.count / maximumCount) * 100}%` }} />
+                    </div>
+                    <span className="statistics-due-label"><span>{showLabel ? bin.startDay : ''}</span></span>
                   </div>
                 );
               })}
@@ -462,6 +563,7 @@ function LogbookDistributionGraph({ exerciseSummaries }: { exerciseSummaries: Ex
           </div>
         </div>
       </div>
+      <div className="statistics-time-of-day-axis-title">days relative to today</div>
     </section>
   );
 }
@@ -1107,7 +1209,7 @@ export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedEx
 
         <div className="settings-panel-content">
           <div className="settings-tab-content" id={`statisticstab-${activeTab}`}>
-            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><TimeDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><TimeOfDayDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '4' ? <LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} /> : activeTab === '6' ? <TempTab exerciseSummaries={exerciseSummaries} /> : null}
+            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><TimeDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><TimeOfDayDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '4' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><DueDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} /> : activeTab === '6' ? <TempTab exerciseSummaries={exerciseSummaries} /> : null}
           </div>
         </div>
       </div>

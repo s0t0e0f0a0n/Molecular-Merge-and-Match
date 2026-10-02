@@ -387,6 +387,21 @@ def increment_incorrect_count(exercise_id: int | str) -> None:
         db.refresh(row)
 
 
+def reset_difficulty_counter(row: Statistics) -> None:
+    match = re.fullmatch(r"([EMD])(\d+)", row.difficulty or "")
+    if match and int(match.group(2)) != 0:
+        row.difficulty = f"{match.group(1)}0"
+
+
+def reset_exercise_difficulty(exercise_id: int | str) -> None:
+    with get_db() as db:
+        row = _find_statistics_row(db, str(exercise_id))
+        if row is None:
+            return
+        reset_difficulty_counter(row)
+        db.commit()
+
+
 def _next_difficulty(current: str | None, rating: str, *, increment: bool) -> str:
     match = re.fullmatch(r"[EMD](\d+)", current or "")
     count = int(match.group(1)) if match else 0

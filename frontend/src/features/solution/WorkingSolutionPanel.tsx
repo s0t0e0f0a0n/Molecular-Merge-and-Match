@@ -157,6 +157,7 @@ export function WorkingSolutionPanel({
   const [expanded, setExpanded] = useState(false);
   const [validating, setValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<boolean | null>(null);
+  const [alreadyValidatedResult, setAlreadyValidatedResult] = useState<boolean | null>(null);
   const [shouldIterateDifficulty, setShouldIterateDifficulty] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [confidence, setConfidence] = useState(3);
@@ -246,23 +247,25 @@ useEffect(() => {
   useEffect(() => {
     setValidating(false);
     setValidationResult(null);
+    setAlreadyValidatedResult(null);
     setShouldIterateDifficulty(false);
     setValidationError(null);
     setConfidence(3);
   }, [exerciseId, solution?.smiles]);
 
   useEffect(() => {
-    if (validationResult === null && validationError === null) {
+    if (validationResult === null && alreadyValidatedResult === null && validationError === null) {
       return;
     }
 
     const timeoutId = window.setTimeout(() => {
       setValidationResult(null);
+      setAlreadyValidatedResult(null);
       setValidationError(null);
     }, 30_000);
 
     return () => window.clearTimeout(timeoutId);
-  }, [validationResult, validationError]);
+  }, [validationResult, alreadyValidatedResult, validationError]);
 
   // Heavy (non-H, non-*) atoms for atom-to-atom merge
   const heavyAtoms: MolAtom[] = useMemo(() => {
@@ -356,6 +359,7 @@ useEffect(() => {
 
     setValidating(true);
     setValidationResult(null);
+    setAlreadyValidatedResult(null);
     setValidationError(null);
 
     const mol = rdkit.get_mol(solution.smiles);
@@ -384,6 +388,10 @@ useEffect(() => {
     try {
       const hash = await sha256Hex(inchi);
       const result = await validateExerciseSolutionHash(exerciseId, hash, confidence);
+      if (result.already_completed) {
+        setAlreadyValidatedResult(result.is_correct);
+        return;
+      }
       setValidationResult(result.is_correct);
       setShouldIterateDifficulty(result.should_iterate_difficulty);
       if (result.is_correct) {
@@ -601,6 +609,11 @@ useEffect(() => {
         {validationResult === false && (
           <div style={{ marginTop: 4, fontSize: 12, color: '#b30000' }}>
             Your answer is incorrect.
+          </div>
+        )}
+        {alreadyValidatedResult !== null && (
+          <div style={{ marginTop: 4, fontSize: 12, color: alreadyValidatedResult ? '#0f5f0f' : '#b30000' }}>
+            You've already successfully validated this exercise. Your current validation is {alreadyValidatedResult ? 'correct' : 'incorrect'}.
           </div>
         )}
         <div style={{ marginTop: 4, fontSize: 12 }}>
