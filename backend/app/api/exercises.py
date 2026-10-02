@@ -19,6 +19,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.statistics import (
     _ensure_statistics_row,
+    _find_statistics_row,
     increment_incorrect_count,
     mark_exercise_completed,
     mark_exercise_selected,
@@ -31,6 +32,7 @@ from app.core.solvent_tokens import (
     extract_solvent_ids,
     resolve_solvent_tokens,
 )
+from app.core.statistics_keys import canonical_statistics_exercise_id, statistics_exercise_id_keys
 from app.core.tag_tokens import (
     apply_tag_count_delta as apply_tag_count_delta,
 )
@@ -191,6 +193,7 @@ class ExerciseCreate(BaseModel):
     c13_data_source: str | None = Field(default=None, max_length=255)
     name: str | None = Field(default=None, max_length=255)
     exercise_set: str | None = Field(default=None, max_length=255)
+    in_SR: int = 0
     tags: list[str] = Field(default_factory=list)
     additional_spectra: list[AdditionalSpectrumPayload] = Field(default_factory=list)
     solvent: str | None = Field(default=None, max_length=100)
@@ -276,6 +279,7 @@ class ExerciseOut(BaseModel):
     molecular_formula: str | None
     dbe: float
     exercise_set: str | None
+    in_SR: int = 0
     tags: list[str]
     completed: bool | None = None
 
@@ -310,6 +314,7 @@ class ExerciseSummaryOut(BaseModel):
     id: int
     name: str | None
     exercise_set: str | None
+    in_SR: int = 0
     tags: list[str]
     statistics_tags: list[str] = Field(default_factory=list)
     difficulty: str | None = None
@@ -320,6 +325,7 @@ class ExerciseSummaryOut(BaseModel):
     cheats_off: datetime | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    due_time: datetime | None = None
     fragments_drawn: int | None = None
     merges_done: int | None = None
     matches_done: int | None = None
@@ -712,7 +718,7 @@ def _to_response(row: Exercise, db) -> ExerciseOut:
 
     return ExerciseOut(
         id=row.id, name=row.name, molecular_formula=row.molecular_formula, dbe=row.dbe,
-        exercise_set=row.exercise_set, tags=tags, h1_svg_path=row.h1_svg_path, h1_svg_url=row.h1_svg_path,
+        exercise_set=row.exercise_set, in_SR=row.in_SR, tags=tags, h1_svg_path=row.h1_svg_path, h1_svg_url=row.h1_svg_path,
         h1_axis_start=row.h1_axis_start, h1_axis_end=row.h1_axis_end, h1_nmr_text=row.h1_nmr_text,
         h1_frequency_mhz=row.h1_frequency_mhz, h1_solvent=resolve_solvent_tokens(db, row.h1_solvent),
         h1_data_source=row.h1_data_source, h1_peaks=[H1PeakOut.model_validate(p) for p in row.h1_peaks],
@@ -779,6 +785,7 @@ def _to_summary_response(
         id=row.id,
         name=row.name,
         exercise_set=row.exercise_set,
+        in_SR=row.in_SR,
         tags=tags,
         statistics_tags=statistics_tags,
         difficulty=statistics.difficulty if statistics is not None else None,
@@ -789,6 +796,7 @@ def _to_summary_response(
         cheats_off=statistics.cheats_off if statistics is not None else None,
         started_at=statistics.started_at if statistics is not None else None,
         completed_at=statistics.completed_at if statistics is not None else None,
+        due_time=row.due_time,
         fragments_drawn=statistics.fragments_drawn if statistics is not None else None,
         merges_done=statistics.merges_done if statistics is not None else None,
         matches_done=statistics.matches_done if statistics is not None else None,
@@ -806,12 +814,16 @@ def list_exercise_summaries() -> list[ExerciseSummaryOut]:
     with get_db() as db:
         rows = db.query(Exercise).order_by(Exercise.id.desc()).all()
         exercise_ids = {str(row.id) for row in rows}
-        statistics_by_exercise_id = {
-            statistics.exercise_id: statistics
-            for statistics in db.query(Statistics)
-            .filter(Statistics.exercise_id.in_(exercise_ids))
-            .all()
+        statistics_keys = {
+            key for exercise_id in exercise_ids
+            for key in statistics_exercise_id_keys(exercise_id)
         }
+        statistics_by_exercise_id = {}
+        for statistics in db.query(Statistics).filter(Statistics.exercise_id.in_(statistics_keys)).all():
+            exercise_key = canonical_statistics_exercise_id(statistics.exercise_id)
+            existing = statistics_by_exercise_id.get(exercise_key)
+            if existing is None or statistics.exercise_id == exercise_key:
+                statistics_by_exercise_id[exercise_key] = statistics
         storage_keys = {f"exercise-{exercise_id}" for exercise_id in exercise_ids}
         storage_keys_with_fragments = {
             fragment_exercise_id
@@ -1036,11 +1048,7 @@ def validate_cas_answer(
         is_correct = any(hmac.compare_digest(c_hash, input_hash) for c_hash in candidate_hashes)
         should_iterate_difficulty = False
         if is_correct:
-            statistics_row = (
-                db.query(Statistics)
-                .filter(Statistics.exercise_id == str(exercise_id))
-                .first()
-            )
+            statistics_row = _find_statistics_row(db, str(exercise_id))
             should_iterate_difficulty = statistics_row is None or statistics_row.completed_at is None
             was_completed = row.completed is True
             row.completed = True
@@ -1067,13 +1075,11 @@ def validate_solution_answer(
         row = db.query(Exercise).filter(Exercise.id == exercise_id).first()
         if not row:
             raise HTTPException(status_code=404, detail="Exercise not found.")
-        statistics_row = (
-            db.query(Statistics)
-            .filter(Statistics.exercise_id == str(exercise_id))
-            .first()
-        )
+        statistics_row = _find_statistics_row(db, str(exercise_id))
         if statistics_row is None:
-            statistics_row = Statistics(exercise_id=str(exercise_id))
+            statistics_row = Statistics(
+                exercise_id=canonical_statistics_exercise_id(exercise_id)
+            )
             db.add(statistics_row)
         statistics_row.confidence = body.confidence
         if row.solution_inchi_hash is None:
@@ -1245,6 +1251,7 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
                 molecular_formula=molecular_formula,
                 dbe=formula_dbe,
                 exercise_set=body.exercise_set.strip() if body.exercise_set else None,
+                in_SR=body.in_SR,
                 tags_csv=None,
                 h1_svg_path=_upload_file_path_to_url(h1_path),
                 h1_axis_start=body.h1_axis_scale.begin,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExerciseSummary } from '../../api/exercises';
 import type { Tag } from '../../api/tags';
+import { deferExerciseAfterSkip } from '../../api/spacedrep';
 import { ExerciseCreationForm } from './ExerciseCreationForm';
 import { ExerciseZipImport } from './ExerciseZipImport';
 import { formatChemistryText } from '../../utils/formatChemistryText';
@@ -11,6 +12,8 @@ const exerciseNameCollator = new Intl.Collator(undefined, {
 });
 
 export type ExerciseMenuProps = {
+  srMode: boolean;
+  onSetSrMode: (enabled: boolean) => Promise<void>;
   selectedExerciseId: number | null;
   exerciseSummaries: ExerciseSummary[];
   activeTags: Tag[];
@@ -25,6 +28,8 @@ export type ExerciseMenuProps = {
 };
 
 export function ExerciseMenu({
+  srMode,
+  onSetSrMode,
   selectedExerciseId,
   exerciseSummaries,
   activeTags,
@@ -45,6 +50,9 @@ export function ExerciseMenu({
   const [showOnlyIncomplete, setShowOnlyIncomplete] = useState(false);
   const [tagFilterMode, setTagFilterMode] = useState<'AND' | 'OR'>('AND');
   const [deletionMode, setDeletionMode] = useState(false);
+  const [skippingExercise, setSkippingExercise] = useState(false);
+  const [savingSrMode, setSavingSrMode] = useState(false);
+  const [srFinishedDialogDismissed, setSrFinishedDialogDismissed] = useState(false);
   const [selectedForDeletion, setSelectedForDeletion] = useState<Set<string>>(new Set());
   const exerciseMenuCloseTimer = useRef<number | null>(null);
   const zipImportingRef = useRef(false);
@@ -108,6 +116,81 @@ export function ExerciseMenu({
   useEffect(() => {
     if (!showCreation) setCreationFormOpen(false);
   }, [showCreation]);
+
+  useEffect(() => {
+    if (!srMode) return;
+    setDeletionMode(false);
+    setSelectedForDeletion(new Set());
+    setCreationFormOpen(false);
+  }, [srMode]);
+
+  const exercisesByDueTime = useMemo(() => [...exerciseSummaries].sort((a, b) => {
+    const aDueTime = a.due_time ? Date.parse(a.due_time) : Number.POSITIVE_INFINITY;
+    const bDueTime = b.due_time ? Date.parse(b.due_time) : Number.POSITIVE_INFINITY;
+    return aDueTime - bDueTime || a.id - b.id;
+  }), [exerciseSummaries]);
+  const pastExercises = useMemo(
+    () => exercisesByDueTime.filter((exercise) => {
+      const dueTime = exercise.due_time?.trim();
+      if (!dueTime || Number(dueTime) === 0) return false;
+      return Number.isFinite(Date.parse(dueTime));
+    }),
+    [exercisesByDueTime],
+  );
+  const nextExercises = useMemo(
+    () => exerciseSummaries
+      .filter((exercise) => {
+        if (exercise.completed !== false || (exercise.in_SR ?? 0) <= 0) return false;
+        const dueTime = exercise.due_time?.trim();
+        if (!dueTime) return true;
+        if (Number(dueTime) === 0) return false;
+        const dueTimestamp = Date.parse(dueTime);
+        return Number.isFinite(dueTimestamp) && dueTimestamp < Date.now();
+      })
+      .sort((a, b) => (a.in_SR ?? 0) - (b.in_SR ?? 0) || a.id - b.id),
+    [exerciseSummaries],
+  );
+
+  const handleSetSrMode = useCallback(async (enabled: boolean) => {
+    if (savingSrMode) return;
+    setSavingSrMode(true);
+    try {
+      await onSetSrMode(enabled);
+    } catch (error) {
+      console.error('failed to update spaced repetition mode', error);
+    } finally {
+      setSavingSrMode(false);
+    }
+  }, [onSetSrMode, savingSrMode]);
+
+  const handleGoToNextExercise = useCallback(async () => {
+    if (skippingExercise || nextExercises.length === 0) return;
+    setSkippingExercise(true);
+    try {
+      const selectedExercise = exerciseSummaries.find((exercise) => exercise.id === selectedExerciseId);
+      if (selectedExerciseId !== null && (selectedExercise?.in_SR ?? 0) !== 0) {
+        await deferExerciseAfterSkip(selectedExerciseId);
+      }
+      await onExercisesMutated();
+      const currentIndex = nextExercises.findIndex((exercise) => exercise.id === selectedExerciseId);
+      const remainingExercises = nextExercises.filter((exercise) => exercise.id !== selectedExerciseId);
+      const nextExercise = currentIndex >= 0
+        ? nextExercises.slice(currentIndex + 1).find((exercise) => exercise.id !== selectedExerciseId)
+          ?? remainingExercises[0]
+        : remainingExercises[0];
+      if (nextExercise) onSelectExercise(nextExercise.id);
+    } catch (error) {
+      console.error('failed to defer skipped exercise', error);
+    } finally {
+      setSkippingExercise(false);
+    }
+  }, [exerciseSummaries, nextExercises, onExercisesMutated, onSelectExercise, selectedExerciseId, skippingExercise]);
+
+  const formatDueTime = useCallback((value: string | null | undefined) => {
+    if (!value) return 'Not scheduled';
+    const timestamp = Date.parse(value);
+    return Number.isNaN(timestamp) ? 'Not scheduled' : new Date(timestamp).toLocaleString();
+  }, []);
 
   const exerciseSetOptions = useMemo(() => {
     const setNames = new Set<string>();
@@ -295,14 +378,16 @@ export function ExerciseMenu({
         <span style={{ fontSize: 12 }}>{exerciseMenuOpen ? '▲' : '▼'}</span>
       </button>
 
-      <button
-        type="button"
-        onClick={onResetExercise}
-        title="Reset this exercise"
-        style={{ background: 'none', border: 'none', padding: '1px 3px', cursor: 'pointer', fontSize: 14, color: '#b33', lineHeight: 1, borderRadius: 4 }}
-      >
-        {'\u21BA'}
-      </button>
+      {!srMode && (
+        <button
+          type="button"
+          onClick={onResetExercise}
+          title="Reset this exercise"
+          style={{ background: 'none', border: 'none', padding: '1px 3px', cursor: 'pointer', fontSize: 14, color: '#b33', lineHeight: 1, borderRadius: 4 }}
+        >
+          {'\u21BA'}
+        </button>
+      )}
 
       <div
         onMouseEnter={cancelExerciseMenuClose}
@@ -317,7 +402,7 @@ export function ExerciseMenu({
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <div style={{ fontSize: 13, fontWeight: 600 }}>Exercises</div>
-          <button
+          {!srMode && <button
             type="button"
             onClick={() => {
               setDeletionMode((mode) => !mode);
@@ -327,10 +412,38 @@ export function ExerciseMenu({
             style={{ background: 'none', border: 'none', padding: '2px 2px', cursor: 'pointer', lineHeight: 1, borderRadius: 4, opacity: deletionMode ? 1 : 0.6, display: 'flex', alignItems: 'center' }}
           >
             <img src={`${import.meta.env.BASE_URL}chemisch_afval.svg`} alt="Delete" style={{ width: 16, height: 16 }} />
-          </button>
+          </button>}
         </div>
 
-        <div style={{ display: creationFormOpen ? 'none' : 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 12 }}>
+        {srMode ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
+            <button
+              type="button"
+              onClick={handleGoToNextExercise}
+              disabled={nextExercises.length === 0 || skippingExercise}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #111', background: '#111', color: '#fff', cursor: nextExercises.length === 0 || skippingExercise ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, opacity: nextExercises.length === 0 || skippingExercise ? 0.55 : 1 }}
+            >
+              Go to next exercise
+            </button>
+            <div style={{ fontSize: 12, fontWeight: 700 }}>Past exercises</div>
+            {loadingExerciseSummaries ? (
+              <div style={{ fontSize: 12, opacity: 0.7 }}>Loading exercises...</div>
+            ) : exerciseSummariesError ? (
+              <div style={{ fontSize: 12, color: '#b30000' }}>{exerciseSummariesError}</div>
+            ) : pastExercises.length === 0 ? (
+              <div style={{ fontSize: 12, opacity: 0.7 }}>No past exercises.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '52vh', overflowY: 'auto' }}>
+                {pastExercises.map((exercise) => (
+                  <div key={exercise.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '8px 10px', borderBottom: '1px solid #eee', fontSize: 13 }}>
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{renderExerciseSummaryLabel(exercise)}</span>
+                    <span style={{ flexShrink: 0, fontSize: 12, opacity: 0.65 }}>Due: {formatDueTime(exercise.due_time)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : <div style={{ display: creationFormOpen ? 'none' : 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 12 }}>
           <div style={{ border: '1px solid #e5e5e5', borderRadius: 12, padding: 10, background: '#fafafa', display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 }}>
             <div style={{ fontSize: 12, fontWeight: 700 }}>Exercise sets</div>
             <div style={{ flex: 1, minHeight: 0, maxHeight: '52vh', overflowY: 'auto', scrollbarGutter: 'stable', paddingRight: 4 }}>
@@ -497,10 +610,23 @@ export function ExerciseMenu({
               )}
             </div>
           </div>
-        </div>
+        </div>}
+
+        {srMode && !srFinishedDialogDismissed && !loadingExerciseSummaries && !exerciseSummariesError && nextExercises.length === 0 ? (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0, 0, 0, 0.35)', display: 'grid', placeItems: 'center', padding: 16 }}>
+            <div role="dialog" aria-modal="true" aria-labelledby="sr-finished-title" style={{ width: 'min(420px, 100%)', background: 'white', border: '1px solid #ccc', borderRadius: 8, padding: 20, boxShadow: '0 12px 32px rgba(0,0,0,0.22)' }}>
+              <h2 id="sr-finished-title" style={{ margin: '0 0 12px', fontSize: 18 }}>Done for today</h2>
+              <p style={{ margin: '0 0 18px', fontSize: 14 }}>Do you want to switch to normal mode or stay in spaced repetition mode?</p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button type="button" disabled={savingSrMode} onClick={() => void handleSetSrMode(false)} style={{ padding: '8px 12px', border: '1px solid #aaa', borderRadius: 6, background: '#fff', cursor: 'pointer' }}>Switch to normal mode</button>
+                <button type="button" disabled={savingSrMode} onClick={() => setSrFinishedDialogDismissed(true)} style={{ padding: '8px 12px', border: '1px solid #111', borderRadius: 6, background: '#111', color: '#fff', cursor: 'pointer' }}>Stay in spaced repetition</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <div style={{ marginTop: creationFormOpen ? 0 : 8, borderTop: creationFormOpen ? 'none' : '1px solid #eee', paddingTop: creationFormOpen ? 0 : 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {deletionMode && selectedForDeletion.size > 0 && (
+          {!srMode && deletionMode && selectedForDeletion.size > 0 && (
             <button type="button" onClick={() => void handleDeleteSelected()} style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #ccc', background: '#ff6b6b', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
               Delete {selectedForDeletion.size} item{selectedForDeletion.size !== 1 ? 's' : ''}
             </button>
@@ -511,7 +637,7 @@ export function ExerciseMenu({
               onImportingChange={(isImporting) => { zipImportingRef.current = isImporting; }}
             />
           </div>
-          {showCreation ? (
+          {showCreation && !srMode ? (
             <>
               <button type="button" onClick={() => setCreationFormOpen((open) => !open)} style={{ width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: '1px solid #ccc', background: '#f9f9f9', color: '#111', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                 {creationFormOpen ? 'Hide exercise creation form' : 'Create new exercise'}

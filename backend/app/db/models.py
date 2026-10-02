@@ -28,6 +28,8 @@ class Exercise(Base):
     tags_csv: Mapped[str | None] = mapped_column(Text, nullable=True)
     bookmark: Mapped[int | None] = mapped_column(Integer, nullable=True)
     exercise_set: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    in_SR: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    due_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
 
     h1_svg_path: Mapped[str] = mapped_column(Text, nullable=False)
     h1_axis_start: Mapped[float] = mapped_column(Float, nullable=False)
@@ -304,10 +306,7 @@ class Statistics(Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True, default=None,
     )
-    mastery_index: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
-    eligible_purge_time: Mapped[datetime | None] = mapped_column(
-            DateTime(timezone=False), nullable=True, default=None,
-        )
+    mastery_index: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
     paused_at: Mapped[datetime | None] = mapped_column(
             DateTime(timezone=False), nullable=True, default=None,
         )

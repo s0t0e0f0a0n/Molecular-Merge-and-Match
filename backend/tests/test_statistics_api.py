@@ -1,6 +1,9 @@
 import json
 from datetime import datetime, timedelta
 
+import pytest
+
+from app.api.spacedrep import calculate_spaced_repetition_interval
 from app.api.statistics import mark_exercise_completed, mark_exercise_paused, mark_exercise_resumed
 from app.db.models import Exercise, LogbookState, Statistics, UserSettings
 from app.db.session import SessionLocal
@@ -92,6 +95,97 @@ def test_completion_stores_final_logbook_counts(client):
         assert row.fragments_drawn == 1
         assert row.matches_done == 1
         assert row.merges_done == 1
+    finally:
+        db.close()
+
+
+def test_completion_saves_mastery_index_and_next_review_time(client):
+    db = SessionLocal()
+    try:
+        db.add(Exercise(
+            id=44,
+            name="Mastery test exercise",
+            h1_svg_path="/mastery-h1.svg",
+            h1_axis_start=10,
+            h1_axis_end=0,
+            c13_svg_path="/mastery-c13.svg",
+            c13_axis_start=200,
+            c13_axis_end=0,
+            h1_nmr_text="h1",
+            c13_nmr_text="c13",
+        ))
+        settings = db.query(UserSettings).filter(UserSettings.name == "User").first()
+        if settings is None:
+            settings = UserSettings(name="User")
+            db.add(settings)
+        settings.cheats = "000000000000"
+        db.add(Statistics(
+            exercise_id="44",
+            timer_total=120,
+            incorrect_count=1,
+            difficulty="M2",
+            confidence=4,
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+    mark_exercise_completed(44)
+
+    db = SessionLocal()
+    try:
+        row = db.query(Statistics).filter(Statistics.exercise_id == "44").one()
+        expected = calculate_spaced_repetition_interval(
+            timer_total=120,
+            incorrect_count=1,
+            cheats_used="000000000000",
+            confidence=4,
+            difficulty="M2",
+            completed_at=row.completed_at,
+            cheats_off=row.cheats_off,
+        )
+
+        assert row.mastery_index == pytest.approx(expected["mastery_index"])
+        exercise = db.query(Exercise).filter(Exercise.id == 44).one()
+        assert exercise.due_time == row.completed_at + timedelta(
+            days=expected["next_review_days"]
+        )
+    finally:
+        db.close()
+
+
+def test_completion_reuses_prefixed_statistics_row(client):
+    db = SessionLocal()
+    try:
+        db.add(Exercise(
+            id=54,
+            name="Prefixed statistics exercise",
+            h1_svg_path="/prefixed-h1.svg",
+            h1_axis_start=10,
+            h1_axis_end=0,
+            c13_svg_path="/prefixed-c13.svg",
+            c13_axis_start=200,
+            c13_axis_end=0,
+            h1_nmr_text="h1",
+            c13_nmr_text="c13",
+        ))
+        db.add(Statistics(exercise_id="exercise-54", timer_total=91))
+        db.commit()
+    finally:
+        db.close()
+
+    mark_exercise_completed(54)
+
+    db = SessionLocal()
+    try:
+        rows = db.query(Statistics).filter(
+            Statistics.exercise_id.in_(("54", "exercise-54"))
+        ).all()
+        assert len(rows) == 1
+        assert rows[0].exercise_id == "exercise-54"
+        assert rows[0].timer_total == 91
+        assert rows[0].completed_at is not None
+        assert db.query(Exercise).filter_by(id=54).one().due_time is not None
     finally:
         db.close()
 

@@ -2,6 +2,7 @@ export type ExerciseSummary = {
   id: number;
   name: string | null;
   exercise_set: string | null;
+  in_SR?: number;
   tags: string[];
   statistics_tags?: string[];
   difficulty?: string | null;
@@ -12,6 +13,7 @@ export type ExerciseSummary = {
   cheats_off?: string | null;
   started_at?: string | null;
   completed_at?: string | null;
+  due_time?: string | null;
   fragments_drawn?: number | null;
   merges_done?: number | null;
   matches_done?: number | null;

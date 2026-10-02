@@ -10,6 +10,7 @@ from app.api.predefined_fragments import router as predefined_fragments_router
 from app.api.reset import router as reset_router
 from app.api.settings import router as settings_router
 from app.api.solvents import router as solvents_router
+from app.api.spacedrep import router as spacedrep_router
 from app.api.statistics import router as statistics_router
 from app.api.tags import router as tags_router
 from app.api.warnings import router as warnings_router
@@ -28,5 +29,6 @@ api_router.include_router(reset_router)
 api_router.include_router(statistics_router)
 api_router.include_router(warnings_router)
 api_router.include_router(settings_router)
+api_router.include_router(spacedrep_router)
 api_router.include_router(solvents_router)
 api_router.include_router(tags_router)

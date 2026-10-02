@@ -556,6 +556,110 @@ function TimeDistributionGraph({ exerciseSummaries }: { exerciseSummaries: Exerc
           </div>
         </div>
       </div>
+      <div className="statistics-time-of-day-axis-title">time spent (min)</div>
+    </section>
+  );
+}
+
+const TIME_OF_DAY_BIN_COUNT = 96;
+
+function buildTimeOfDayDistribution(
+  exerciseSummaries: ExerciseSummary[],
+  logbooks: Record<string, ApiLogbookState>,
+): Array<{ easy: number; medium: number; difficult: number }> {
+  const buckets = Array.from({ length: TIME_OF_DAY_BIN_COUNT }, () => ({ easy: 0, medium: 0, difficult: 0 }));
+  exerciseSummaries.forEach((exercise) => {
+    const difficulty = exerciseDifficulty(exercise);
+    const logbook = logbooks[String(exercise.id)] ?? logbooks[`exercise-${exercise.id}`];
+    if (!difficulty || !logbook) return;
+    parseLogbookRestarts(logbook.restarts).forEach(({ start, stop }) => {
+      let cursor = start;
+      while (cursor < stop) {
+        const date = new Date(cursor);
+        const bin = Math.floor((date.getHours() * 60 + date.getMinutes()) / 15);
+        const binEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, (bin + 1) * 15).getTime();
+        const segmentEnd = Math.min(stop, binEnd);
+        buckets[bin][difficulty] += (segmentEnd - cursor) / 1000;
+        cursor = segmentEnd;
+      }
+    });
+  });
+  return buckets;
+}
+
+function formatTimeOfDayBin(index: number): string {
+  const minutes = index * 15;
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
+function TimeOfDayDistributionGraph({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
+  const [logbooks, setLogbooks] = useState<Record<string, ApiLogbookState>>({});
+
+  useEffect(() => {
+    let isCurrent = true;
+    fetchAllLogbooks()
+      .then((data) => {
+        if (isCurrent) setLogbooks(data);
+      })
+      .catch(() => {
+        if (isCurrent) setLogbooks({});
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [exerciseSummaries]);
+
+  const buckets = buildTimeOfDayDistribution(exerciseSummaries, logbooks);
+  const maximumSeconds = timeScaleMaximum(Math.max(0, ...buckets.map((bucket) => bucket.easy + bucket.medium + bucket.difficult)));
+  const ticks = timeScaleTicks(maximumSeconds);
+
+  return (
+    <section className="statistics-timeline-section" aria-label="Time spent by time of day">
+      <div className="statistics-timeline-heading">
+        <h3>Time spent by time of day</h3>
+        <div className="statistics-timeline-legend" aria-label="Difficulty legend">
+          <span className="statistics-timeline-legend-item"><span className="statistics-contribution-swatch statistics-contribution-status is-green" aria-hidden="true" />Easy</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-contribution-swatch statistics-contribution-status is-blue" aria-hidden="true" />Medium</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-contribution-swatch statistics-contribution-status is-red" aria-hidden="true" />Difficult</span>
+        </div>
+      </div>
+      <div className="statistics-timeline-chart statistics-time-of-day-chart">
+        <div className="statistics-timeline-axis-title">Total time</div>
+        <div className="statistics-timeline-axis" aria-label="Total time">
+          {ticks.map((tick) => (
+            <span key={tick} className="statistics-timeline-axis-label" style={{ bottom: `${(tick / maximumSeconds) * 100}%` }}>
+              {formatDuration(Math.round(tick))}
+            </span>
+          ))}
+        </div>
+        <div className="statistics-timeline-viewport">
+          <div className="statistics-timeline-plot">
+            <div className="statistics-timeline-guides" aria-hidden="true">
+              {ticks.map((tick) => (
+                <span key={tick} style={{ bottom: `${(tick / maximumSeconds) * 100}%` }} />
+              ))}
+            </div>
+            <div className="statistics-time-of-day-distribution" style={{ '--timeline-days': buckets.length } as React.CSSProperties}>
+              {buckets.map((bucket, index) => {
+                const total = bucket.easy + bucket.medium + bucket.difficult;
+                const label = `${formatTimeOfDayBin(index)}-${formatTimeOfDayBin((index + 1) % TIME_OF_DAY_BIN_COUNT)}: ${formatDuration(Math.round(total))}`;
+                return (
+                  <div key={index} className="statistics-time-of-day-bin" title={label}>
+                    <div className="statistics-timeline-bar" aria-label={label}>
+                      <span className="statistics-timeline-segment is-green" style={{ height: `${(bucket.easy / maximumSeconds) * 100}%` }} />
+                      <span className="statistics-timeline-segment is-blue" style={{ height: `${(bucket.medium / maximumSeconds) * 100}%` }} />
+                      <span className="statistics-timeline-segment is-red" style={{ height: `${(bucket.difficult / maximumSeconds) * 100}%` }} />
+                    </div>
+                    <span className="statistics-time-distribution-label">{index % 4 === 0 ? String(index / 4) : ''}</span>
+                  </div>
+                );
+              })}
+              <span className="statistics-time-of-day-end-label">24</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="statistics-time-of-day-axis-title">time of the day</div>
     </section>
   );
 }
@@ -1003,7 +1107,7 @@ export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedEx
 
         <div className="settings-panel-content">
           <div className="settings-tab-content" id={`statisticstab-${activeTab}`}>
-            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <TimeDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '4' ? <LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} /> : activeTab === '6' ? <TempTab exerciseSummaries={exerciseSummaries} /> : null}
+            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><TimeDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><TimeOfDayDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '4' ? <LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} /> : activeTab === '6' ? <TempTab exerciseSummaries={exerciseSummaries} /> : null}
           </div>
         </div>
       </div>

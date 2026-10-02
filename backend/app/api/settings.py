@@ -3,6 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from app.core.statistics_keys import statistics_exercise_id_keys
 from app.db.models import Statistics, UserSettings
 from app.db.session import get_db
 
@@ -35,6 +36,7 @@ def _serialize_settings(settings: UserSettings) -> dict[str, object]:
         "show_exchange": bool(getattr(settings, "show_exchange", True)),
         "show_missing": bool(getattr(settings, "show_missing", True)),
         "show_creation": bool(getattr(settings, "show_creation", True)),
+        "SR_mode": bool(getattr(settings, "SR_mode", False)),
     }
 
 
@@ -60,7 +62,7 @@ def _record_cheats_disabled(
     if exercise_id is None or not previous_cheats.startswith("1") or next_cheats.startswith("1"):
         return
 
-    db.query(Statistics).filter(Statistics.exercise_id == str(exercise_id)).update(
+    db.query(Statistics).filter(Statistics.exercise_id.in_(statistics_exercise_id_keys(exercise_id))).update(
         {Statistics.cheats_off: datetime.now()},
         synchronize_session=False,
     )
@@ -77,6 +79,7 @@ class UserSettingsResponse(BaseModel):
     show_exchange: bool
     show_missing: bool
     show_creation: bool
+    SR_mode: bool
     active_preset: str
     available_presets: list[str]
 
@@ -95,6 +98,7 @@ class UpdateUserSettingsRequest(BaseModel):
     show_exchange: bool | None = None
     show_missing: bool | None = None
     show_creation: bool | None = None
+    SR_mode: bool | None = None
 
 
 def _build_response(settings: UserSettings, active_preset: str = _ACTIVE_SETTINGS_NAME) -> UserSettingsResponse:
@@ -123,6 +127,7 @@ def _build_response(settings: UserSettings, active_preset: str = _ACTIVE_SETTING
         show_exchange=bool(serialized["show_exchange"]),
         show_missing=bool(serialized["show_missing"]),
         show_creation=bool(serialized["show_creation"]),
+        SR_mode=bool(serialized["SR_mode"]),
         active_preset=active_preset,
         available_presets=preset_names,
     )
@@ -193,6 +198,8 @@ def update_settings(payload: UpdateUserSettingsRequest) -> UserSettingsResponse:
             settings.show_missing = bool(payload.show_missing)
         if payload.show_creation is not None:
             settings.show_creation = bool(payload.show_creation)
+        if payload.SR_mode is not None:
+            settings.SR_mode = bool(payload.SR_mode)
 
         db.commit()
         db.refresh(settings)

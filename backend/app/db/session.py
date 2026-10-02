@@ -400,6 +400,12 @@ def _migrate_add_missing_columns() -> None:
         if "exercise_set" not in existing_exercise:
             conn.execute(text("ALTER TABLE exercises ADD COLUMN exercise_set TEXT"))
             conn.commit()
+        if "in_SR" not in existing_exercise:
+            conn.execute(text("ALTER TABLE exercises ADD COLUMN in_SR INTEGER NOT NULL DEFAULT 0"))
+            conn.commit()
+        if "due_time" not in existing_exercise:
+            conn.execute(text("ALTER TABLE exercises ADD COLUMN due_time DATETIME"))
+            conn.commit()
         if "bookmark" not in existing_exercise:
             conn.execute(text("ALTER TABLE exercises ADD COLUMN bookmark INTEGER"))
             conn.commit()
@@ -557,8 +563,11 @@ def _migrate_add_missing_columns() -> None:
         if "fragments_drawn" not in existing_statistics:
             conn.execute(text("ALTER TABLE statistics ADD COLUMN fragments_drawn INTEGER DEFAULT 0"))
             conn.commit()
-        if "eligible_purge_time" not in existing_statistics:
-            conn.execute(text("ALTER TABLE statistics ADD COLUMN eligible_purge_time DATETIME"))
+        if "due_time" not in existing_statistics:
+            if "eligible_purge_time" in existing_statistics:
+                conn.execute(text("ALTER TABLE statistics RENAME COLUMN eligible_purge_time TO due_time"))
+            else:
+                conn.execute(text("ALTER TABLE statistics ADD COLUMN due_time DATETIME"))
             conn.commit()
         if "paused_at" not in existing_statistics:
             conn.execute(text("ALTER TABLE statistics ADD COLUMN paused_at DATETIME"))
@@ -567,7 +576,7 @@ def _migrate_add_missing_columns() -> None:
             conn.execute(text("ALTER TABLE statistics ADD COLUMN pause_total INTEGER NOT NULL DEFAULT 0"))
             conn.commit()
         if "mastery_index" not in existing_statistics:
-            conn.execute(text("ALTER TABLE statistics ADD COLUMN mastery_index INTEGER DEFAULT 0"))
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN mastery_index FLOAT DEFAULT 0"))
             conn.commit()
         elif next(row[2] for row in statistics_columns if row[1] == "cheats_used").upper() != "VARCHAR(15)":
             conn.execute(text("ALTER TABLE statistics RENAME TO statistics_legacy"))
@@ -589,7 +598,8 @@ def _migrate_add_missing_columns() -> None:
                     timer_total INTEGER NOT NULL DEFAULT 0,
                     started_at DATETIME,
                     completed_at DATETIME,
-                    eligible_purge_time DATETIME
+                    mastery_index FLOAT DEFAULT 0,
+                    due_time DATETIME
                 )
                 """
             ))
@@ -597,14 +607,50 @@ def _migrate_add_missing_columns() -> None:
                 """
                 INSERT INTO statistics
                     (id, exercise_id, incorrect_count, cheats_used, difficulty, confidence, merges_done, matches_done, fragments_drawn, dbe_set, start_counting,
-                     stop_counting, timer_total, started_at, completed_at, eligible_purge_time)
+                     stop_counting, timer_total, started_at, completed_at, mastery_index, due_time)
                 SELECT id, exercise_id, incorrect_count, CAST(cheats_used AS TEXT), difficulty, confidence, merges_done, matches_done, fragments_drawn,
                        CASE WHEN dbe_set IS NULL THEN 0 ELSE 1 END, start_counting,
-                       stop_counting, timer_total, started_at, completed_at, eligible_purge_time
+                       stop_counting, timer_total, started_at, completed_at, mastery_index, due_time
                 FROM statistics_legacy
                 """
             ))
             conn.execute(text("DROP TABLE statistics_legacy"))
+            conn.commit()
+
+        mastery_index_column = next(
+            row for row in conn.execute(text("PRAGMA table_info(statistics)"))
+            if row[1] == "mastery_index"
+        )
+        if mastery_index_column[2].upper() != "FLOAT":
+            conn.execute(text(
+                "CREATE TEMP TABLE statistics_mastery_index_migration AS "
+                "SELECT id, mastery_index FROM statistics"
+            ))
+            conn.commit()
+            conn.execute(text("ALTER TABLE statistics DROP COLUMN mastery_index"))
+            conn.commit()
+            conn.execute(text("ALTER TABLE statistics ADD COLUMN mastery_index FLOAT DEFAULT 0"))
+            conn.commit()
+            conn.execute(text(
+                "UPDATE statistics SET mastery_index = ("
+                "SELECT mastery_index FROM statistics_mastery_index_migration "
+                "WHERE statistics_mastery_index_migration.id = statistics.id)"
+            ))
+            conn.execute(text("DROP TABLE statistics_mastery_index_migration"))
+            conn.commit()
+
+        conn.execute(text(
+            "UPDATE exercises SET due_time = COALESCE("
+            "(SELECT due_time FROM statistics "
+            "WHERE statistics.exercise_id = CAST(exercises.id AS TEXT) LIMIT 1), "
+            "(SELECT due_time FROM statistics "
+            "WHERE statistics.exercise_id = 'exercise-' || CAST(exercises.id AS TEXT) LIMIT 1)) "
+            "WHERE exercises.due_time IS NULL"
+        ))
+        conn.commit()
+
+        if any(row[1] == "due_time" for row in conn.execute(text("PRAGMA table_info(statistics)"))):
+            conn.execute(text("ALTER TABLE statistics DROP COLUMN due_time"))
             conn.commit()
 
         dbe_set_column = next(

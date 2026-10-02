@@ -282,6 +282,7 @@ export function MolecularBookkeepingPage() {
   const [showExchangeText, setShowExchangeText] = useState(true);
   const [showMissingText, setShowMissingText] = useState(true);
   const [showCreation, setShowCreation] = useState(true);
+  const [srMode, setSrMode] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState('Light');
   const [selectedPreset, setSelectedPreset] = useState('User');
   const [availablePresets, setAvailablePresets] = useState<string[]>(['Default', 'Beginner', 'Exam', 'User']);
@@ -790,6 +791,7 @@ useEffect(() => {
     setShowExchangeText(settings.show_exchange ?? true);
     setShowMissingText(settings.show_missing ?? true);
     setShowCreation(settings.show_creation ?? true);
+    setSrMode(settings.SR_mode === true);
     setSelectedTheme(settings.theme ?? 'Light');
 
     if (settings.active_preset) {
@@ -820,6 +822,7 @@ useEffect(() => {
       if (overrides.show_exchange !== undefined) payload.show_exchange = overrides.show_exchange;
       if (overrides.show_missing !== undefined) payload.show_missing = overrides.show_missing;
       if (overrides.show_creation !== undefined) payload.show_creation = overrides.show_creation;
+      if (overrides.SR_mode !== undefined) payload.SR_mode = overrides.SR_mode;
 
       try {
         const saved = await updateUserSettings(payload);
@@ -2014,6 +2017,8 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
           />
 
           <ExerciseMenu
+            srMode={srMode}
+            onSetSrMode={(enabled) => persistUserSettings({ SR_mode: enabled })}
             selectedExerciseId={selectedExerciseId}
             exerciseSummaries={exerciseSummaries}
             activeTags={activeTags}

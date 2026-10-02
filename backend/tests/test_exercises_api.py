@@ -1,5 +1,6 @@
 import base64
 import hashlib
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -52,6 +53,38 @@ def test_list_exercises_empty_initially(client):
     response = client.get("/api/v1/exercises/")
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_create_exercise_defaults_in_sr_to_zero(client):
+    response = client.post("/api/v1/exercises/", json=_exercise_payload())
+
+    assert response.status_code == 201
+    assert response.json()["in_SR"] == 0
+
+    db = SessionLocal()
+    try:
+        exercise = db.query(Exercise).one()
+        assert exercise.in_SR == 0
+        column = next(row for row in db.execute(text("PRAGMA table_info(exercises)")) if row[1] == "in_SR")
+        assert column[2].upper() == "INTEGER"
+    finally:
+        db.close()
+
+
+def test_create_exercise_stores_in_sr_value(client):
+    payload = _exercise_payload()
+    payload["in_SR"] = 1
+
+    response = client.post("/api/v1/exercises/", json=payload)
+
+    assert response.status_code == 201
+    assert response.json()["in_SR"] == 1
+
+    db = SessionLocal()
+    try:
+        assert db.query(Exercise).one().in_SR == 1
+    finally:
+        db.close()
 
 
 def test_dbe_input_counter_increments_for_each_value_submission(client):
@@ -218,6 +251,55 @@ def test_hidden_tags_are_included_for_statistics_summaries(client):
         assert tag_name in summary["statistics_tags"]
     finally:
         db.query(TagsUsed).filter(TagsUsed.tag_name == tag_name).delete()
+        db.commit()
+        db.close()
+
+
+def test_exercise_summary_includes_due_time(client):
+    payload = _exercise_payload()
+    payload["in_SR"] = 7
+    create_response = client.post("/api/v1/exercises/", json=payload)
+    assert create_response.status_code == 201
+    exercise_id = create_response.json()["id"]
+    due_time = datetime(2026, 10, 3, 14, 30)
+
+    db = SessionLocal()
+    try:
+        exercise = db.query(Exercise).filter_by(id=exercise_id).one()
+        exercise.due_time = due_time
+        db.commit()
+
+        summaries_response = client.get("/api/v1/exercises/summaries")
+        assert summaries_response.status_code == 200
+        summary = next(item for item in summaries_response.json() if item["id"] == exercise_id)
+        assert summary["due_time"] == due_time.isoformat()
+        assert summary["in_SR"] == 7
+    finally:
+        db.query(Statistics).filter_by(exercise_id=str(exercise_id)).delete()
+        db.commit()
+        db.close()
+
+
+def test_exercise_summary_finds_prefixed_statistics_row(client):
+    create_response = client.post("/api/v1/exercises/", json=_exercise_payload())
+    assert create_response.status_code == 201
+    exercise_id = create_response.json()["id"]
+    due_time = datetime(2026, 10, 5, 10, 15)
+
+    db = SessionLocal()
+    try:
+        exercise = db.query(Exercise).filter_by(id=exercise_id).one()
+        exercise.due_time = due_time
+        db.commit()
+
+        summaries_response = client.get("/api/v1/exercises/summaries")
+        assert summaries_response.status_code == 200
+        summary = next(item for item in summaries_response.json() if item["id"] == exercise_id)
+        assert summary["due_time"] == due_time.isoformat()
+    finally:
+        db.query(Statistics).filter(
+            Statistics.exercise_id.in_((str(exercise_id), f"exercise-{exercise_id}"))
+        ).delete(synchronize_session=False)
         db.commit()
         db.close()
 

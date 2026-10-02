@@ -8,6 +8,11 @@ from typing import Literal
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
+from app.api.spacedrep import calculate_spaced_repetition_interval
+from app.core.statistics_keys import (
+    canonical_statistics_exercise_id,
+    statistics_exercise_id_keys,
+)
 from app.db.models import Exercise, LogbookState, Statistics, UserSettings
 from app.db.session import get_db
 
@@ -52,16 +57,11 @@ def _ensure_statistics_row(db, exercise_id: int | str) -> tuple[Statistics | Non
     if _is_reference_exercise(db, exercise_id):
         return None, False
 
-    exercise_key = str(exercise_id)
-    row = (
-        db.query(Statistics)
-        .filter(Statistics.exercise_id == exercise_key)
-        .first()
-    )
+    row = _find_statistics_row(db, str(exercise_id))
     if row is not None:
         return row, False
 
-    row = Statistics(exercise_id=exercise_key)
+    row = Statistics(exercise_id=canonical_statistics_exercise_id(exercise_id))
     db.add(row)
     db.flush()
     return row, True
@@ -70,26 +70,10 @@ def _ensure_statistics_row(db, exercise_id: int | str) -> tuple[Statistics | Non
 def _find_statistics_row(db, exercise_id: str) -> Statistics | None:
     """Try to find a statistics row for the given id, accepting both
     bare numeric ids ("8") and prefixed keys ("exercise-8")."""
-    key = str(exercise_id)
-    row = db.query(Statistics).filter(Statistics.exercise_id == key).first()
-    if row is not None:
-        return row
-
-    # If key is numeric, try the prefixed form
-    if key.isdigit():
-        alt = f"exercise-{key}"
-        row = db.query(Statistics).filter(Statistics.exercise_id == alt).first()
+    for key in statistics_exercise_id_keys(exercise_id):
+        row = db.query(Statistics).filter(Statistics.exercise_id == key).first()
         if row is not None:
             return row
-
-    # If key starts with exercise- try the bare numeric suffix
-    if key.startswith("exercise-"):
-        suffix = key[len("exercise-"):]
-        if suffix:
-            row = db.query(Statistics).filter(Statistics.exercise_id == suffix).first()
-            if row is not None:
-                return row
-
     return None
 
 
@@ -337,11 +321,7 @@ def mark_exercise_paused(exercise_id: int | str) -> None:
 def mark_exercise_completed(exercise_id: int | str) -> None:
     with get_db() as db:
         # Once completion was recorded, repeated completion calls must not mutate statistics.
-        existing = (
-            db.query(Statistics)
-            .filter(Statistics.exercise_id == str(exercise_id))
-            .first()
-        )
+        existing = _find_statistics_row(db, str(exercise_id))
         if existing is not None and existing.completed_at is not None:
             return
 
@@ -354,6 +334,21 @@ def mark_exercise_completed(exercise_id: int | str) -> None:
         row.completed_at = completed_at
         row.fragments_drawn, row.matches_done, row.merges_done = _logbook_event_counts(db, exercise_id)
         _finalize_timer(db, row, completed_at, count_short_elapsed=True)
+        spaced_repetition = calculate_spaced_repetition_interval(
+            timer_total=row.timer_total,
+            incorrect_count=row.incorrect_count,
+            cheats_used=row.cheats_used,
+            confidence=row.confidence,
+            difficulty=row.difficulty,
+            completed_at=completed_at,
+            cheats_off=row.cheats_off,
+        )
+        row.mastery_index = spaced_repetition["mastery_index"]
+        exercise = db.query(Exercise).filter(Exercise.id == int(exercise_id)).first()
+        if exercise is not None:
+            exercise.due_time = completed_at + timedelta(
+            days=spaced_repetition["next_review_days"]
+            )
         db.commit()
         db.refresh(row)
 

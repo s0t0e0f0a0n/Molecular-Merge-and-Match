@@ -90,7 +90,11 @@ vi.mock('../../../src/context/RDKitContext', () => ({
 describe('MolecularBookkeepingPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFetch.mockClear();
+    mockFetch.mockReset();
+    mockFetch.mockImplementation(() => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve([]),
+    } as Response));
     sessionStorage.clear();
     window.history.replaceState(null, '', '/');
     rdkitMock = null;
@@ -288,6 +292,160 @@ it('shows ZIP upload control in the exercise menu', async () => {
   expect(
     document.querySelector('input[type="file"][accept=".zip,application/zip"]'),
   ).not.toBeNull();
+});
+
+it('uses the spaced-repetition menu when SR_mode is enabled', async () => {
+  const user = userEvent.setup();
+  const dueTime = new Date(Date.now() - 60_000).toISOString();
+  const futureDueTime = new Date(Date.now() + 86_400_000).toISOString();
+  vi.mocked(fetchExerciseSummaries).mockResolvedValue([
+    { ...mockSummaries[0], in_SR: 3, due_time: futureDueTime },
+    { ...mockSummaries[1], in_SR: 2, due_time: dueTime },
+    { ...mockSummaries[1], id: 3, name: 'Exercise 3', in_SR: 0 },
+    { ...mockSummaries[1], id: 4, name: 'Exercise 4', in_SR: 1, due_time: dueTime },
+    { ...mockSummaries[1], id: 5, name: 'Exercise 5', in_SR: 2, due_time: dueTime },
+    { ...mockSummaries[0], id: 6, name: 'Exercise 6', due_time: null },
+    { ...mockSummaries[0], id: 7, name: 'Exercise 7', due_time: '0' },
+  ]);
+  mockFetch.mockImplementation(async (url) => ({
+    ok: true,
+    json: async () => url.includes('/api/v1/settings/') ? { SR_mode: true } : [],
+  }) as Response);
+
+  renderPage();
+  await user.click(await screen.findByTestId('exercise-menu-button'));
+
+  expect(await screen.findByRole('button', { name: 'Go to next exercise' })).toBeInTheDocument();
+  expect(screen.getByText('Past exercises')).toBeInTheDocument();
+  expect(screen.getAllByText('Exercise 1').length).toBeGreaterThan(0);
+  expect(screen.queryByText('Exercise 6')).not.toBeInTheDocument();
+  expect(screen.queryByText('Exercise 7')).not.toBeInTheDocument();
+  expect(screen.getByText('Exercise 2')).toBeInTheDocument();
+  expect(screen.getAllByText(`Due: ${new Date(Date.parse(dueTime)).toLocaleString()}`)).toHaveLength(3);
+  expect(screen.getAllByText(`Due: ${new Date(Date.parse(futureDueTime)).toLocaleString()}`)).toHaveLength(1);
+  expect(screen.queryByText('Exercise sets')).not.toBeInTheDocument();
+  expect(screen.queryByText('Filters')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Delete exercises' })).not.toBeInTheDocument();
+  expect(screen.queryByTitle('Reset this exercise')).not.toBeInTheDocument();
+  expect(await screen.findByText('Upload exercise ZIP')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Go to next exercise' }));
+  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(4));
+  await user.click(screen.getByRole('button', { name: 'Go to next exercise' }));
+  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(2));
+  await user.click(screen.getByRole('button', { name: 'Go to next exercise' }));
+  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(5));
+});
+
+it('offers to switch modes when no SR exercises are currently due', async () => {
+  const user = userEvent.setup();
+  vi.mocked(fetchExerciseSummaries).mockResolvedValue([
+    { ...mockSummaries[1], id: 20, in_SR: 1, due_time: new Date(Date.now() + 60_000).toISOString() },
+  ]);
+  const settingsRequests: Array<{ url: string; init?: RequestInit }> = [];
+  mockFetch.mockImplementation(async (url, init) => {
+    settingsRequests.push({ url, init });
+    return {
+      ok: true,
+      json: async () => url.includes('/api/v1/settings/')
+        ? { SR_mode: init?.method === 'PUT' ? false : true }
+        : [],
+    } as Response;
+  });
+
+  renderPage();
+  await user.click(await screen.findByTestId('exercise-menu-button'));
+
+  expect(await screen.findByRole('dialog', { name: 'Done for today' })).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Switch to normal mode' }));
+
+  await waitFor(() => {
+    expect(settingsRequests.some(({ init }) => (
+      init?.method === 'PUT' && JSON.parse(String(init.body)).SR_mode === false
+    ))).toBe(true);
+  });
+});
+
+it('dismisses the exhausted-queue dialog temporarily when staying in SR mode', async () => {
+  const user = userEvent.setup();
+  vi.mocked(fetchExerciseSummaries).mockResolvedValueOnce([
+    {
+      ...mockSummaries[0],
+      id: 31,
+      name: 'Completed history exercise',
+      completed: true,
+      due_time: new Date(Date.now() + 60_000).toISOString(),
+    },
+  ]);
+  const settingsRequests: Array<{ url: string; init?: RequestInit }> = [];
+  mockFetch.mockImplementation(async (url, init) => {
+    settingsRequests.push({ url, init });
+    return {
+      ok: true,
+      json: async () => url.includes('/api/v1/settings/') ? { SR_mode: true } : [],
+    } as Response;
+  });
+
+  renderPage();
+  await user.click(await screen.findByTestId('exercise-menu-button'));
+  expect(await screen.findByRole('dialog', { name: 'Done for today' })).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Stay in spaced repetition' }));
+
+  expect(screen.queryByRole('dialog', { name: 'Done for today' })).not.toBeInTheDocument();
+  expect(screen.getAllByText('Completed history exercise').length).toBeGreaterThan(0);
+  expect(settingsRequests.some(({ init }) => init?.method === 'PUT')).toBe(false);
+});
+
+it('shows the done-for-today dialog after deferring the last due exercise', async () => {
+  const user = userEvent.setup();
+  const eligibleExercise = {
+    ...mockSummaries[1],
+    id: 20,
+    name: 'Exercise 20',
+    in_SR: 1,
+    due_time: new Date(Date.now() - 60_000).toISOString(),
+  };
+  vi.mocked(fetchExerciseSummaries)
+    .mockResolvedValueOnce([eligibleExercise])
+    .mockResolvedValueOnce([{
+      ...eligibleExercise,
+      due_time: new Date(Date.now() + 6 * 60 * 60_000).toISOString(),
+    }]);
+  mockFetch.mockImplementation(async (url) => ({
+    ok: true,
+    json: async () => url.includes('/api/v1/settings/') ? { SR_mode: true } : [],
+  }) as Response);
+
+  renderPage();
+  await user.click(await screen.findByTestId('exercise-menu-button'));
+  await user.click(await screen.findByRole('button', { name: 'Go to next exercise' }));
+
+  expect(await screen.findByRole('dialog', { name: 'Done for today' })).toBeInTheDocument();
+  expect(fetchExerciseDetail).toHaveBeenCalledTimes(1);
+});
+
+it('treats an SR exercise without a due time as ready immediately', async () => {
+  const user = userEvent.setup();
+  vi.mocked(fetchExerciseSummaries).mockResolvedValueOnce([
+    { ...mockSummaries[1], id: 21, name: 'New SR exercise', in_SR: 1, due_time: null },
+    { ...mockSummaries[1], id: 22, name: 'Next new SR exercise', in_SR: 2, due_time: null },
+    { ...mockSummaries[1], id: 23, name: 'Zero SR exercise', in_SR: 0, due_time: null },
+    { ...mockSummaries[1], id: 24, name: 'Negative SR exercise', in_SR: -1, due_time: null },
+  ]);
+  mockFetch.mockImplementation(async (url) => ({
+    ok: true,
+    json: async () => url.includes('/api/v1/settings/') ? { SR_mode: true } : [],
+  }) as Response);
+
+  renderPage();
+  await user.click(await screen.findByTestId('exercise-menu-button'));
+
+  expect(screen.queryByRole('dialog', { name: 'Done for today' })).not.toBeInTheDocument();
+  const goButton = await screen.findByRole('button', { name: 'Go to next exercise' });
+  expect(goButton).toBeEnabled();
+  await user.click(goButton);
+  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(22));
 });
 
 it('shows an error when loading exercise detail fails', async () => {

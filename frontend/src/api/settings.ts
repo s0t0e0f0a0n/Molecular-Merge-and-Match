@@ -11,6 +11,7 @@ export type UserSettings = {
   show_exchange?: boolean;
   show_missing?: boolean;
   show_creation?: boolean;
+  SR_mode?: boolean;
   active_preset?: string;
   available_presets?: string[];
 };
@@ -27,6 +28,7 @@ export type UpdateUserSettingsRequest = {
   show_exchange?: boolean;
   show_missing?: boolean;
   show_creation?: boolean;
+  SR_mode?: boolean;
 };
 
 export async function fetchUserSettings(): Promise<UserSettings> {

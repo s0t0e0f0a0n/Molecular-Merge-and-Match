@@ -441,6 +441,68 @@
     height: calc(var(--timeline-bars-height) + var(--timeline-date-height));
 }
 
+.statistics-time-of-day-distribution {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(var(--timeline-days), minmax(0, 1fr));
+    gap: 0;
+    width: 100%;
+    height: calc(var(--timeline-bars-height) + var(--timeline-date-height));
+    align-items: end;
+    border-bottom: 1px solid #cbd5e1;
+}
+
+.statistics-time-of-day-bin {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 5px;
+    min-width: 0;
+    height: calc(var(--timeline-bars-height) + var(--timeline-date-height));
+}
+
+.statistics-time-of-day-bin .statistics-timeline-bar {
+    width: 100%;
+    background: transparent;
+    border-radius: 0;
+}
+
+.statistics-time-of-day-chart .statistics-timeline-viewport {
+    overflow: visible;
+}
+
+.statistics-time-of-day-end-label {
+    position: absolute;
+    right: -6px;
+    top: calc(var(--timeline-bars-height) + 5px);
+    color: #64748b;
+    font-size: 10px;
+}
+
+.statistics-time-of-day-axis-title {
+    margin-top: -4px;
+    color: #475569;
+    font-size: 12px;
+    font-style: italic;
+    line-height: 1;
+    text-align: center;
+}
+
+.statistics-graph-box {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 14px;
+}
+
+.statistics-time-of-day-bin .statistics-time-distribution-label {
+    overflow: visible;
+    text-align: left;
+}
+
 .statistics-time-distribution-label {
     overflow: hidden;
     width: 100%;
