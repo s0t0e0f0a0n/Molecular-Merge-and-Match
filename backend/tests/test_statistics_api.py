@@ -108,6 +108,22 @@ def test_timer_restarts_are_saved_with_the_timer_interval(client):
         assert len(intervals) == 1
         assert datetime.fromisoformat(intervals[0]["start"]) == statistics.start_counting
         assert datetime.fromisoformat(intervals[0]["stop"]) == statistics.stop_counting
+        assert statistics.pause_total == 1
+    finally:
+        db.close()
+
+
+def test_pause_and_switch_each_increment_pause_total(client):
+    mark_exercise_resumed(50)
+    mark_exercise_paused(50)
+
+    response = client.post("/api/v1/statistics/stop", params={"exercise_id": "50"})
+    assert response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        statistics = db.query(Statistics).filter(Statistics.exercise_id == "50").one()
+        assert statistics.pause_total == 2
     finally:
         db.close()
 

@@ -302,10 +302,12 @@ def mark_exercise_selected(exercise_id: int | str) -> None:
 def mark_exercise_closed(exercise_id: int | str) -> None:
     with get_db() as db:
         row, _ = _ensure_statistics_row(db, exercise_id)
-        if row is None or row.start_counting is None or row.stop_counting is not None:
+        if row is None:
             return
 
-        _finalize_timer(db, row, datetime.now(), count_short_elapsed=True)
+        row.pause_total += 1
+        if row.start_counting is not None and row.stop_counting is None:
+            _finalize_timer(db, row, datetime.now(), count_short_elapsed=True)
 
         db.commit()
         db.refresh(row)
@@ -319,7 +321,9 @@ def mark_exercise_paused(exercise_id: int | str) -> None:
         row, _ = _ensure_statistics_row(db, exercise_id)
         if row is None:
             return
+        row.pause_total += 1
         if row.start_counting is None or row.stop_counting is not None:
+            db.commit()
             db.refresh(row)
             return
 

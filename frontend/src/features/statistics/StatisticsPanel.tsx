@@ -6,7 +6,7 @@ import { resetExercises, type ResetLevel } from '../../api/reset';
 import { fetchTags, type Tag } from '../../api/tags';
 import '../../panelStyles.css';
 
-type StatisticsTabId = '1' | '2' | '3' | '4' | '5';
+type StatisticsTabId = '1' | '2' | '3' | '4' | '5' | '6';
 
 type StatisticsPanelProps = {
   isOpen: boolean;
@@ -19,6 +19,7 @@ type StatisticsPanelProps = {
 // tab 3 contains timing graphs
 // tab 4 contains advanced statistics 
 // tab 5 conatins the reset functions
+// tab 6 contains temporary statistics
 const TABS: Array<{ id: StatisticsTabId; label: React.ReactNode }> = [
   { id: '1', label: <>
     {/* @ts-expect-error legacy SVG uses an HTML class attribute spelling */}
@@ -55,6 +56,7 @@ const TABS: Array<{ id: StatisticsTabId; label: React.ReactNode }> = [
 
       <svg fill="currentColor" style={{ verticalAlign: 'middle' }} width="18px" height="18px" viewBox="7 8 26 26" xmlns="http://www.w3.org/2000/svg"><g stroke-linecap="round" stroke-linejoin="round"></g><g><path d="M10 16.682l5.69 5.685 1.408-1.407-3.283-3.28h10.131c1.147 0 2.19.467 2.943 1.222a4.157 4.157 0 011.225 2.946 4.18 4.18 0 01-4.168 4.168h-5.628V28h5.522c3.387 0 6.16-2.77 6.16-6.157a6.117 6.117 0 00-1.81-4.343 6.143 6.143 0 00-4.35-1.805H13.815l3.283-3.285L15.69 11 10 16.682z" fill-rule="nonzero"></path></g>
       </svg>&nbsp;<span>Reset</span></> },
+  { id: '6', label: 'Temp' },
 ];
 
 const CONTRIBUTION_STATUSES = [
@@ -668,6 +670,31 @@ function StatisticsSummary({ exerciseSummaries }: { exerciseSummaries: ExerciseS
   );
 }
 
+function perfectStreak(exerciseSummaries: ExerciseSummary[]): number {
+  const completedExercises = exerciseSummaries
+    .map((exercise) => ({ exercise, completedAt: parseExerciseDate(exercise.completed_at) }))
+    .filter((entry): entry is { exercise: ExerciseSummary; completedAt: Date } => entry.completedAt !== null)
+    .sort((left, right) => right.completedAt.getTime() - left.completedAt.getTime());
+
+  let streak = 0;
+  for (const { exercise } of completedExercises) {
+    if (exercise.incorrect_count !== 0) break;
+    streak += 1;
+  }
+  return streak;
+}
+
+function TempTab({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
+  return (
+    <section className="statistics-summary" aria-label="Temporary statistics">
+      <div className="statistics-summary-item">
+        <h3>Perfect streak</h3>
+        <p>{perfectStreak(exerciseSummaries)} exercises</p>
+      </div>
+    </section>
+  );
+}
+
 function isTrackedExerciseSet(exercise: ExerciseSummary): boolean {
   const exerciseSet = exercise.exercise_set?.trim().toLowerCase();
   return exerciseSet !== 'examples' && exerciseSet !== 'references';
@@ -976,7 +1003,7 @@ export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedEx
 
         <div className="settings-panel-content">
           <div className="settings-tab-content" id={`statisticstab-${activeTab}`}>
-            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <TimeDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '4' ? <LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} /> : null}
+            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <TimeDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '4' ? <LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} /> : activeTab === '6' ? <TempTab exerciseSummaries={exerciseSummaries} /> : null}
           </div>
         </div>
       </div>

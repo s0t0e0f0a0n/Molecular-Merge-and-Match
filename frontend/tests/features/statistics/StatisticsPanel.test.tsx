@@ -260,3 +260,28 @@ describe('Advanced logbook distribution', () => {
       .toHaveStyle({ height: '50%' });
   });
 });
+
+describe('Temporary statistics', () => {
+  it('counts perfect completed exercises until the first exercise with mistakes', async () => {
+    const user = userEvent.setup();
+    render(
+      <StatisticsPanel
+        isOpen
+        onClose={() => undefined}
+        exerciseSummaries={[
+          { id: 91, name: 'Older perfect', exercise_set: 'set-a', tags: [], completed_at: '2026-09-01T00:00:00Z', incorrect_count: 0 },
+          { id: 92, name: 'Most recent perfect', exercise_set: 'set-a', tags: [], completed_at: '2026-09-04T00:00:00Z', incorrect_count: 0 },
+          { id: 93, name: 'First with mistakes', exercise_set: 'set-a', tags: [], completed_at: '2026-09-02T00:00:00Z', incorrect_count: 1 },
+          { id: 94, name: 'Second most recent perfect', exercise_set: 'set-a', tags: [], completed_at: '2026-09-03T00:00:00Z', incorrect_count: 0 },
+          { id: 95, name: 'Incomplete perfect', exercise_set: 'set-a', tags: [], incorrect_count: 0 },
+        ]}
+        selectedExerciseId={91}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Temp' }));
+
+    expect(screen.getByRole('heading', { name: 'Perfect streak' })).toBeInTheDocument();
+    expect(screen.getByText('2 exercises')).toBeInTheDocument();
+  });
+});
