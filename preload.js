@@ -2,7 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   toggleFullscreen: () => ipcRenderer.send('toggle-fullscreen'),
-  openNmrPreview: () => ipcRenderer.send('open-nmr-preview')
+  openNmrPreview: () => ipcRenderer.send('open-nmr-preview'),
+  setActiveExerciseId: (exerciseId) => ipcRenderer.send('set-active-exercise-id', exerciseId)
 });
 
 window.addEventListener('DOMContentLoaded', () => {

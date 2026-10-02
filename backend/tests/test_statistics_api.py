@@ -112,6 +112,35 @@ def test_timer_restarts_are_saved_with_the_timer_interval(client):
         db.close()
 
 
+def test_stopping_timer_persists_short_elapsed_segment(client):
+    started_at = datetime.now() - timedelta(seconds=4)
+    db = SessionLocal()
+    try:
+        db.add(Statistics(exercise_id="47", start_counting=started_at, timer_total=0))
+        db.add(
+            LogbookState(
+                exercise_id="exercise-47",
+                restarts=json.dumps([{"start": started_at.isoformat(), "stop": None}]),
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.post("/api/v1/statistics/stop", params={"exercise_id": "47"})
+    assert response.status_code == 200
+    assert response.json()["timer_total"] >= 3
+    assert response.json()["stop_counting"] is not None
+
+    db = SessionLocal()
+    try:
+        logbook = db.query(LogbookState).filter(LogbookState.exercise_id == "exercise-47").one()
+        intervals = json.loads(logbook.restarts)
+        assert intervals[0]["stop"] is not None
+    finally:
+        db.close()
+
+
 def test_logbook_entry_checkpoints_short_timer_segment(client):
     started_at = datetime.now() - timedelta(seconds=4)
     db = SessionLocal()

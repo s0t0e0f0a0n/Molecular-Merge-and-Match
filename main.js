@@ -1,4 +1,4 @@
-const { app, BrowserWindow, protocol, net, ipcMain, globalShortcut } = require('electron');
+const { app, BrowserWindow, protocol, net, ipcMain, globalShortcut, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -8,6 +8,9 @@ let backendProcess = null;
 let backendPort = 8000;
 let mainWindow = null;
 let nmrWindow = null;
+let activeExerciseId = null;
+let mainWindowCloseAuthorized = false;
+let mainWindowCloseInProgress = false;
 
 protocol.registerSchemesAsPrivileged([
     { scheme: 'api', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }
@@ -23,6 +26,11 @@ ipcMain.on('toggle-fullscreen', (event) => {
 
 ipcMain.on('open-nmr-preview', () => {
     openNmrWindow();
+});
+
+ipcMain.on('set-active-exercise-id', (_event, exerciseId) => {
+    activeExerciseId =
+        Number.isSafeInteger(exerciseId) && exerciseId > 0 ? exerciseId : null;
 });
 
 // Controleer of de app binnen een Snap-omgeving draait
@@ -237,6 +245,20 @@ function createWindow() {
     });
     mainWindow = win;
 
+    win.on('close', (event) => {
+        if (mainWindowCloseAuthorized || activeExerciseId === null) return;
+
+        event.preventDefault();
+        if (mainWindowCloseInProgress) return;
+        mainWindowCloseInProgress = true;
+
+        void flushActiveExerciseTimerBeforeClose(win);
+    });
+
+    win.on('closed', () => {
+        if (mainWindow === win) mainWindow = null;
+    });
+
     win.once('ready-to-show', () => {
         win.maximize();
         win.show();
@@ -255,6 +277,64 @@ function createWindow() {
     const indexPath = path.join(__dirname, 'frontend', 'dist', 'index.html');
     console.log("Loading from:", indexPath);
     win.loadFile(indexPath);
+}
+
+async function flushActiveExerciseTimerBeforeClose(win) {
+    while (!win.isDestroyed()) {
+        const exerciseId = activeExerciseId;
+        if (exerciseId === null) {
+            mainWindowCloseAuthorized = true;
+            mainWindowCloseInProgress = false;
+            win.close();
+            return;
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        try {
+            const response = await net.fetch(
+                `http://127.0.0.1:${backendPort}/api/v1/statistics/stop?exercise_id=${encodeURIComponent(String(exerciseId))}`,
+                { method: 'POST', signal: controller.signal },
+            );
+            if (!response.ok) {
+                throw new Error(`Timer save failed (${response.status})`);
+            }
+
+            activeExerciseId = null;
+            mainWindowCloseAuthorized = true;
+            mainWindowCloseInProgress = false;
+            win.close();
+            return;
+        } catch (error) {
+            console.error('Failed to save active exercise timer before closing:', error);
+            clearTimeout(timeoutId);
+            const { response } = await dialog.showMessageBox(win, {
+                type: 'warning',
+                title: 'Could not save exercise progress',
+                message: 'The timer could not be saved. Would you like to retry before closing?',
+                detail: error instanceof Error ? error.message : String(error),
+                buttons: ['Retry', 'Close Without Saving', 'Cancel'],
+                defaultId: 0,
+                cancelId: 2,
+                noLink: true,
+            });
+
+            if (response === 0) continue;
+            if (response === 1) {
+                mainWindowCloseAuthorized = true;
+                mainWindowCloseInProgress = false;
+                win.close();
+                return;
+            }
+
+            mainWindowCloseInProgress = false;
+            return;
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    }
+
+    mainWindowCloseInProgress = false;
 }
 
 function openNmrWindow() {

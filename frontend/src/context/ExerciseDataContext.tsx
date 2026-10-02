@@ -26,6 +26,14 @@ type ExerciseDataContextValue = {
   setSelectedExerciseStatistics: (statistics: ExerciseStatistics | null) => void;
 };
 
+declare global {
+  interface Window {
+    electronAPI?: {
+      setActiveExerciseId?: (exerciseId: number | null) => void;
+    };
+  }
+}
+
 const ExerciseDataContext = createContext<ExerciseDataContextValue | undefined>(undefined);
 
 export function ExerciseDataProvider({
@@ -49,6 +57,12 @@ export function ExerciseDataProvider({
     id: selectedExerciseId,
     completed: selectedExercise?.completed
   };
+
+  useEffect(() => {
+    window.electronAPI?.setActiveExerciseId?.(
+      selectedExercise?.completed === true ? null : selectedExerciseId,
+    );
+  }, [selectedExercise?.completed, selectedExerciseId]);
 
   // This handles the Unmount lifecycle cleanly (e.g., leaving the app or closing the module)
   useEffect(() => {

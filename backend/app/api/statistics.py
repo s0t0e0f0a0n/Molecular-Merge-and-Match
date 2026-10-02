@@ -305,8 +305,7 @@ def mark_exercise_closed(exercise_id: int | str) -> None:
         if row is None or row.start_counting is None or row.stop_counting is not None:
             return
 
-        is_completed = _exercise_is_completed(db, exercise_id)
-        _finalize_timer(db, row, datetime.now(), count_short_elapsed=is_completed)
+        _finalize_timer(db, row, datetime.now(), count_short_elapsed=True)
 
         db.commit()
         db.refresh(row)
@@ -446,4 +445,3 @@ def pause_exercise_timer(exercise_id: str = Query(...)) -> StatisticsOut:
 def resume_exercise_timer(exercise_id: str = Query(...)) -> StatisticsOut:
     mark_exercise_resumed(exercise_id)
     return get_statistics(exercise_id=exercise_id)
-
