@@ -50,6 +50,7 @@ import {
 } from '../../api/solvents';
 import { fetchTags, type Tag } from '../../api/tags';
 import { SettingsPanel } from '../settings/SettingsPanel';
+import { InfoPanel } from '../information/InfoPanel';
 import { StatisticsPanel } from '../statistics/StatisticsPanel';
 import {
   ExerciseTimerDisplay,
@@ -288,6 +289,7 @@ export function MolecularBookkeepingPage() {
   const [selectedPreset, setSelectedPreset] = useState('User');
   const [availablePresets, setAvailablePresets] = useState<string[]>(['Default', 'Beginner', 'Exam', 'User']);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [infoPanelOpen, setInfoPanelOpen] = useState(false);
   const [statisticsPanelOpen, setStatisticsPanelOpen] = useState(false);
   const [cheatMenuOpen, setCheatMenuOpen] = useState(false);
   const cheatMenuRef = useRef<HTMLDivElement>(null);
@@ -1698,12 +1700,19 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <img
-            src={`${import.meta.env.BASE_URL}logo.svg`}
-            alt="Molecular Merge and Match"
-            title="Molecular Merge and Match"
-            style={{ width: 36, height: 36, verticalAlign: 'middle' }}
-          />
+          <button
+            type="button"
+            onClick={() => setInfoPanelOpen(true)}
+            title="Open information"
+            aria-label="Open information"
+            style={{ border: 'none', padding: 0, background: 'none', cursor: 'pointer', display: 'flex' }}
+          >
+            <img
+              src={`${import.meta.env.BASE_URL}logo.svg`}
+              alt=""
+              style={{ width: 36, height: 36, verticalAlign: 'middle' }}
+            />
+          </button>
           <button
             type="button"
             onClick={() => setSettingsPanelOpen(true)}
@@ -2431,6 +2440,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         onTagsUpdated={handleTagsUpdated}
         onTagVisibilityUpdated={handleTagVisibilityUpdated}
       />
+      <InfoPanel isOpen={infoPanelOpen} onClose={() => setInfoPanelOpen(false)} />
       <StatisticsPanel
         isOpen={statisticsPanelOpen}
         onClose={() => setStatisticsPanelOpen(false)}

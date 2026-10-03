@@ -330,7 +330,7 @@ class UserSettings(Base):
     show_exchange: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     show_missing: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     show_warnings: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    show_creation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    show_creation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     show_timer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     cheats: Mapped[str] = mapped_column(String(15), nullable=False, default="000000000000")
     SR_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
