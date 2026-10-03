@@ -36,6 +36,10 @@ def _serialize_settings(settings: UserSettings) -> dict[str, object]:
         "show_exchange": bool(getattr(settings, "show_exchange", True)),
         "show_missing": bool(getattr(settings, "show_missing", True)),
         "show_creation": bool(getattr(settings, "show_creation", True)),
+        "show_apt": bool(getattr(settings, "show_apt", False)),
+        "show_source": bool(getattr(settings, "show_source", False)),
+        "show_tags": bool(getattr(settings, "show_tags", False)),
+        "enable_delete": bool(getattr(settings, "enable_delete", False)),
         "SR_mode": bool(getattr(settings, "SR_mode", False)),
     }
 
@@ -51,6 +55,11 @@ def _apply_settings_values(target: UserSettings, source: UserSettings) -> None:
     target.show_exchange = bool(getattr(source, "show_exchange", True))
     target.show_missing = bool(getattr(source, "show_missing", True))
     target.show_creation = bool(getattr(source, "show_creation", True))
+    target.show_apt = bool(getattr(source, "show_apt", False))
+    target.show_source = bool(getattr(source, "show_source", False))
+    target.show_tags = bool(getattr(source, "show_tags", False))
+    target.enable_delete = bool(getattr(source, "enable_delete", False))
+    target.SR_mode = bool(getattr(source, "SR_mode", False))
 
 
 def _record_cheats_disabled(
@@ -79,6 +88,10 @@ class UserSettingsResponse(BaseModel):
     show_exchange: bool
     show_missing: bool
     show_creation: bool
+    show_apt: bool
+    show_source: bool
+    show_tags: bool
+    enable_delete: bool
     SR_mode: bool
     active_preset: str
     available_presets: list[str]
@@ -98,6 +111,10 @@ class UpdateUserSettingsRequest(BaseModel):
     show_exchange: bool | None = None
     show_missing: bool | None = None
     show_creation: bool | None = None
+    show_apt: bool | None = None
+    show_source: bool | None = None
+    show_tags: bool | None = None
+    enable_delete: bool | None = None
     SR_mode: bool | None = None
 
 
@@ -127,6 +144,10 @@ def _build_response(settings: UserSettings, active_preset: str = _ACTIVE_SETTING
         show_exchange=bool(serialized["show_exchange"]),
         show_missing=bool(serialized["show_missing"]),
         show_creation=bool(serialized["show_creation"]),
+        show_apt=bool(serialized["show_apt"]),
+        show_source=bool(serialized["show_source"]),
+        show_tags=bool(serialized["show_tags"]),
+        enable_delete=bool(serialized["enable_delete"]),
         SR_mode=bool(serialized["SR_mode"]),
         active_preset=active_preset,
         available_presets=preset_names,
@@ -198,6 +219,14 @@ def update_settings(payload: UpdateUserSettingsRequest) -> UserSettingsResponse:
             settings.show_missing = bool(payload.show_missing)
         if payload.show_creation is not None:
             settings.show_creation = bool(payload.show_creation)
+        if payload.show_apt is not None:
+            settings.show_apt = bool(payload.show_apt)
+        if payload.show_source is not None:
+            settings.show_source = bool(payload.show_source)
+        if payload.show_tags is not None:
+            settings.show_tags = bool(payload.show_tags)
+        if payload.enable_delete is not None:
+            settings.enable_delete = bool(payload.enable_delete)
         if payload.SR_mode is not None:
             settings.SR_mode = bool(payload.SR_mode)
 

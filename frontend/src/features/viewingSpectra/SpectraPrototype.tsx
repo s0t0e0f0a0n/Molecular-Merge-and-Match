@@ -89,6 +89,8 @@ export interface SpectrumViewerProps {
   frequencyMhz?: number | null;
   /** When true, append "APT" next to a 13C title. Ignored for 1H. */
   apt?: boolean;
+  /** When true, append the APT phase annotation after the marker. */
+  showAptDetails?: boolean;
   /** Toggle literal "solvent" text embedded inside source SVG. */
   showSolventText?: boolean;
   /** Toggle literal "exchanges with D2O / D₂O" text in 1H source SVGs. */
@@ -155,6 +157,7 @@ function renderSpectrumTitle(
   solvent: string | null | undefined,
   frequencyMhz: number | null | undefined,
   apt: boolean | undefined,
+  showAptDetails: boolean | undefined,
 ) {
   const massNumber = type === 'H' ? '1' : '13';
   const nucleus = type === 'H' ? 'H' : 'C';
@@ -173,7 +176,9 @@ function renderSpectrumTitle(
         </span>
       )}
       {apt && type === 'C' && (
-        <span key="apt" style={{ marginLeft: 8, fontWeight: 500 }}>APT</span>
+        <span key="apt" style={{ marginLeft: 8, fontWeight: 500 }}>
+          APT{showAptDetails ? ' (CH/CH₃ ↓, CH₂ ↑)' : ''}
+        </span>
       )}
     </span>
   );
@@ -413,7 +418,7 @@ function SpectrumCanvas({
               minWidth: 'max-content',
               padding: '4px 6px',
               borderRadius: 6,
-              background: 'rgba(0, 0, 0, 0.4)',
+              background: 'rgba(0, 0, 0, 0.25)',
               color: 'white',
               fontSize: 10,
               lineHeight: 0.9,              
@@ -431,10 +436,10 @@ function SpectrumCanvas({
   );
 }
 
-export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRange, onHoverPeak, onSelectPeak, isHighlighted, embedded = false, solvent, frequencyMhz, apt, showSolventText = true, showExchangeText = true, showCheatSegmentsOverlay = false, showSpectrumDataSource = false, dataSource = null }: SpectrumViewerProps) {
+export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRange, onHoverPeak, onSelectPeak, isHighlighted, embedded = false, solvent, frequencyMhz, apt, showAptDetails, showSolventText = true, showExchangeText = true, showCheatSegmentsOverlay = false, showSpectrumDataSource = false, dataSource = null }: SpectrumViewerProps) {
   // Built-in title: `<sup>n</sup>X-NMR Spectrum [solvent] [freq] [APT]`.
   // Callers can still pass an explicit `title` to override (used by tests).
-  const renderedTitle: React.ReactNode = title ?? renderSpectrumTitle(type, solvent, frequencyMhz, apt);
+  const renderedTitle: React.ReactNode = title ?? renderSpectrumTitle(type, solvent, frequencyMhz, apt, showAptDetails);
   const [viewMode, setViewMode] = useState<ViewMode>('fit')
   const [zoom, setZoom] = useState(1.2) // Multiplier for 'scroll' mode
   const [isPopupOpen, setIsPopupOpen] = useState(false)

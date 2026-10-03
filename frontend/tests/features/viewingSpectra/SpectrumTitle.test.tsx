@@ -29,6 +29,27 @@ function commonProps(overrides: Partial<React.ComponentProps<typeof SpectrumView
  * so a different solvent forces React to fully unmount and remount the formatted subtree.
  */
 describe('SpectrumViewer title — italic solvent rerender', () => {
+  it('always shows the APT marker and toggles its phase annotation independently', () => {
+    const { container, rerender } = render(
+      <SpectrumViewer {...commonProps({ type: 'C', apt: true })} />,
+    );
+
+    expect(container).toHaveTextContent('APT');
+    expect(container).not.toHaveTextContent('CH/CH₃');
+
+    rerender(
+      <SpectrumViewer {...commonProps({ type: 'C', apt: true, showAptDetails: true })} />,
+    );
+
+    expect(container).toHaveTextContent('APT (CH/CH₃ ↓, CH₂ ↑)');
+
+    rerender(
+      <SpectrumViewer {...commonProps({ type: 'C', apt: false, showAptDetails: true })} />,
+    );
+
+    expect(container).not.toHaveTextContent('APT');
+  });
+
   it('replaces italic solvent content cleanly when the prop changes', () => {
     const { container, rerender } = render(
       <SpectrumViewer {...commonProps({ solvent: '/it{Cl}3', frequencyMhz: 300 })} />,

@@ -59,9 +59,20 @@ vi.mock('../../../src/features/viewingSpectra/SpectraPrototype', async (importOr
   const actual = await importOriginal<typeof import('../../../src/features/viewingSpectra/SpectraPrototype')>();
   return {
     ...actual,
-    SpectrumViewer: ({ title, type }: { title?: string; type?: 'H' | 'C' }) => (
-      <div data-testid="spectrum-mock">
+    SpectrumViewer: ({ title, type, apt, showAptDetails, showSpectrumDataSource, dataSource }: {
+      title?: string;
+      type?: 'H' | 'C';
+      apt?: boolean;
+      showAptDetails?: boolean;
+      showSpectrumDataSource?: boolean;
+      dataSource?: string | null;
+    }) => (
+      <div data-testid="spectrum-mock" data-show-source={showSpectrumDataSource}>
         {title ?? (type === 'H' ? '1H-NMR Spectrum' : '13C-NMR Spectrum')}
+        {apt && type === 'C' && (
+          <span>{`APT${showAptDetails ? ' (CH/CH₃ ↓, CH₂ ↑)' : ''}`}</span>
+        )}
+        {showSpectrumDataSource && dataSource && <span>Data source: {dataSource}</span>}
       </div>
     ),
     SpectraPrototype: () => <div data-testid="spectra-mock">Spectra</div>,
@@ -335,6 +346,125 @@ it('uses the spaced-repetition menu when SR_mode is enabled', async () => {
   await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(2));
   await user.click(screen.getByRole('button', { name: 'Go to next exercise' }));
   await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(5));
+});
+
+it('shows the APT phase annotation when enabled in settings', async () => {
+  const user = userEvent.setup();
+  const settingsPayloads: Array<Record<string, boolean>> = [];
+  vi.mocked(fetchExerciseDetail).mockResolvedValue({ ...mockExercise1, c13_apt: true });
+  mockFetch.mockImplementation(async (url, init) => {
+    if (url.includes('/api/v1/settings/')) {
+      const payload = init?.method === 'PUT'
+        ? JSON.parse(String(init.body)) as Record<string, boolean>
+        : {};
+      if (init?.method === 'PUT') settingsPayloads.push(payload);
+      return {
+        ok: true,
+        json: async () => ({ show_apt: payload.show_apt ?? false }),
+      } as Response;
+    }
+    return { ok: true, json: async () => [] } as Response;
+  });
+
+  renderPage();
+  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(1));
+  expect(await screen.findByText('APT')).toBeInTheDocument();
+  expect(screen.queryByText('APT (CH/CH₃ ↓, CH₂ ↑)')).not.toBeInTheDocument();
+
+  await user.click(await screen.findByRole('button', { name: 'Open settings' }));
+  const showAptSwitch = document.querySelector<HTMLLabelElement>(
+    'label[for="setting-show-apt"]',
+  );
+  expect(screen.getByText('Show APT spectrum')).toBeInTheDocument();
+  await user.click(showAptSwitch!);
+
+  expect(await screen.findByText('APT (CH/CH₃ ↓, CH₂ ↑)')).toBeInTheDocument();
+  await waitFor(() => expect(settingsPayloads).toContainEqual({ show_apt: true }));
+});
+
+it('uses show_source for spectrum labels instead of legacy cheat bit 10', async () => {
+  const user = userEvent.setup();
+  const settingsPayloads: Array<Record<string, boolean>> = [];
+  const legacyCheats = '100000000100';
+  vi.mocked(fetchExerciseDetail).mockResolvedValue({
+    ...mockExercise1,
+    h1_data_source: 'H source',
+    c13_data_source: 'C source',
+  });
+  mockFetch.mockImplementation(async (url, init) => {
+    if (url.includes('/api/v1/settings/')) {
+      const payload = init?.method === 'PUT'
+        ? JSON.parse(String(init.body)) as Record<string, boolean>
+        : {};
+      if (init?.method === 'PUT') settingsPayloads.push(payload);
+      return {
+        ok: true,
+        json: async () => ({ cheats: legacyCheats, show_source: payload.show_source ?? false }),
+      } as Response;
+    }
+    return { ok: true, json: async () => [] } as Response;
+  });
+
+  renderPage();
+  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(1));
+  expect(screen.queryByText('Data source: H source')).not.toBeInTheDocument();
+  expect(screen.queryByText('Data source: C source')).not.toBeInTheDocument();
+  expect(screen.getAllByTestId('spectrum-mock')).toHaveLength(2);
+
+  await user.click(await screen.findByRole('button', { name: 'Open settings' }));
+  await user.click(screen.getByRole('button', { name: 'Cheats' }));
+  expect(screen.queryByText('Show spectrum data source labels')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Settings' }));
+
+  const showSourceSwitch = document.querySelector<HTMLLabelElement>(
+    'label[for="setting-show-source"]',
+  );
+  expect(screen.getByText('Show data source')).toBeInTheDocument();
+  await user.click(showSourceSwitch!);
+
+  expect(await screen.findByText('Data source: H source')).toBeInTheDocument();
+  expect(await screen.findByText('Data source: C source')).toBeInTheDocument();
+  await waitFor(() => expect(settingsPayloads).toContainEqual({ show_source: true }));
+});
+
+it('shows up to six current-exercise tags beside the cheats indicator when enabled', async () => {
+  const user = userEvent.setup();
+  const tags = ['one', 'two', 'three', 'four', 'five', 'six', 'seven'];
+  vi.mocked(fetchExerciseDetail).mockResolvedValue({ ...mockExercise1, tags });
+  mockFetch.mockImplementation(async (url, init) => {
+    const payload = init?.method === 'PUT'
+      ? JSON.parse(String(init.body)) as Record<string, boolean>
+      : {};
+    return {
+      ok: true,
+      json: async () => url.includes('/api/v1/settings/')
+        ? {
+            cheats: '100000000000',
+            show_tags: payload.show_tags ?? false,
+          }
+        : [],
+    } as Response;
+  });
+
+  renderPage();
+  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(1));
+  expect(screen.queryByText('one')).not.toBeInTheDocument();
+
+  await user.click(await screen.findByRole('button', { name: 'Open settings' }));
+  const showTagsSwitch = document.querySelector<HTMLLabelElement>('label[for="setting-show-tags"]');
+  await user.click(showTagsSwitch!);
+
+  const tagGroup = await screen.findByRole('group', { name: 'Current exercise tags' });
+  expect(tagGroup.querySelectorAll('span')).toHaveLength(6);
+  for (const tag of tags.slice(0, 6)) {
+    expect(tagGroup).toHaveTextContent(tag);
+  }
+  expect(tagGroup).not.toHaveTextContent('seven');
+  expect(screen.getByRole('button', { name: 'Cheats are enabled' })).toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: 'Cheats are enabled' }).compareDocumentPosition(tagGroup)
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
 });
 
 it('offers to switch modes when no SR exercises are currently due', async () => {
@@ -1560,5 +1690,62 @@ it('shows incorrect solution feedback when validation fails', async () => {
         ).toBe(true);
       });
     });
+  });
+
+  it('saves enable delete and spaced repetition settings from the settings panel', async () => {
+    const user = userEvent.setup();
+    const settingsPayloads: Array<Record<string, boolean>> = [];
+    vi.mocked(fetchExerciseSummaries).mockResolvedValue([
+      { ...mockSummaries[0], in_SR: 0 },
+      {
+        ...mockSummaries[1],
+        in_SR: 1,
+        due_time: new Date(Date.now() - 60_000).toISOString(),
+      },
+    ]);
+
+    mockFetch.mockImplementation(async (url, init) => {
+      if (url.includes('/api/v1/settings/')) {
+        const payload = init?.method === 'PUT'
+          ? JSON.parse(String(init.body)) as Record<string, boolean>
+          : {};
+        if (init?.method === 'PUT') settingsPayloads.push(payload);
+        return {
+          ok: true,
+          json: async () => ({
+            link_inherit_mode: 'none',
+            theme: 'Light',
+            cheats: '000000000000',
+            enable_delete: payload.enable_delete ?? false,
+            SR_mode: payload.SR_mode ?? false,
+            active_preset: 'User',
+            available_presets: ['User'],
+          }),
+        } as Response;
+      }
+
+      return { ok: true, json: async () => [] } as Response;
+    });
+
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Open settings' }));
+
+    const enableDeleteInput = document.querySelector<HTMLInputElement>('#setting-enable-delete');
+    const enableDeleteSwitch = document.querySelector<HTMLLabelElement>(
+      'label[for="setting-enable-delete"]',
+    );
+    expect(enableDeleteInput).not.toBeNull();
+    expect(screen.getByText('Enable delete')).toBeInTheDocument();
+    await user.click(enableDeleteSwitch!);
+
+    await waitFor(() => expect(settingsPayloads).toContainEqual({ enable_delete: true }));
+
+    const srModeInput = document.querySelector<HTMLInputElement>('#setting-sr-mode');
+    const srModeSwitch = document.querySelector<HTMLLabelElement>('label[for="setting-sr-mode"]');
+    expect(srModeInput).not.toBeNull();
+    expect(screen.getByText('Spaced repetition mode')).toBeInTheDocument();
+    await user.click(srModeSwitch!);
+
+    await waitFor(() => expect(settingsPayloads).toContainEqual({ SR_mode: true }));
   });
   });

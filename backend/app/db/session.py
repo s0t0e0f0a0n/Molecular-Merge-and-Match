@@ -479,6 +479,18 @@ def _migrate_add_missing_columns() -> None:
         if "show_timer" not in existing_settings:
             conn.execute(text("ALTER TABLE user_settings ADD COLUMN show_timer BOOLEAN"))
             conn.commit()
+        if "show_apt" not in existing_settings:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN show_apt BOOLEAN NOT NULL DEFAULT 0"))
+            conn.commit()
+        if "show_source" not in existing_settings:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN show_source BOOLEAN NOT NULL DEFAULT 0"))
+            conn.commit()
+        if "show_tags" not in existing_settings:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN show_tags BOOLEAN NOT NULL DEFAULT 0"))
+            conn.commit()
+        if "enable_delete" not in existing_settings:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN enable_delete BOOLEAN NOT NULL DEFAULT 0"))
+            conn.commit()
         if "SR_mode" not in existing_settings:
             conn.execute(text("ALTER TABLE user_settings ADD COLUMN SR_mode BOOLEAN NOT NULL DEFAULT 0"))
             conn.commit()

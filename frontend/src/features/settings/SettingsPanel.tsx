@@ -35,6 +35,16 @@ type SettingsPanelProps = {
   onShowMissingTextChange: (value: boolean) => void;
   showCreation: boolean;
   onShowCreationChange: (value: boolean) => void;
+  showApt: boolean;
+  onShowAptChange: (value: boolean) => void;
+  showSource: boolean;
+  onShowSourceChange: (value: boolean) => void;
+  showTags: boolean;
+  onShowTagsChange: (value: boolean) => void;
+  enableDelete: boolean;
+  onEnableDeleteChange: (value: boolean) => void;
+  srMode: boolean;
+  onSrModeChange: (value: boolean) => void;
   cheatBits: string;
   onCheatBitsChange: (value: string) => void;
   solvents: SolventPreference[];
@@ -308,6 +318,16 @@ export function SettingsPanel({
   onShowMissingTextChange,
   showCreation,
   onShowCreationChange,
+  showApt,
+  onShowAptChange,
+  showSource,
+  onShowSourceChange,
+  showTags,
+  onShowTagsChange,
+  enableDelete,
+  onEnableDeleteChange,
+  srMode,
+  onSrModeChange,
   cheatBits,
   onCheatBitsChange,
   solvents,
@@ -466,6 +486,36 @@ export function SettingsPanel({
                 onChange={onShowCreationChange}
                 title="Enable the option to create a single exercise. This will be visible in the exercise drop-down menu, below the ZIP import function."
               />
+              <ToggleRow
+                id="setting-show-apt"
+                label="Show APT spectrum"
+                checked={showApt}
+                onChange={onShowAptChange}
+              />
+              <ToggleRow
+                id="setting-show-source"
+                label="Show data source"
+                checked={showSource}
+                onChange={onShowSourceChange}
+              />
+              <ToggleRow
+                id="setting-show-tags"
+                label="Show tags"
+                checked={showTags}
+                onChange={onShowTagsChange}
+              />
+              <ToggleRow
+                id="setting-enable-delete"
+                label="Enable delete"
+                checked={enableDelete}
+                onChange={onEnableDeleteChange}
+              />
+              <ToggleRow
+                id="setting-sr-mode"
+                label="Spaced repetition mode"
+                checked={srMode}
+                onChange={onSrModeChange}
+              />
               <SelectRow
                 id="setting-link-inherit-mode"
                 label="Link inherit mode"
@@ -610,13 +660,6 @@ export function SettingsPanel({
                 checked={readCheatBit(normalizedCheatBits, 9)}
                 onChange={(checked) => setCheat(9, checked)}
                 title="Include tags marked as cheats in the Tags tab so they can be hidden or deleted like regular tags."
-              />
-              <ToggleRow
-                id="setting-spectrum-data-source"
-                label="Show spectrum data source labels"
-                checked={readCheatBit(normalizedCheatBits, 10)}
-                onChange={(checked) => setCheat(10, checked)}
-                title="Display the spectrum data source text in the bottom-left corner of the ¹H and ¹³C spectra."
               />
             </div>
           )}

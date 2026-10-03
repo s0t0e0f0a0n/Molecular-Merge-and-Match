@@ -23,7 +23,6 @@ class SkipExerciseOut(BaseModel):
 class SpacedRepetitionResult(TypedDict):
     mastery_index: float
     next_review_days: float
-    debug_components: dict[str, float]
 
 
 def calculate_spaced_repetition_interval(
@@ -77,17 +76,11 @@ def calculate_spaced_repetition_interval(
         else 1.0
     )
     mastery_index = max(0.0, mastery * history_multiplier)
-    next_review_days = 2.0 + 38.0 * (mastery_index**2)
+    next_review_days = 2.0 + 22.0 * (mastery_index**2)
 
     return {
         "mastery_index": mastery_index,
         "next_review_days": round(next_review_days, 2),
-        "debug_components": {
-            "C_P": c_penalty,
-            "C_T": c_time,
-            "C_D": c_difficulty,
-            "C_C": c_confidence,
-        },
     }
 
 

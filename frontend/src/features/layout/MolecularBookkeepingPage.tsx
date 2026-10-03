@@ -284,6 +284,10 @@ export function MolecularBookkeepingPage() {
   const [showExchangeText, setShowExchangeText] = useState(true);
   const [showMissingText, setShowMissingText] = useState(true);
   const [showCreation, setShowCreation] = useState(true);
+  const [showApt, setShowApt] = useState(false);
+  const [showSource, setShowSource] = useState(false);
+  const [showTags, setShowTags] = useState(false);
+  const [enableDelete, setEnableDelete] = useState(false);
   const [srMode, setSrMode] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState('Light');
   const [selectedPreset, setSelectedPreset] = useState('User');
@@ -501,7 +505,7 @@ useEffect(() => {
       setExerciseSummaries(data);
 
       if (data.length > 0) {
-        const initialId = data.find((ex) => ex.id === initialUrlId)?.id ?? data[0].id;
+        const initialId = data.find((exercise) => exercise.id === initialUrlId)?.id ?? data[0].id;
         await selectExerciseById(initialId);
       }
     } catch (error) {
@@ -794,6 +798,10 @@ useEffect(() => {
     setShowExchangeText(settings.show_exchange ?? true);
     setShowMissingText(settings.show_missing ?? true);
     setShowCreation(settings.show_creation ?? true);
+    setShowApt(settings.show_apt ?? false);
+    setShowSource(settings.show_source ?? false);
+    setShowTags(settings.show_tags ?? false);
+    setEnableDelete(settings.enable_delete ?? false);
     setSrMode(settings.SR_mode === true);
     setSelectedTheme(settings.theme ?? 'Light');
 
@@ -825,6 +833,10 @@ useEffect(() => {
       if (overrides.show_exchange !== undefined) payload.show_exchange = overrides.show_exchange;
       if (overrides.show_missing !== undefined) payload.show_missing = overrides.show_missing;
       if (overrides.show_creation !== undefined) payload.show_creation = overrides.show_creation;
+      if (overrides.show_apt !== undefined) payload.show_apt = overrides.show_apt;
+      if (overrides.show_source !== undefined) payload.show_source = overrides.show_source;
+      if (overrides.show_tags !== undefined) payload.show_tags = overrides.show_tags;
+      if (overrides.enable_delete !== undefined) payload.enable_delete = overrides.enable_delete;
       if (overrides.SR_mode !== undefined) payload.SR_mode = overrides.SR_mode;
 
       try {
@@ -1000,6 +1012,51 @@ const handleShowCreationChange = useCallback(
     setShowCreation(value);
     setSelectedPreset('User');
     void persistUserSettings({ show_creation: value });
+  },
+  [persistUserSettings],
+);
+
+const handleShowAptChange = useCallback(
+  (value: boolean) => {
+    setShowApt(value);
+    setSelectedPreset('User');
+    void persistUserSettings({ show_apt: value });
+  },
+  [persistUserSettings],
+);
+
+const handleShowSourceChange = useCallback(
+  (value: boolean) => {
+    setShowSource(value);
+    setSelectedPreset('User');
+    void persistUserSettings({ show_source: value });
+  },
+  [persistUserSettings],
+);
+
+const handleShowTagsChange = useCallback(
+  (value: boolean) => {
+    setShowTags(value);
+    setSelectedPreset('User');
+    void persistUserSettings({ show_tags: value });
+  },
+  [persistUserSettings],
+);
+
+const handleEnableDeleteChange = useCallback(
+  (value: boolean) => {
+    setEnableDelete(value);
+    setSelectedPreset('User');
+    void persistUserSettings({ enable_delete: value });
+  },
+  [persistUserSettings],
+);
+
+const handleSrModeChange = useCallback(
+  (value: boolean) => {
+    setSrMode(value);
+    setSelectedPreset('User');
+    return persistUserSettings({ SR_mode: value });
   },
   [persistUserSettings],
 );
@@ -1971,6 +2028,51 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
               )}
             </div>
           )}
+          {showTags && selectedExercise && selectedExercise.tags.length > 0 && (
+            <div
+              role="group"
+              aria-label="Current exercise tags"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: 2,
+                flexShrink: 0,
+              }}
+            >
+              {Array.from({ length: Math.ceil(Math.min(selectedExercise.tags.length, 6) / 3) }, (_, row) => (
+                <div
+                  key={row}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                  {selectedExercise.tags.slice(row * 3, row * 3 + 3).map((tag, index) => (
+                    <span
+                      key={`${tag}-${row * 3 + index}`}
+                      title={tag}
+                      style={{
+                        minWidth: 0,
+                        maxWidth: 76,
+                        fontFamily: 'var(--font-mono)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        overflowWrap: 'break-word',
+                        pointerEvents: 'none',
+                        padding: '4px 6px',
+                        borderRadius: 6,
+                        background: 'rgba(0, 0, 0, 0.25)',
+                        color: 'white',
+                        fontSize: 10,
+                        lineHeight: 0.9,
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Center: WarningPanel (takes remaining space, centered) */}
@@ -2030,7 +2132,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
 
           <ExerciseMenu
             srMode={srMode}
-            onSetSrMode={(enabled) => persistUserSettings({ SR_mode: enabled })}
+            onSetSrMode={handleSrModeChange}
             selectedExerciseId={selectedExerciseId}
             exerciseSummaries={exerciseSummaries}
             activeTags={activeTags}
@@ -2128,7 +2230,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
               height="100%"
               type="H"
               showCheatSegmentsOverlay={cheating.showSpectrumSegmentsOverlay}
-              showSpectrumDataSource={cheating.showSpectrumDataSources}
+              showSpectrumDataSource={showSource}
               dataSource={selectedExercise?.h1_data_source ?? null}
               showSolventText={showSolventText}
               showExchangeText={showExchangeText}
@@ -2153,13 +2255,14 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
               height="100%"
               type="C"
               showCheatSegmentsOverlay={cheating.showSpectrumSegmentsOverlay}
-              showSpectrumDataSource={cheating.showSpectrumDataSources}
+              showSpectrumDataSource={showSource}
               dataSource={selectedExercise?.c13_data_source ?? null}
               showSolventText={showSolventText}
               showExchangeText={showExchangeText}
               solvent={selectedExercise?.c13_solvent ?? null}
               frequencyMhz={selectedExercise?.c13_frequency_mhz ?? null}
-              apt={selectedExercise?.c13_apt ?? false}
+              apt={selectedExercise?.c13_apt === true}
+              showAptDetails={showApt}
               peaks={c13SpectrumPeaks}
               axisRange={cAxisRange}
               onHoverPeak={(peakId) => {
@@ -2432,6 +2535,16 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         onShowMissingTextChange={handleShowMissingTextChange}
         showCreation={showCreation}
         onShowCreationChange={handleShowCreationChange}
+        showApt={showApt}
+        onShowAptChange={handleShowAptChange}
+        showSource={showSource}
+        onShowSourceChange={handleShowSourceChange}
+        showTags={showTags}
+        onShowTagsChange={handleShowTagsChange}
+        enableDelete={enableDelete}
+        onEnableDeleteChange={handleEnableDeleteChange}
+        srMode={srMode}
+        onSrModeChange={handleSrModeChange}
         cheatBits={cheatBits}
         onCheatBitsChange={handleCheatBitsChange}
         solvents={solvents}

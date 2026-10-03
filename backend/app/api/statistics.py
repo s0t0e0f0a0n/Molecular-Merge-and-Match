@@ -347,7 +347,7 @@ def mark_exercise_completed(exercise_id: int | str) -> None:
         exercise = db.query(Exercise).filter(Exercise.id == int(exercise_id)).first()
         if exercise is not None:
             exercise.due_time = completed_at + timedelta(
-            days=spaced_repetition["next_review_days"]
+                days=spaced_repetition["next_review_days"]
             )
         db.commit()
         db.refresh(row)
@@ -438,6 +438,23 @@ def rate_exercise_difficulty(
             row, _ = _ensure_statistics_row(db, exercise_id)
         row.difficulty = _next_difficulty(row.difficulty, body.rating, increment=body.iterate)
         row.confidence = body.confidence
+        # Rating arrives after completion, so mastery must be recomputed with it.
+        if row.completed_at is not None:
+            spaced_repetition = calculate_spaced_repetition_interval(
+                timer_total=row.timer_total,
+                incorrect_count=row.incorrect_count,
+                cheats_used=row.cheats_used,
+                confidence=row.confidence,
+                difficulty=row.difficulty,
+                completed_at=row.completed_at,
+                cheats_off=row.cheats_off,
+            )
+            row.mastery_index = spaced_repetition["mastery_index"]
+            exercise = db.query(Exercise).filter(Exercise.id == int(exercise_id)).first()
+            if exercise is not None:
+                exercise.due_time = row.completed_at + timedelta(
+                    days=spaced_repetition["next_review_days"]
+                )
         db.commit()
         db.refresh(row)
         return StatisticsOut.model_validate(row)

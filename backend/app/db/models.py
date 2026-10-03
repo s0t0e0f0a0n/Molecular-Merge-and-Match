@@ -332,6 +332,10 @@ class UserSettings(Base):
     show_warnings: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     show_creation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     show_timer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    show_apt: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    show_source: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    show_tags: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    enable_delete: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     cheats: Mapped[str] = mapped_column(String(15), nullable=False, default="000000000000")
     SR_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     updated_at: Mapped[datetime] = mapped_column(

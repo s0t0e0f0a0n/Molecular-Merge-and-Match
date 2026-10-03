@@ -17,15 +17,15 @@ def test_cheats_off_within_one_minute_of_completion_counts_as_cheating():
         cheats_off=completed_at - timedelta(seconds=60),
     )
 
-    assert result["debug_components"]["C_P"] == 0.0
+    baseline = calculate_spaced_repetition_interval(60, 0, "000000000000", 5, "E1")
+    assert result["mastery_index"] < baseline["mastery_index"]
 
 
 def test_cheats_used_falls_back_to_first_bit():
     used = calculate_spaced_repetition_interval(60, 0, "100000000000", 5, "E1")
     unused = calculate_spaced_repetition_interval(60, 0, "011111111111", 5, "E1")
 
-    assert used["debug_components"]["C_P"] == 0.0
-    assert unused["debug_components"]["C_P"] == 1.0
+    assert used["mastery_index"] < unused["mastery_index"]
 
 
 def test_cheats_off_outside_one_minute_uses_first_bit():
@@ -40,7 +40,8 @@ def test_cheats_off_outside_one_minute_uses_first_bit():
         cheats_off=completed_at - timedelta(seconds=61),
     )
 
-    assert result["debug_components"]["C_P"] == 1.0
+    baseline = calculate_spaced_repetition_interval(60, 0, "000000000000", 5, "E1")
+    assert result["mastery_index"] == baseline["mastery_index"]
 
 
 def test_skip_sets_only_selected_exercise_due_time_six_hours_ahead(client):

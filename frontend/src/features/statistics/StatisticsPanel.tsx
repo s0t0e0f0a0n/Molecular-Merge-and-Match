@@ -7,7 +7,7 @@ import { resetExercises, type ResetLevel } from '../../api/reset';
 import { fetchTags, type Tag } from '../../api/tags';
 import '../../panelStyles.css';
 
-type StatisticsTabId = '1' | '2' | '3' | '4' | '5' | '6' | '7';
+type StatisticsTabId = '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8';
 
 type StatisticsPanelProps = {
   isOpen: boolean;
@@ -36,13 +36,15 @@ const TABS: Array<{ id: StatisticsTabId; label: React.ReactNode }> = [
       <ResetIcon />&nbsp;<span>Reset</span></> },
   { id: '7', label: <>
       <TagsIcon />&nbsp;<span>Mastery List</span></> },
+  { id: '8', label: <>
+      <TimeDistributionIcon />&nbsp;<span>Level analysis</span></> },
   { id: '6', label: 'Temp' },
 ];
 
 const CONTRIBUTION_STATUSES = [
   { color: 'green', label: 'Completed and correct' },
   { color: 'red', label: 'Attempted and incorrect' },
-  { color: 'yellow', label: 'Completed with cheats activated' },
+  { color: 'yellow', label: 'Completed with cheats' },
   { color: 'blue', label: 'Started but incomplete' },
   { color: 'grey', label: 'Examples or References set' },
   { color: 'white', label: 'Not attempted' },
@@ -71,7 +73,12 @@ function contributionStatus(exercise: ExerciseSummary): string {
   return 'is-white';
 }
 
-type TimelineStatus = 'is-green' | 'is-yellow' | 'is-red' | 'is-blue';
+type TimelineStatus = 'is-black' | 'is-green' | 'is-yellow' | 'is-red' | 'is-blue';
+
+function isReviewedExercise(exercise: ExerciseSummary): boolean {
+  const match = /^[A-Za-z](\d+)$/.exec(exercise.difficulty?.trim() ?? '');
+  return Boolean(match && Number(match[1]) > 1 && !exerciseUsedCheats(exercise));
+}
 
 type TimelineDay = {
   date: Date;
@@ -79,8 +86,9 @@ type TimelineDay = {
 };
 
 const TIMELINE_STATUSES: Array<{ key: TimelineStatus; label: string }> = [
+  { key: 'is-black', label: 'Reviewed' },
   { key: 'is-green', label: 'Completed and correct' },
-  { key: 'is-yellow', label: 'Completed with cheats activated' },
+  { key: 'is-yellow', label: 'Completed with cheats' },
   { key: 'is-red', label: 'Attempted and incorrect' },
   { key: 'is-blue', label: 'Started but incomplete' },
 ];
@@ -120,14 +128,15 @@ function buildTimeline(exerciseSummaries: ExerciseSummary[]): TimelineDay[] {
   for (let date = firstDate; date <= lastDate; date = addDays(date, 1)) {
     days.push({
       date,
-      counts: { 'is-green': 0, 'is-yellow': 0, 'is-red': 0, 'is-blue': 0 },
+      counts: { 'is-black': 0, 'is-green': 0, 'is-yellow': 0, 'is-red': 0, 'is-blue': 0 },
     });
   }
 
   const dayByKey = new Map(days.map((day) => [localDateKey(day.date), day]));
   exerciseSummaries.forEach((exercise) => {
     const date = parseExerciseDate(exercise.completed_at ?? exercise.started_at);
-    const status = contributionStatus(exercise) as TimelineStatus;
+    const baseStatus = contributionStatus(exercise);
+    const status = baseStatus !== 'is-grey' && isReviewedExercise(exercise) ? 'is-black' : baseStatus as TimelineStatus;
     const day = date && dayByKey.get(localDateKey(date));
     if (day && status in day.counts) day.counts[status] += 1;
   });
@@ -1123,7 +1132,7 @@ function MasteryListTab({ exerciseSummaries }: { exerciseSummaries: ExerciseSumm
             <th>Confidence</th>
             <th>Difficulty</th>
             <th>Successes</th>
-            <th>Time spent (last)</th>
+            <th>Time spent</th>
             <th>Mastery Index</th>
             <th>Due date</th>
           </tr>
@@ -1206,6 +1215,107 @@ function ContributionGrid({ exerciseSummaries }: { exerciseSummaries: ExerciseSu
   );
 }
 
+const LEVEL_COUNT = 6;
+const LEVEL_MIN_POINTS = 3;
+
+type LevelPoint = { id: number; name: string; seconds: number; difficulty: 'easy' | 'medium' | 'difficult' };
+
+const LEVEL_DOT_COLORS = { easy: '#22c55e', medium: '#3b82f6', difficult: '#ef4444' } as const;
+
+function buildLevelPoints(exerciseSummaries: ExerciseSummary[]): LevelPoint[][] {
+  const levels: LevelPoint[][] = Array.from({ length: LEVEL_COUNT }, () => []);
+  exerciseSummaries.forEach((exercise) => {
+    const difficulty = exerciseDifficulty(exercise);
+    if (!difficulty || exercise.timer_total == null) return;
+    const tags = [...(exercise.tags ?? []), ...(exercise.statistics_tags ?? [])];
+    const matched = new Set<number>();
+    tags.forEach((tag) => {
+      const match = /^level\s*(\d+)$/i.exec(tag.trim());
+      if (match && Number(match[1]) < LEVEL_COUNT) matched.add(Number(match[1]));
+    });
+    matched.forEach((level) => levels[level].push({
+      id: exercise.id,
+      name: exercise.name ?? `Exercise ${exercise.id}`,
+      seconds: Math.max(0, exercise.timer_total ?? 0),
+      difficulty,
+    }));
+  });
+  return levels;
+}
+
+function LevelAnalysisGraph({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
+  const levels = buildLevelPoints(exerciseSummaries);
+  const visibleLevels = levels
+    .map((points, level) => ({ points, level }))
+    .filter(({ points }) => points.length >= LEVEL_MIN_POINTS);
+  const allSeconds = visibleLevels.flatMap(({ points }) => points.map((point) => point.seconds));
+  const maximum = timeScaleMaximum(Math.max(0, ...allSeconds));
+  const ticks = [0, maximum / 4, maximum / 2, (maximum * 3) / 4, maximum];
+  const position = (seconds: number) => `${Math.min(100, Math.max(0, (seconds / maximum) * 100))}%`;
+
+  return (
+    <section className="statistics-timeline-section" aria-label="Level analysis">
+      <div className="statistics-timeline-heading">
+        <h3>Time per exercise level</h3>
+        <div className="statistics-timeline-legend" aria-label="Difficulty legend">
+          <span className="statistics-timeline-legend-item"><span className="statistics-contribution-swatch statistics-contribution-status is-green" aria-hidden="true" />Easy</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-contribution-swatch statistics-contribution-status is-blue" aria-hidden="true" />Medium</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-contribution-swatch statistics-contribution-status is-red" aria-hidden="true" />Difficult</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-level-mean-legend" aria-hidden="true" />Mean</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-level-mad-legend" aria-hidden="true" />Mean absolute deviation</span>
+        </div>
+      </div>
+      {visibleLevels.length === 0 ? (
+        <p>{`A level row appears once it has at least ${LEVEL_MIN_POINTS} timed exercises.`}</p>
+      ) : (
+        <div className="statistics-level-chart">
+          {visibleLevels.map(({ points, level }) => {
+            const mean = points.reduce((sum, point) => sum + point.seconds, 0) / points.length;
+            const mad = points.reduce((sum, point) => sum + Math.abs(point.seconds - mean), 0) / points.length;
+            const left = Math.max(0, mean - mad);
+            const right = Math.min(maximum, mean + mad);
+            return (
+              <div key={level} className="statistics-level-row">
+                <div className="statistics-level-label">
+                  <strong>Level {level}</strong>
+                  <span>n={points.length}</span>
+                </div>
+                <div className="statistics-level-track">
+                  <div
+                    className="statistics-level-mad"
+                    style={{ left: position(left), width: `${((right - left) / maximum) * 100}%` }}
+                    title={`MAD: ${formatDuration(Math.round(mad))}`}
+                  />
+                  <div className="statistics-level-mean" style={{ left: position(mean) }}>
+                    <span className="statistics-level-mean-label">{`Mean ${formatDuration(Math.round(mean))} / MAD ${formatDuration(Math.round(mad))}`}</span>
+                  </div>
+                  {points.map((point) => (
+                    <span
+                      key={point.id}
+                      className="statistics-level-dot"
+                      style={{ left: position(point.seconds), background: LEVEL_DOT_COLORS[point.difficulty] }}
+                      title={`${point.name}: ${formatDuration(Math.round(point.seconds))}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          <div className="statistics-level-row">
+            <div className="statistics-level-label" />
+            <div className="statistics-level-axis">
+              {ticks.map((tick) => (
+                <span key={tick} style={{ left: position(tick) }}>{formatDuration(Math.round(tick))}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="statistics-time-of-day-axis-title">time spent (min:sec)</div>
+    </section>
+  );
+}
+
 export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedExerciseId }: StatisticsPanelProps) {
   const [activeTab, setActiveTab] = useState<StatisticsTabId>('1');
 
@@ -1243,7 +1353,7 @@ export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedEx
 
         <div className="settings-panel-content">
           <div className="settings-tab-content" id={`statisticstab-${activeTab}`}>
-            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><TimeDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><TimeOfDayDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '4' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><DueDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} /> : activeTab === '6' ? <TempTab exerciseSummaries={exerciseSummaries} /> : activeTab === '7' ? <MasteryListTab exerciseSummaries={exerciseSummaries} /> : null}
+            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><TimeDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><TimeOfDayDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '4' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><DueDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} /> : activeTab === '6' ? <TempTab exerciseSummaries={exerciseSummaries} /> : activeTab === '7' ? <MasteryListTab exerciseSummaries={exerciseSummaries} /> : activeTab === '8' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LevelAnalysisGraph exerciseSummaries={exerciseSummaries} /></div></div> : null}
           </div>
         </div>
       </div>

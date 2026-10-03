@@ -40,8 +40,6 @@ export function useCheating(rawCheats: unknown) {
   const showAtomCount = useMemo(() => isEnabled(7), [isEnabled]);
   const showAltNucleiTables = useMemo(() => isEnabled(8), [isEnabled]);
   const showSecretTags = useMemo(() => isEnabled(9), [isEnabled]);
-  const showSpectrumDataSources = useMemo(() => isEnabled(10), [isEnabled]);
-
   return {
     cheatBits,
     isEnabled,
@@ -53,6 +51,5 @@ export function useCheating(rawCheats: unknown) {
     showAtomCount,
     showAltNucleiTables,
     showSecretTags,
-    showSpectrumDataSources,
   };
 }
