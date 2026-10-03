@@ -6,6 +6,8 @@ export type ExerciseSummary = {
   tags: string[];
   statistics_tags?: string[];
   difficulty?: string | null;
+  confidence?: number | null;
+  mastery_index?: number | null;
   completed?: boolean | null;
   incorrect_count?: number | null;
   timer_total?: number | null;

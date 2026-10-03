@@ -320,6 +320,8 @@ class ExerciseSummaryOut(BaseModel):
     tags: list[str]
     statistics_tags: list[str] = Field(default_factory=list)
     difficulty: str | None = None
+    confidence: int | None = None
+    mastery_index: float | None = None
     completed: bool | None = None
     incorrect_count: int | None = None
     timer_total: int | None = None
@@ -793,6 +795,8 @@ def _to_summary_response(
         tags=tags,
         statistics_tags=statistics_tags,
         difficulty=statistics.difficulty if statistics is not None else None,
+        confidence=statistics.confidence if statistics is not None else None,
+        mastery_index=statistics.mastery_index if statistics is not None else None,
         completed=row.completed,
         incorrect_count=statistics.incorrect_count if statistics is not None else None,
         timer_total=statistics.timer_total if statistics is not None else None,

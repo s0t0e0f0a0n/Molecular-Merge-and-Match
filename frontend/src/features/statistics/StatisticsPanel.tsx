@@ -7,7 +7,7 @@ import { resetExercises, type ResetLevel } from '../../api/reset';
 import { fetchTags, type Tag } from '../../api/tags';
 import '../../panelStyles.css';
 
-type StatisticsTabId = '1' | '2' | '3' | '4' | '5' | '6';
+type StatisticsTabId = '1' | '2' | '3' | '4' | '5' | '6' | '7';
 
 type StatisticsPanelProps = {
   isOpen: boolean;
@@ -34,6 +34,8 @@ const TABS: Array<{ id: StatisticsTabId; label: React.ReactNode }> = [
   { id: '5', label: <>
 
       <ResetIcon />&nbsp;<span>Reset</span></> },
+  { id: '7', label: <>
+      <TagsIcon />&nbsp;<span>Mastery List</span></> },
   { id: '6', label: 'Temp' },
 ];
 
@@ -1097,6 +1099,60 @@ function ResetTab({ exerciseSummaries, selectedExerciseId }: { exerciseSummaries
   );
 }
 
+function exerciseLevel(exercise: ExerciseSummary): string {
+  const tags = exercise.statistics_tags ?? exercise.tags;
+  return tags.find((tag) => /^level [0-5]$/i.test(tag.trim()))?.trim() ?? '';
+}
+
+function MasteryListTab({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
+  // Only exercises with a statistics row have a difficulty value.
+  const rows = exerciseSummaries
+    .filter((exercise) => exercise.difficulty != null)
+    .sort((left, right) => (right.mastery_index ?? 0) - (left.mastery_index ?? 0));
+  const difficultyNames: Record<string, string> = { E: 'Easy', M: 'Medium', D: 'Difficult' };
+
+  return (
+    <div className="statistics-mastery-list">
+      <table className="statistics-mastery-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Level</th>
+            <th>Cheats</th>
+            <th>Incorrect</th>
+            <th>Confidence</th>
+            <th>Difficulty</th>
+            <th>Successes</th>
+            <th>Time spent (last)</th>
+            <th>Mastery Index</th>
+            <th>Due date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((exercise) => {
+            const match = /^([EMD])(\d+)$/.exec(exercise.difficulty?.trim() ?? '');
+            const due = parseExerciseDate(exercise.due_time);
+            return (
+              <tr key={exercise.id}>
+                <td>{`${exercise.exercise_set ?? 'Unassigned'} / ${exercise.name ?? `Exercise ${exercise.id}`}`}</td>
+                <td>{exerciseLevel(exercise)}</td>
+                <td>{exerciseUsedCheats(exercise) ? 'yes' : 'no'}</td>
+                <td>{exercise.incorrect_count ?? 0}</td>
+                <td>{exercise.confidence ?? ''}</td>
+                <td>{match ? difficultyNames[match[1]] : '--'}</td>
+                <td>{match ? match[2] : '--'}</td>
+                <td>{formatDuration(exercise.timer_total)}</td>
+                <td>{(exercise.mastery_index ?? 0).toFixed(3)}</td>
+                <td>{due ? due.toLocaleDateString() : ''}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function ContributionGrid({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
   const slotCount = Math.ceil(exerciseSummaries.length / CONTRIBUTION_COLUMNS) * CONTRIBUTION_COLUMNS;
   const solvedExercises = exerciseSummaries.filter((exercise) => exercise.completed_at);
@@ -1187,7 +1243,7 @@ export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedEx
 
         <div className="settings-panel-content">
           <div className="settings-tab-content" id={`statisticstab-${activeTab}`}>
-            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><TimeDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><TimeOfDayDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '4' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><DueDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} /> : activeTab === '6' ? <TempTab exerciseSummaries={exerciseSummaries} /> : null}
+            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><TimeDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><TimeOfDayDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '4' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><DueDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} /> : activeTab === '6' ? <TempTab exerciseSummaries={exerciseSummaries} /> : activeTab === '7' ? <MasteryListTab exerciseSummaries={exerciseSummaries} /> : null}
           </div>
         </div>
       </div>

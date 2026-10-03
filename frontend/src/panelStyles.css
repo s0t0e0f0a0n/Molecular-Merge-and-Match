@@ -1270,3 +1270,7 @@ input[type="checkbox"]:hover {
 .nmr-phase-label { align-self: center; color: #0f172a; font-size: 12px; font-weight: 700; margin-left: 4px; }
 .nmr-imaginary-toggle input { width: 16px; height: 16px; accent-color: #0f766e; }
 .nmr-phase-flip { align-self: end; border: 1px solid #0f766e; border-radius: 5px; background: #ecfdf5; color: #0f766e; cursor: pointer; font-size: 12px; font-weight: 700; padding: 6px 8px; }
+.statistics-mastery-list { overflow: auto; max-height: 100%; }
+.statistics-mastery-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.statistics-mastery-table th, .statistics-mastery-table td { padding: 4px 8px; text-align: left; border-bottom: 1px solid rgba(128, 128, 128, 0.3); white-space: nowrap; }
+.statistics-mastery-table th { position: sticky; top: 0; background: inherit; }
