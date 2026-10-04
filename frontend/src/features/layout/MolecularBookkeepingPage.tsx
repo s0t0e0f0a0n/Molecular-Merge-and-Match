@@ -2132,6 +2132,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
 
           <ExerciseMenu
             srMode={srMode}
+            enableDelete={enableDelete}
             onSetSrMode={handleSrModeChange}
             selectedExerciseId={selectedExerciseId}
             exerciseSummaries={exerciseSummaries}
@@ -2559,6 +2560,8 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         onClose={() => setStatisticsPanelOpen(false)}
         exerciseSummaries={exerciseSummaries}
         selectedExerciseId={selectedExerciseId}
+        enableDelete={enableDelete}
+        deleteProgression={cheating.isEnabled(10)}
       />
       {/* Cis/trans stereo choice dialog */}
       {stereoDialogState && (

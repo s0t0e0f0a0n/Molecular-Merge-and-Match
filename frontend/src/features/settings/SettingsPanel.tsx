@@ -661,6 +661,13 @@ export function SettingsPanel({
                 onChange={(checked) => setCheat(9, checked)}
                 title="Include tags marked as cheats in the Tags tab so they can be hidden or deleted like regular tags."
               />
+              <ToggleRow
+                id="setting-delete-progression"
+                label="Delete progression"
+                checked={readCheatBit(normalizedCheatBits, 10)}
+                onChange={(checked) => setCheat(10, checked)}
+                title="Enabling this cheat allows user progress to be permanently deleted through the Statistics Panel"
+              />
             </div>
           )}
 

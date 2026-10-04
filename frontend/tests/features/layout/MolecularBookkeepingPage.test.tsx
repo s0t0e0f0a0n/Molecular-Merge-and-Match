@@ -382,9 +382,9 @@ it('shows the APT phase annotation when enabled in settings', async () => {
   await waitFor(() => expect(settingsPayloads).toContainEqual({ show_apt: true }));
 });
 
-it('uses show_source for spectrum labels instead of legacy cheat bit 10', async () => {
+it('keeps spectrum source labels independent from delete progression cheat bit 10', async () => {
   const user = userEvent.setup();
-  const settingsPayloads: Array<Record<string, boolean>> = [];
+  const settingsPayloads: Array<Record<string, unknown>> = [];
   const legacyCheats = '100000000100';
   vi.mocked(fetchExerciseDetail).mockResolvedValue({
     ...mockExercise1,
@@ -394,12 +394,15 @@ it('uses show_source for spectrum labels instead of legacy cheat bit 10', async 
   mockFetch.mockImplementation(async (url, init) => {
     if (url.includes('/api/v1/settings/')) {
       const payload = init?.method === 'PUT'
-        ? JSON.parse(String(init.body)) as Record<string, boolean>
+        ? JSON.parse(String(init.body)) as Record<string, unknown>
         : {};
       if (init?.method === 'PUT') settingsPayloads.push(payload);
       return {
         ok: true,
-        json: async () => ({ cheats: legacyCheats, show_source: payload.show_source ?? false }),
+        json: async () => ({
+          cheats: typeof payload.cheats === 'string' ? payload.cheats : legacyCheats,
+          show_source: payload.show_source ?? false,
+        }),
       } as Response;
     }
     return { ok: true, json: async () => [] } as Response;
@@ -413,6 +416,11 @@ it('uses show_source for spectrum labels instead of legacy cheat bit 10', async 
 
   await user.click(await screen.findByRole('button', { name: 'Open settings' }));
   await user.click(screen.getByRole('button', { name: 'Cheats' }));
+  const deleteProgressionToggle = document.querySelector<HTMLInputElement>('#setting-delete-progression');
+  expect(deleteProgressionToggle).not.toBeNull();
+  expect(deleteProgressionToggle).toBeChecked();
+  await user.click(deleteProgressionToggle!);
+  await waitFor(() => expect(settingsPayloads.some((payload) => payload.cheats === '100000000000')).toBe(true));
   expect(screen.queryByText('Show spectrum data source labels')).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Settings' }));
 

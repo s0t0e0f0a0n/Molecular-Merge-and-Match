@@ -36,6 +36,8 @@ function renderResetPanel() {
       onClose={() => undefined}
       exerciseSummaries={summaries}
       selectedExerciseId={2}
+      enableDelete
+      deleteProgression
     />,
   );
 }
@@ -79,6 +81,34 @@ describe('Statistics reset controls', () => {
     await user.selectOptions(selectors[0], 'workspace');
     expect((selectors[0] as HTMLSelectElement).value).toBe('workspace');
     expect(selectors.slice(1).every((selector) => (selector as HTMLSelectElement).value === '')).toBe(true);
+  });
+
+  it('hides the exercise reset level when delete is disabled', async () => {
+    render(
+      <StatisticsPanel
+        isOpen
+        onClose={() => undefined}
+        exerciseSummaries={summaries}
+        selectedExerciseId={2}
+        enableDelete={false}
+      />,
+    );
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Reset' }));
+    expect(screen.queryByRole('option', { name: 'Exercise' })).not.toBeInTheDocument();
+  });
+
+  it('hides progression reset unless the delete progression cheat is enabled', async () => {
+    render(
+      <StatisticsPanel
+        isOpen
+        onClose={() => undefined}
+        exerciseSummaries={summaries}
+        selectedExerciseId={2}
+        enableDelete
+      />,
+    );
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Reset' }));
+    expect(screen.queryByRole('option', { name: 'Progression data' })).not.toBeInTheDocument();
   });
 
   it('covers all five reset levels for every reset target', async () => {

@@ -13,6 +13,7 @@ const exerciseNameCollator = new Intl.Collator(undefined, {
 
 export type ExerciseMenuProps = {
   srMode: boolean;
+  enableDelete: boolean;
   onSetSrMode: (enabled: boolean) => Promise<void>;
   selectedExerciseId: number | null;
   exerciseSummaries: ExerciseSummary[];
@@ -29,6 +30,7 @@ export type ExerciseMenuProps = {
 
 export function ExerciseMenu({
   srMode,
+  enableDelete,
   onSetSrMode,
   selectedExerciseId,
   exerciseSummaries,
@@ -57,6 +59,12 @@ export function ExerciseMenu({
   const exerciseMenuCloseTimer = useRef<number | null>(null);
   const zipImportingRef = useRef(false);
   const exerciseMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (enableDelete) return;
+    setDeletionMode(false);
+    setSelectedForDeletion(new Set());
+  }, [enableDelete]);
 
   const normalizeExerciseSet = useCallback((value: string | null | undefined) => {
     const trimmed = value?.trim();
@@ -294,6 +302,7 @@ export function ExerciseMenu({
   }, [exercisesBySet]);
 
   const handleDeleteSelected = useCallback(async () => {
+    if (!enableDelete || srMode) return;
     const ok = window.confirm(
       `Delete ${selectedForDeletion.size} item${selectedForDeletion.size !== 1 ? 's' : ''}? This cannot be undone.`,
     );
@@ -307,7 +316,7 @@ export function ExerciseMenu({
     setSelectedForDeletion(new Set());
     setDeletionMode(false);
     if (failed.length > 0) alert(`Failed to delete: ${failed.join(', ')}`);
-  }, [selectedForDeletion, onDeleteExercises]);
+  }, [enableDelete, srMode, selectedForDeletion, onDeleteExercises]);
 
   const toggleExpandedSet = (setName: string) => {
     setExpandedExerciseSets((previous) => (
@@ -402,7 +411,7 @@ export function ExerciseMenu({
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <div style={{ fontSize: 13, fontWeight: 600 }}>Exercises</div>
-          {!srMode && <button
+          {!srMode && enableDelete && <button
             type="button"
             onClick={() => {
               setDeletionMode((mode) => !mode);

@@ -14,6 +14,8 @@ type StatisticsPanelProps = {
   onClose: () => void;
   exerciseSummaries: ExerciseSummary[];
   selectedExerciseId: number | null;
+  enableDelete?: boolean;
+  deleteProgression?: boolean;
 };
 // tab 1 contains progression overview and graph.
 // tab 2 contains timing tables
@@ -1028,7 +1030,7 @@ function ProgressionTab({ exerciseSummaries }: { exerciseSummaries: ExerciseSumm
 
 type ResetRowId = 'current' | 'set' | 'tag' | 'age' | 'difficulty' | 'all';
 
-function ResetTab({ exerciseSummaries, selectedExerciseId }: { exerciseSummaries: ExerciseSummary[]; selectedExerciseId: number | null }) {
+function ResetTab({ exerciseSummaries, selectedExerciseId, enableDelete, deleteProgression }: { exerciseSummaries: ExerciseSummary[]; selectedExerciseId: number | null; enableDelete: boolean; deleteProgression: boolean }) {
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedSet, setSelectedSet] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
@@ -1040,6 +1042,22 @@ function ResetTab({ exerciseSummaries, selectedExerciseId }: { exerciseSummaries
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
   const exerciseSets = Array.from(new Set(exerciseSummaries.map((exercise) => exercise.exercise_set?.trim()).filter((set): set is string => Boolean(set)))).sort((left, right) => left.localeCompare(right));
+
+  useEffect(() => {
+    setResetLevels((levels) => ({
+      current: (levels.current === 'exercise' && !enableDelete) || (levels.current === 'progression' && !deleteProgression) ? '' : levels.current,
+      set: (levels.set === 'exercise' && !enableDelete) || (levels.set === 'progression' && !deleteProgression) ? '' : levels.set,
+      tag: (levels.tag === 'exercise' && !enableDelete) || (levels.tag === 'progression' && !deleteProgression) ? '' : levels.tag,
+      age: (levels.age === 'exercise' && !enableDelete) || (levels.age === 'progression' && !deleteProgression) ? '' : levels.age,
+      difficulty: (levels.difficulty === 'exercise' && !enableDelete) || (levels.difficulty === 'progression' && !deleteProgression) ? '' : levels.difficulty,
+      all: (levels.all === 'exercise' && !enableDelete) || (levels.all === 'progression' && !deleteProgression) ? '' : levels.all,
+    }));
+    setPendingReset((pending) => (
+      (pending?.level === 'exercise' && !enableDelete) || (pending?.level === 'progression' && !deleteProgression)
+        ? null
+        : pending
+    ));
+  }, [deleteProgression, enableDelete]);
 
   useEffect(() => {
     fetchTags().then(setTags).catch(() => setTags([]));
@@ -1056,13 +1074,13 @@ function ResetTab({ exerciseSummaries, selectedExerciseId }: { exerciseSummaries
 
   const requestReset = (rowId: ResetRowId, exerciseIds: number[]) => {
     const level = resetLevels[rowId];
-    if (exerciseIds.length === 0 || level === '') return;
+    if (exerciseIds.length === 0 || level === '' || (level === 'exercise' && !enableDelete) || (level === 'progression' && !deleteProgression)) return;
     setResetError(null);
     setPendingReset({ exerciseIds, level });
   };
 
   const proceedWithReset = async () => {
-    if (!pendingReset || resetting) return;
+    if (!pendingReset || resetting || (pendingReset.level === 'exercise' && !enableDelete) || (pendingReset.level === 'progression' && !deleteProgression)) return;
     setResetting(true);
     setResetError(null);
     try {
@@ -1083,8 +1101,8 @@ function ResetTab({ exerciseSummaries, selectedExerciseId }: { exerciseSummaries
       <option value="logbook">Logbook data</option>
       <option value="workspace">Workspace data</option>
       <option value="completion">Completion status</option>
-      <option value="progression">Progression data</option>
-      <option value="exercise">Exercise</option>
+      {deleteProgression ? <option value="progression">Progression data</option> : null}
+      {enableDelete ? <option value="exercise">Exercise</option> : null}
     </select>
   );
 
@@ -1316,7 +1334,7 @@ function LevelAnalysisGraph({ exerciseSummaries }: { exerciseSummaries: Exercise
   );
 }
 
-export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedExerciseId }: StatisticsPanelProps) {
+export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedExerciseId, enableDelete = false, deleteProgression = false }: StatisticsPanelProps) {
   const [activeTab, setActiveTab] = useState<StatisticsTabId>('1');
 
   if (!isOpen) {
@@ -1353,7 +1371,7 @@ export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedEx
 
         <div className="settings-panel-content">
           <div className="settings-tab-content" id={`statisticstab-${activeTab}`}>
-            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><TimeDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><TimeOfDayDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '4' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><DueDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} /> : activeTab === '6' ? <TempTab exerciseSummaries={exerciseSummaries} /> : activeTab === '7' ? <MasteryListTab exerciseSummaries={exerciseSummaries} /> : activeTab === '8' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LevelAnalysisGraph exerciseSummaries={exerciseSummaries} /></div></div> : null}
+            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><TimeDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><TimeOfDayDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '4' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><DueDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} enableDelete={enableDelete} deleteProgression={deleteProgression} /> : activeTab === '6' ? <TempTab exerciseSummaries={exerciseSummaries} /> : activeTab === '7' ? <MasteryListTab exerciseSummaries={exerciseSummaries} /> : activeTab === '8' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LevelAnalysisGraph exerciseSummaries={exerciseSummaries} /></div></div> : null}
           </div>
         </div>
       </div>
