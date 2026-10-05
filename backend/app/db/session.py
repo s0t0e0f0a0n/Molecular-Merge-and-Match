@@ -22,6 +22,7 @@ from app.db.models import (
     PredefinedFragment,
     SolventsUsed,
     Statistics,
+    StatisticsReviewEvent,
     TagsUsed,
     UserSettings,
     WorkingSolution,
@@ -631,6 +632,44 @@ def _migrate_add_missing_columns() -> None:
             conn.execute(text("DROP TABLE statistics_legacy"))
             conn.commit()
 
+        if "SR_status" not in {
+            row[1] for row in conn.execute(text("PRAGMA table_info(statistics)"))
+        }:
+            conn.execute(
+                text(
+                    "ALTER TABLE statistics "
+                    "ADD COLUMN SR_status VARCHAR(20) NOT NULL DEFAULT 'new'"
+                )
+            )
+            conn.commit()
+
+        review_event_columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(statistics_review_events)"))
+        }
+        if (
+            "SR_status" in review_event_columns
+            and "status_at_review" not in review_event_columns
+        ):
+            conn.execute(
+                text(
+                    "ALTER TABLE statistics_review_events "
+                    "RENAME COLUMN SR_status TO status_at_review"
+                )
+            )
+            conn.commit()
+        elif "SR_status" in review_event_columns:
+            conn.execute(
+                text(
+                    "UPDATE statistics_review_events "
+                    "SET status_at_review = SR_status"
+                )
+            )
+            conn.execute(
+                text("ALTER TABLE statistics_review_events DROP COLUMN SR_status")
+            )
+            conn.commit()
+
         mastery_index_column = next(
             row for row in conn.execute(text("PRAGMA table_info(statistics)"))
             if row[1] == "mastery_index"
@@ -746,26 +785,57 @@ def _purge_soft_deleted_fragments() -> None:
         db.close()
 
 
-def _reopen_overdue_exercises_for_sr() -> None:
-    """In SR mode, make exercises whose due_time has passed reviewable again."""
-
+def _reopen_overdue_exercises_in_db(db: Session) -> None:
+    """In SR mode, make selected exercises whose due_time has passed reviewable."""
     from app.core.statistics_keys import statistics_exercise_id_keys
+
+    settings_row = db.query(UserSettings).filter(UserSettings.name == "User").first()
+    if settings_row is None or not settings_row.SR_mode:
+        return
+    overdue = (
+        db.query(Exercise)
+        .filter(
+            Exercise.in_SR > 0,
+            Exercise.due_time.isnot(None),
+            Exercise.due_time < datetime.now(),
+        )
+        .all()
+    )
+    for exercise in overdue:
+        exercise.completed = False
+        statistics_rows = db.query(Statistics).filter(
+            Statistics.exercise_id.in_(statistics_exercise_id_keys(exercise.id))
+        ).all()
+        for row in statistics_rows:
+            if row.completed_at is not None:
+                baseline_exists = (
+                    db.query(StatisticsReviewEvent.id)
+                    .filter(
+                        StatisticsReviewEvent.exercise_id == row.exercise_id,
+                        StatisticsReviewEvent.reviewed_at == row.completed_at,
+                        StatisticsReviewEvent.is_correct.is_(True),
+                    )
+                    .first()
+                )
+                if baseline_exists is None:
+                    db.add(
+                        StatisticsReviewEvent(
+                            exercise_id=row.exercise_id,
+                            reviewed_at=row.completed_at,
+                            status_at_review=row.SR_status,
+                            is_correct=True,
+                            is_baseline=True,
+                        )
+                    )
+            row.completed_at = None
+
+
+def _reopen_overdue_exercises_for_sr() -> None:
+    """Reopen overdue selected exercises at application startup when SR is enabled."""
 
     db = SessionLocal()
     try:
-        settings_row = db.query(UserSettings).filter(UserSettings.name == "User").first()
-        if settings_row is None or not settings_row.SR_mode:
-            return
-        overdue = (
-            db.query(Exercise)
-            .filter(Exercise.due_time.isnot(None), Exercise.due_time < datetime.now())
-            .all()
-        )
-        for exercise in overdue:
-            exercise.completed = False
-            db.query(Statistics).filter(
-                Statistics.exercise_id.in_(statistics_exercise_id_keys(exercise.id))
-            ).update({Statistics.completed_at: None}, synchronize_session=False)
+        _reopen_overdue_exercises_in_db(db)
         db.commit()
     finally:
         db.close()

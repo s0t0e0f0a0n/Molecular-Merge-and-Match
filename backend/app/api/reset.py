@@ -7,7 +7,14 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
 from app.core.usage_counts import recount_exercise_usage
-from app.db.models import Exercise, Fragment, LogbookState, Statistics, WorkingSolution
+from app.db.models import (
+    Exercise,
+    Fragment,
+    LogbookState,
+    Statistics,
+    StatisticsReviewEvent,
+    WorkingSolution,
+)
 from app.db.session import get_db
 
 router = APIRouter(prefix="/exercises", tags=["exercises"])
@@ -47,6 +54,9 @@ def reset_exercises(body: ResetExercisesRequest) -> None:
                     synchronize_session=False,
                 )
             if body.level in {"progression", "exercise"}:
+                db.query(StatisticsReviewEvent).filter(
+                    StatisticsReviewEvent.exercise_id.in_(keys)
+                ).delete(synchronize_session=False)
                 db.query(Statistics).filter(Statistics.exercise_id.in_(keys)).delete(synchronize_session=False)
             if body.level == "exercise" and exercise is not None:
                 db.delete(exercise)

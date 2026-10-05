@@ -7,7 +7,14 @@ import pytest
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.db.models import Exercise, ExerciseAdditionalSpectrum, SolventsUsed, Statistics, TagsUsed
+from app.db.models import (
+    Exercise,
+    ExerciseAdditionalSpectrum,
+    SolventsUsed,
+    Statistics,
+    StatisticsReviewEvent,
+    TagsUsed,
+)
 from app.db.session import SessionLocal
 
 INCHI_CCO = "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3"
@@ -53,6 +60,37 @@ def test_list_exercises_empty_initially(client):
     response = client.get("/api/v1/exercises/")
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_correct_solution_validation_records_learning_review_before_completion(client):
+    created = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_CCO),
+    )
+    assert created.status_code == 201
+    exercise_id = created.json()["id"]
+
+    response = client.post(
+        f"/api/v1/exercises/{exercise_id}/validate-solution",
+        json={"solution_hash": INCHI_CCO, "confidence": 4},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["is_correct"] is True
+    db = SessionLocal()
+    try:
+        statistics = db.query(Statistics).filter_by(exercise_id=str(exercise_id)).one()
+        event = (
+            db.query(StatisticsReviewEvent)
+            .filter_by(exercise_id=str(exercise_id))
+            .one()
+        )
+        assert statistics.SR_status == "learning"
+        assert statistics.completed_at is not None
+        assert event.status_at_review == "learning"
+        assert event.is_correct is True
+    finally:
+        db.close()
 
 
 def test_create_exercise_defaults_in_sr_to_zero(client):
@@ -198,6 +236,18 @@ def test_exercise_deletion_recounts_usage(client, deletion_api):
             c13_solvent=f"%solv{{{solvent_b.id}}}",
         )
         db.add_all([removed, removed_again, survivor])
+        db.flush()
+        db.add_all(
+            [
+                StatisticsReviewEvent(
+                    exercise_id=str(exercise.id),
+                    reviewed_at=datetime.now(),
+                    status_at_review="learning",
+                    is_correct=True,
+                )
+                for exercise in (removed, removed_again)
+            ]
+        )
         db.commit()
         removed_ids = [removed.id, removed_again.id]
         tag_a_id, tag_b_id = tag_a.id, tag_b.id
@@ -220,6 +270,16 @@ def test_exercise_deletion_recounts_usage(client, deletion_api):
     try:
         assert db.query(TagsUsed).filter(TagsUsed.id == tag_a_id).one().tag_count == 1
         assert db.query(TagsUsed).filter(TagsUsed.id == tag_b_id).one().tag_count == 0
+        assert (
+            db.query(StatisticsReviewEvent)
+            .filter(
+                StatisticsReviewEvent.exercise_id.in_(
+                    [str(exercise_id) for exercise_id in removed_ids]
+                )
+            )
+            .count()
+            == 0
+        )
         assert db.query(SolventsUsed).filter(SolventsUsed.id == solvent_a_id).one().count == 1
         assert db.query(SolventsUsed).filter(SolventsUsed.id == solvent_b_id).one().count == 0
     finally:
@@ -267,6 +327,12 @@ def test_exercise_summary_includes_due_time(client):
     try:
         exercise = db.query(Exercise).filter_by(id=exercise_id).one()
         exercise.due_time = due_time
+        statistics = db.query(Statistics).filter_by(exercise_id=str(exercise_id)).one_or_none()
+        if statistics is None:
+            statistics = Statistics(exercise_id=str(exercise_id), SR_status="mature")
+            db.add(statistics)
+        else:
+            statistics.SR_status = "mature"
         db.commit()
 
         summaries_response = client.get("/api/v1/exercises/summaries")
@@ -274,6 +340,7 @@ def test_exercise_summary_includes_due_time(client):
         summary = next(item for item in summaries_response.json() if item["id"] == exercise_id)
         assert summary["due_time"] == due_time.isoformat()
         assert summary["in_SR"] == 7
+        assert summary["SR_status"] == "mature"
     finally:
         db.query(Statistics).filter_by(exercise_id=str(exercise_id)).delete()
         db.commit()
@@ -591,4 +658,3 @@ def test_create_exercise_with_populated_optional_text_fields(client):
     assert len(created["alt_nuclei"]) == 1
     assert created["alt_nuclei"][0]["nucleus"] == "31P"
     assert created["alt_nuclei"][0]["ppm"] == -14.2
-

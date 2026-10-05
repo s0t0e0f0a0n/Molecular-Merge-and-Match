@@ -79,9 +79,10 @@ Level 0: This level is for the absolute beginner and features by default only ti
 For each exercise, statistics are stored. This includes when it was first started, halted, and completed; how much time was spent until halt or completion; if any cheats were used; and how often incorrect validation occurred.<br/>
 You can optionally set a confidence level before submitting the answer for validation. You will be asked about how difficult the exercise was. <br />
 In the statistics panel, the collective data is visualized in several different ways to show insight into study behavior and progression.
+The Advanced tab also shows daily spaced-repetition reviews, grouped into learning, relearning, young, and mature exercises, with a cumulative review total.
 
 #### Spaced repetition
-A feuture that will be implemented in the next full release.<br />
+A feaure that will be implemented in the next full release.<br />
 A system widly used and recognised for flashcard learning material, where you need to know answers within seconds. 
 Based on your speed and difficulty and other parameters a calculation takes place to determine at what future point in time revisiting the exercise is optimal.<br />
 This same sort of system, but for macro-length exercises will be incorporated.

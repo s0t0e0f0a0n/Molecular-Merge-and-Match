@@ -5,6 +5,7 @@ import { deferExerciseAfterSkip } from '../../api/spacedrep';
 import { ExerciseCreationForm } from './ExerciseCreationForm';
 import { ExerciseZipImport } from './ExerciseZipImport';
 import { formatChemistryText } from '../../utils/formatChemistryText';
+import { getSpacedRepetitionQueue } from './spacedRepetitionQueue';
 
 const exerciseNameCollator = new Intl.Collator(undefined, {
   numeric: true,
@@ -16,6 +17,8 @@ export type ExerciseMenuProps = {
   enableDelete: boolean;
   onSetSrMode: (enabled: boolean) => Promise<void>;
   selectedExerciseId: number | null;
+  validationAttempted: boolean;
+  validatedCorrectExerciseId: number | null;
   exerciseSummaries: ExerciseSummary[];
   activeTags: Tag[];
   loadingExerciseSummaries: boolean;
@@ -33,6 +36,8 @@ export function ExerciseMenu({
   enableDelete,
   onSetSrMode,
   selectedExerciseId,
+  validationAttempted,
+  validatedCorrectExerciseId,
   exerciseSummaries,
   activeTags,
   loadingExerciseSummaries,
@@ -146,16 +151,7 @@ export function ExerciseMenu({
     [exercisesByDueTime],
   );
   const nextExercises = useMemo(
-    () => exerciseSummaries
-      .filter((exercise) => {
-        if (exercise.completed !== false || (exercise.in_SR ?? 0) <= 0) return false;
-        const dueTime = exercise.due_time?.trim();
-        if (!dueTime) return true;
-        if (Number(dueTime) === 0) return false;
-        const dueTimestamp = Date.parse(dueTime);
-        return Number.isFinite(dueTimestamp) && dueTimestamp < Date.now();
-      })
-      .sort((a, b) => (a.in_SR ?? 0) - (b.in_SR ?? 0) || a.id - b.id),
+    () => getSpacedRepetitionQueue(exerciseSummaries),
     [exerciseSummaries],
   );
 
@@ -172,7 +168,7 @@ export function ExerciseMenu({
   }, [onSetSrMode, savingSrMode]);
 
   const handleGoToNextExercise = useCallback(async () => {
-    if (skippingExercise || nextExercises.length === 0) return;
+    if (!validationAttempted || skippingExercise || nextExercises.length === 0) return;
     setSkippingExercise(true);
     try {
       const selectedExercise = exerciseSummaries.find((exercise) => exercise.id === selectedExerciseId);
@@ -192,7 +188,20 @@ export function ExerciseMenu({
     } finally {
       setSkippingExercise(false);
     }
-  }, [exerciseSummaries, nextExercises, onExercisesMutated, onSelectExercise, selectedExerciseId, skippingExercise]);
+  }, [exerciseSummaries, nextExercises, onExercisesMutated, onSelectExercise, selectedExerciseId, skippingExercise, validationAttempted]);
+
+  useEffect(() => {
+    if (!srMode || validatedCorrectExerciseId === null || validatedCorrectExerciseId !== selectedExerciseId) {
+      return;
+    }
+
+    const currentIndex = nextExercises.findIndex((exercise) => exercise.id === selectedExerciseId);
+    const nextExercise = currentIndex >= 0
+      ? nextExercises.slice(currentIndex + 1)[0]
+        ?? nextExercises.find((exercise) => exercise.id !== selectedExerciseId)
+      : nextExercises.find((exercise) => exercise.id !== selectedExerciseId);
+    if (nextExercise) onSelectExercise(nextExercise.id);
+  }, [nextExercises, onSelectExercise, selectedExerciseId, srMode, validatedCorrectExerciseId]);
 
   const formatDueTime = useCallback((value: string | null | undefined) => {
     if (!value) return 'Not scheduled';
@@ -435,8 +444,9 @@ export function ExerciseMenu({
             <button
               type="button"
               onClick={handleGoToNextExercise}
-              disabled={nextExercises.length === 0 || skippingExercise}
-              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #111', background: '#111', color: '#fff', cursor: nextExercises.length === 0 || skippingExercise ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, opacity: nextExercises.length === 0 || skippingExercise ? 0.55 : 1 }}
+              disabled={!validationAttempted || nextExercises.length === 0 || skippingExercise}
+              title={!validationAttempted ? 'Attempt validation for this exercise before moving on' : undefined}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #111', background: '#111', color: '#fff', cursor: !validationAttempted || nextExercises.length === 0 || skippingExercise ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, opacity: !validationAttempted || nextExercises.length === 0 || skippingExercise ? 0.55 : 1 }}
             >
               Go to next exercise
             </button>
@@ -451,7 +461,9 @@ export function ExerciseMenu({
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '52vh', overflowY: 'auto' }}>
                 {pastExercises.map((exercise) => (
                   <div key={exercise.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '8px 10px', borderBottom: '1px solid #eee', fontSize: 13 }}>
-                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{renderExerciseSummaryLabel(exercise)}</span>
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {normalizeExerciseSet(exercise.exercise_set)} — {renderExerciseSummaryLabel(exercise)} ({exercise.SR_status ?? 'new'})
+                    </span>
                     <span style={{ flexShrink: 0, fontSize: 12, opacity: 0.65 }}>Due: {formatDueTime(exercise.due_time)}</span>
                   </div>
                 ))}
@@ -628,13 +640,14 @@ export function ExerciseMenu({
         </div>}
 
         {srMode && !srFinishedDialogDismissed && !loadingExerciseSummaries && !exerciseSummariesError && nextExercises.length === 0 ? (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0, 0, 0, 0.35)', display: 'grid', placeItems: 'center', padding: 16 }}>
-            <div role="dialog" aria-modal="true" aria-labelledby="sr-finished-title" style={{ width: 'min(420px, 100%)', background: 'white', border: '1px solid #ccc', borderRadius: 8, padding: 20, boxShadow: '0 12px 32px rgba(0,0,0,0.22)' }}>
-              <h2 id="sr-finished-title" style={{ margin: '0 0 12px', fontSize: 18 }}>Done for today</h2>
-              <p style={{ margin: '0 0 18px', fontSize: 14 }}>Do you want to switch to normal mode or stay in spaced repetition mode?</p>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                <button type="button" disabled={savingSrMode} onClick={() => void handleSetSrMode(false)} style={{ padding: '8px 12px', border: '1px solid #aaa', borderRadius: 6, background: '#fff', cursor: 'pointer' }}>Switch to normal mode</button>
-                <button type="button" disabled={savingSrMode} onClick={() => setSrFinishedDialogDismissed(true)} style={{ padding: '8px 12px', border: '1px solid #111', borderRadius: 6, background: '#111', color: '#fff', cursor: 'pointer' }}>Stay in spaced repetition</button>
+          <div className="statistics-reset-confirmation-backdrop" role="presentation">
+            <div className="statistics-reset-confirmation" role="dialog" aria-modal="true" aria-labelledby="sr-finished-title">
+              <div className="statistics-reset-confirmation-icon" aria-hidden="true">!</div>
+              <h3 id="sr-finished-title">Done for today</h3>
+              <p className="statistics-reset-confirmation-detail">There are no spaced repetition exercises available right now. Do you want to switch to normal mode or stay in spaced repetition mode?</p>
+              <div className="statistics-reset-confirmation-actions">
+                <button type="button" className="statistics-reset-proceed" disabled={savingSrMode} onClick={() => void handleSetSrMode(false)}>Switch to normal mode</button>
+                <button type="button" className="statistics-reset-cancel" disabled={savingSrMode} onClick={() => setSrFinishedDialogDismissed(true)}>Stay in spaced repetition</button>
               </div>
             </div>
           </div>

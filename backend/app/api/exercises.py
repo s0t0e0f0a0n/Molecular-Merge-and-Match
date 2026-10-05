@@ -20,11 +20,10 @@ from sqlalchemy.orm import selectinload
 from app.api.statistics import (
     _ensure_statistics_row,
     _find_statistics_row,
-    increment_incorrect_count,
+    _record_spaced_repetition_review,
     mark_exercise_completed,
     mark_exercise_selected,
     reset_difficulty_counter,
-    reset_exercise_difficulty,
 )
 from app.core.calculation import calculate_dbe, parse_formula
 from app.core.config import settings
@@ -56,6 +55,7 @@ from app.db.models import (
     Fragment,
     LogbookState,
     Statistics,
+    StatisticsReviewEvent,
     TagsUsed,
     WorkingSolution,
 )
@@ -317,6 +317,7 @@ class ExerciseSummaryOut(BaseModel):
     name: str | None
     exercise_set: str | None
     in_SR: int = 0
+    SR_status: str = "new"
     tags: list[str]
     statistics_tags: list[str] = Field(default_factory=list)
     difficulty: str | None = None
@@ -792,6 +793,7 @@ def _to_summary_response(
         name=row.name,
         exercise_set=row.exercise_set,
         in_SR=row.in_SR,
+        SR_status=statistics.SR_status if statistics is not None else "new",
         tags=tags,
         statistics_tags=statistics_tags,
         difficulty=statistics.difficulty if statistics is not None else None,
@@ -1064,12 +1066,23 @@ def validate_cas_answer(
             return CasAnswerValidationOut(is_correct=is_correct, already_completed=True)
 
         if not is_correct:
-            increment_incorrect_count(exercise_id)
-            reset_exercise_difficulty(exercise_id)
+            statistics_row, _ = _ensure_statistics_row(db, exercise_id)
+            if statistics_row is not None:
+                _record_spaced_repetition_review(
+                    db, statistics_row, row, is_correct=False
+                )
+                statistics_row.incorrect_count += 1
+                reset_difficulty_counter(statistics_row)
+                db.commit()
             return CasAnswerValidationOut(is_correct=False)
 
         statistics_row = _find_statistics_row(db, str(exercise_id))
         should_iterate_difficulty = statistics_row is None or statistics_row.completed_at is None
+        statistics_row, _ = _ensure_statistics_row(db, exercise_id)
+        if statistics_row is not None:
+            _record_spaced_repetition_review(
+                db, statistics_row, row, is_correct=True
+            )
         row.completed = True
         db.commit()
         mark_exercise_completed(exercise_id)
@@ -1101,21 +1114,22 @@ def validate_solution_answer(
         if _exercise_already_validated(db, row):
             return SolutionValidationOut(is_correct=is_correct, already_completed=True)
 
-        statistics_row = _find_statistics_row(db, str(exercise_id))
+        statistics_row, _ = _ensure_statistics_row(db, exercise_id)
         if statistics_row is None:
-            statistics_row = Statistics(
-                exercise_id=canonical_statistics_exercise_id(exercise_id)
-            )
-            db.add(statistics_row)
-        statistics_row.confidence = body.confidence
+            return SolutionValidationOut(is_correct=False)
+        should_iterate_difficulty = statistics_row.completed_at is None
+        _record_spaced_repetition_review(
+            db, statistics_row, row, is_correct=is_correct
+        )
 
         if not is_correct:
             statistics_row.incorrect_count += 1
+            statistics_row.confidence = body.confidence
             reset_difficulty_counter(statistics_row)
             db.commit()
             return SolutionValidationOut(is_correct=False)
 
-        should_iterate_difficulty = statistics_row.completed_at is None
+        statistics_row.confidence = body.confidence
         row.completed = True
         db.commit()
         mark_exercise_completed(exercise_id)
@@ -1167,6 +1181,11 @@ def delete_exercise(exercise_id: int) -> None:
         ).delete(synchronize_session=False)
         db.query(LogbookState).filter(
             LogbookState.exercise_id == exercise_key,
+        ).delete(synchronize_session=False)
+        db.query(StatisticsReviewEvent).filter(
+            StatisticsReviewEvent.exercise_id.in_(
+                (str(exercise_id), exercise_key)
+            )
         ).delete(synchronize_session=False)
 
         file_paths = []

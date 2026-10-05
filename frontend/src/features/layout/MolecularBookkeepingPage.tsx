@@ -18,6 +18,7 @@ import { parseMolBlock, molGraphToMolBlock } from '../../utils/molParser';
 import { mergeAtAtoms } from '../../utils/mergeFragments';
 import type { MolGraph } from '../../types/molecule';
 import { ExerciseMenu } from '../exercises/ExerciseMenu';
+import { getSpacedRepetitionQueue } from '../exercises/spacedRepetitionQueue';
 import {
   fetchExerciseStatistics,
   fetchExerciseSummaries,
@@ -268,6 +269,8 @@ export function MolecularBookkeepingPage() {
     const id = Number(raw);
     return Number.isFinite(id) && id > 0 ? id : null;
   });
+  const exercisesInitializedRef = useRef(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
 
   const [casAnswerInput, setCasAnswerInput] = useState('');
@@ -275,6 +278,8 @@ export function MolecularBookkeepingPage() {
   const [casAlreadyValidated, setCasAlreadyValidated] = useState(false);
   const [casShouldIterateDifficulty, setCasShouldIterateDifficulty] = useState(false);
   const [validatingCasAnswer, setValidatingCasAnswer] = useState(false);
+  const [validationAttemptExerciseId, setValidationAttemptExerciseId] = useState<number | null>(null);
+  const [validatedCorrectExerciseId, setValidatedCorrectExerciseId] = useState<number | null>(null);
   const [cheatBits, setCheatBits] = useState(DEFAULT_CHEATS);
   const [settingsHover, setSettingsHover] = useState(false);
   const [showCASValidation, setShowCASValidation] = useState(true);
@@ -320,6 +325,8 @@ export function MolecularBookkeepingPage() {
     setCasAnswerInput('');
     setCasAnswerIsCorrect(null);
     setValidatingCasAnswer(false);
+    setValidationAttemptExerciseId(null);
+    setValidatedCorrectExerciseId(null);
   }, [selectedExerciseId]);
 
   useEffect(() => {
@@ -494,6 +501,8 @@ export function MolecularBookkeepingPage() {
 }, []);
 
 useEffect(() => {
+  if (!settingsLoaded || exercisesInitializedRef.current) return;
+  exercisesInitializedRef.current = true;
   void loadActiveTags();
 
   async function initExercises() {
@@ -505,8 +514,17 @@ useEffect(() => {
       setExerciseSummaries(data);
 
       if (data.length > 0) {
-        const initialId = data.find((exercise) => exercise.id === initialUrlId)?.id ?? data[0].id;
-        await selectExerciseById(initialId);
+        if (srMode) {
+          const queue = getSpacedRepetitionQueue(data);
+          if (queue.length > 0) {
+            await selectExerciseById(queue[0].id);
+          } else {
+            await clearSelectedExercise();
+          }
+        } else {
+          const initialId = data.find((exercise) => exercise.id === initialUrlId)?.id ?? data[0].id;
+          await selectExerciseById(initialId);
+        }
       }
     } catch (error) {
       setExerciseSummariesError(
@@ -518,7 +536,7 @@ useEffect(() => {
   }
 
   void initExercises();
-}, [selectExerciseById, initialUrlId, loadActiveTags]);
+}, [clearSelectedExercise, loadActiveTags, initialUrlId, selectExerciseById, settingsLoaded, srMode]);
 
 useEffect(() => {
   const handleExerciseSummariesRefresh = () => {
@@ -885,6 +903,7 @@ useEffect(() => {
       })
       .finally(() => {
         setLoadingLinkSettings(false);
+        setSettingsLoaded(true);
       });
   }, [applyIncomingSettings]);
 
@@ -938,11 +957,21 @@ const handleApplyPreset = useCallback(
     try {
       const applied = await applySettingsPreset(presetName, selectedExerciseId);
       applyIncomingSettings(applied);
+      if (!srMode && applied.SR_mode) {
+        const summaries = await fetchExerciseSummaries();
+        setExerciseSummaries(summaries);
+        const queue = getSpacedRepetitionQueue(summaries);
+        if (queue.length > 0) {
+          await selectExerciseById(queue[0].id);
+        } else {
+          await clearSelectedExercise();
+        }
+      }
     } catch (err) {
       console.error('failed to apply settings preset', err);
     }
   },
-  [applyIncomingSettings, selectedExerciseId],
+  [applyIncomingSettings, clearSelectedExercise, selectedExerciseId, selectExerciseById, srMode],
 );
 
 //const handleThemeChange = useCallback(
@@ -1054,12 +1083,22 @@ const handleEnableDeleteChange = useCallback(
 );
 
 const handleSrModeChange = useCallback(
-  (value: boolean) => {
+  async (value: boolean) => {
     setSrMode(value);
     setSelectedPreset('User');
-    return persistUserSettings({ SR_mode: value });
+    await persistUserSettings({ SR_mode: value });
+    if (!value) return;
+
+    const summaries = await fetchExerciseSummaries();
+    setExerciseSummaries(summaries);
+    const queue = getSpacedRepetitionQueue(summaries);
+    if (queue.length === 0) {
+      await clearSelectedExercise();
+      return;
+    }
+    await selectExerciseById(queue[0].id);
   },
-  [persistUserSettings],
+  [clearSelectedExercise, persistUserSettings, selectExerciseById],
 );
 
 const handleCheatBitsChange = useCallback(
@@ -1677,6 +1716,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
     async () => {
       if (selectedExerciseId === null) return;
 
+      setValidationAttemptExerciseId(selectedExerciseId);
       const normalizedCas = casAnswerInput.replace(/\s+/g, '');
       setCasAnswerInput(normalizedCas);
       setCasAnswerIsCorrect(null);
@@ -1688,6 +1728,9 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         setCasAlreadyValidated(result.already_completed === true);
         setCasAnswerIsCorrect(result.is_correct);
         setCasShouldIterateDifficulty(result.should_iterate_difficulty);
+        if (srMode && result.is_correct && result.already_completed) {
+          setValidatedCorrectExerciseId(selectedExerciseId);
+        }
         if (result.is_correct) {
           setSelectedExerciseStatistics(await fetchExerciseStatistics(selectedExerciseId));
         }
@@ -1700,8 +1743,14 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         setValidatingCasAnswer(false);
       }
     },
-    [casAnswerInput, selectedExerciseId, setSelectedExerciseStatistics],
+    [casAnswerInput, selectedExerciseId, setSelectedExerciseStatistics, srMode],
   );
+
+  const handleCorrectValidationRated = useCallback((exerciseId: number) => {
+    if (srMode && selectedExerciseId === exerciseId) {
+      setValidatedCorrectExerciseId(exerciseId);
+    }
+  }, [selectedExerciseId, srMode]);
   return (
     <div
       style={{
@@ -2136,6 +2185,8 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
             enableDelete={enableDelete}
             onSetSrMode={handleSrModeChange}
             selectedExerciseId={selectedExerciseId}
+            validationAttempted={validationAttemptExerciseId === selectedExerciseId}
+            validatedCorrectExerciseId={validatedCorrectExerciseId}
             exerciseSummaries={exerciseSummaries}
             activeTags={activeTags}
             loadingExerciseSummaries={loadingExerciseSummaries}
@@ -2371,6 +2422,8 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
             mergeState={mergeState}
             onSolutionAtomClick={handleSolutionAtomClick}
             onSendToFragments={handleSendToFragments}
+            onValidationAttempt={(exerciseId) => setValidationAttemptExerciseId(exerciseId)}
+            onCorrectValidation={handleCorrectValidationRated}
             formulaDbe={effectiveFormulaDbe}
             showMissingText={showMissingText}
           />
@@ -2507,7 +2560,10 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
           exerciseId={selectedExerciseId}
           resetKey={`${selectedExerciseId}-${casAnswerInput}`}
           iterateDifficulty={casShouldIterateDifficulty}
-          onRated={() => setCasAnswerIsCorrect(null)}
+          onRated={() => {
+            setCasAnswerIsCorrect(null);
+            if (selectedExerciseId !== null) handleCorrectValidationRated(selectedExerciseId);
+          }}
         />
       )}
       {/* Settingspanel dialog */}

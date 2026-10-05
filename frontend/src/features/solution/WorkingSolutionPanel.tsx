@@ -129,6 +129,8 @@ export interface WorkingSolutionPanelProps {
   mergeState: MergeState;
   onSolutionAtomClick: (pointIndex: number) => void;
   onSendToFragments: () => void;
+  onValidationAttempt: (exerciseId: number) => void;
+  onCorrectValidation: (exerciseId: number) => void;
   formulaDbe?: number | null;
   showMissingText?: boolean;
 }
@@ -140,6 +142,8 @@ export function WorkingSolutionPanel({
   mergeState,
   onSolutionAtomClick,
   onSendToFragments,
+  onValidationAttempt,
+  onCorrectValidation,
   formulaDbe,
   showMissingText = true,
 }: WorkingSolutionPanelProps) {
@@ -351,6 +355,7 @@ useEffect(() => {
 
   const handleValidateSolution = async () => {
     if (!solution || !rdkit || exerciseId === null || validating) return;
+    onValidationAttempt(exerciseId);
     if (!globalThis.crypto?.subtle) {
       setValidationError('Validation is not available in this environment.');
       setValidationResult(null);
@@ -390,6 +395,7 @@ useEffect(() => {
       const result = await validateExerciseSolutionHash(exerciseId, hash, confidence);
       if (result.already_completed) {
         setAlreadyValidatedResult(result.is_correct);
+        if (result.is_correct) onCorrectValidation(exerciseId);
         return;
       }
       setValidationResult(result.is_correct);
@@ -645,7 +651,10 @@ useEffect(() => {
           resetKey={`${exerciseId}-${solution.smiles}`}
           confidence={confidence}
           iterateDifficulty={shouldIterateDifficulty}
-          onRated={() => setValidationResult(null)}
+          onRated={() => {
+            setValidationResult(null);
+            if (exerciseId !== null) onCorrectValidation(exerciseId);
+          }}
         />
       )}
 

@@ -3,6 +3,7 @@ export type ExerciseSummary = {
   name: string | null;
   exercise_set: string | null;
   in_SR?: number;
+  SR_status?: string;
   tags: string[];
   statistics_tags?: string[];
   difficulty?: string | null;
@@ -132,6 +133,17 @@ export type ExerciseStatistics = {
   started_at: string | null;
   completed_at: string | null;
   difficulty: string;
+  SR_status: string;
+};
+
+export type StatisticsReviewDay = {
+  date: string;
+  new: number;
+  learning: number;
+  relearning: number;
+  young: number;
+  mature: number;
+  total: number;
 };
 
 // This fetches the exercise names, which is used to list the exercises, for the user to choose one from.
@@ -284,6 +296,14 @@ export async function fetchExerciseStatistics(
     throw new Error(`Failed to load exercise statistics (${response.status})`);
   }
   return (await response.json()) as ExerciseStatistics;
+}
+
+export async function fetchStatisticsReviewHistory(): Promise<StatisticsReviewDay[]> {
+  const response = await fetch('/api/v1/statistics/review-history');
+  if (!response.ok) {
+    throw new Error(`Failed to load spaced-repetition review history (${response.status})`);
+  }
+  return (await response.json()) as StatisticsReviewDay[];
 }
 
 export async function rateExerciseDifficulty(

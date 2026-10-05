@@ -292,6 +292,9 @@ class Statistics(Base):
     fragments_drawn: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
     dbe_set: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     difficulty: Mapped[str] = mapped_column(String(10), nullable=False, default="O0")
+    SR_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="new", server_default="new"
+    )
     confidence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     start_counting: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True, default=None
@@ -311,6 +314,20 @@ class Statistics(Base):
             DateTime(timezone=False), nullable=True, default=None,
         )
     pause_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class StatisticsReviewEvent(Base):
+    __tablename__ = "statistics_review_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    exercise_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    reviewed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), nullable=False, index=True
+    )
+    status_at_review: Mapped[str] = mapped_column(String(20), nullable=False)
+    is_correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    is_baseline: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
 
 class UserSettings(Base):
     __tablename__ = "user_settings"

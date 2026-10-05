@@ -7,13 +7,20 @@ from typing import Literal
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 
 from app.api.spacedrep import calculate_spaced_repetition_interval
 from app.core.statistics_keys import (
     canonical_statistics_exercise_id,
     statistics_exercise_id_keys,
 )
-from app.db.models import Exercise, LogbookState, Statistics, UserSettings
+from app.db.models import (
+    Exercise,
+    LogbookState,
+    Statistics,
+    StatisticsReviewEvent,
+    UserSettings,
+)
 from app.db.session import get_db
 
 router = APIRouter(prefix="/statistics", tags=["statistics"])
@@ -34,9 +41,20 @@ class StatisticsOut(BaseModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     difficulty: str = "O0"
+    SR_status: str = "new"
     confidence: int = 0
 
     model_config = {"from_attributes": True}
+
+
+class StatisticsReviewDayOut(BaseModel):
+    date: str
+    new: int = 0
+    learning: int = 0
+    relearning: int = 0
+    young: int = 0
+    mature: int = 0
+    total: int = 0
 
 
 class DifficultyRatingIn(BaseModel):
@@ -411,6 +429,64 @@ def _next_difficulty(current: str | None, rating: str, *, increment: bool) -> st
     return f"{rating}{count}"
 
 
+def _record_spaced_repetition_review(
+    db,
+    row: Statistics,
+    exercise: Exercise,
+    *,
+    is_correct: bool,
+    reviewed_at: datetime | None = None,
+) -> None:
+    reviewed_at = reviewed_at or datetime.now()
+    match = re.fullmatch(r"[EMD](\d+)", row.difficulty or "")
+    difficulty_count = int(match.group(1)) if match else 0
+    status = row.SR_status or "new"
+
+    if not is_correct:
+        if difficulty_count > 0:
+            status = "relearning"
+    elif difficulty_count == 0:
+        if status == "new":
+            status = "learning"
+    else:
+        previous_completed_at = row.completed_at
+        if previous_completed_at is None:
+            previous_success = (
+                db.query(StatisticsReviewEvent)
+                .filter(
+                    StatisticsReviewEvent.exercise_id == row.exercise_id,
+                    StatisticsReviewEvent.is_correct.is_(True),
+                )
+                .order_by(StatisticsReviewEvent.reviewed_at.desc())
+                .first()
+            )
+            previous_completed_at = (
+                previous_success.reviewed_at if previous_success is not None else None
+            )
+
+        scheduled_interval_days = (
+            (exercise.due_time - previous_completed_at).total_seconds() / 86400
+            if exercise.due_time is not None and previous_completed_at is not None
+            else None
+        )
+        status = (
+            "mature"
+            if scheduled_interval_days is not None and scheduled_interval_days >= 45
+            else "young"
+        )
+
+    row.SR_status = status
+    db.flush()
+    db.add(
+        StatisticsReviewEvent(
+            exercise_id=row.exercise_id,
+            reviewed_at=reviewed_at,
+            status_at_review=status,
+            is_correct=is_correct,
+        )
+    )
+
+
 @router.get("/", response_model=StatisticsOut)
 def get_statistics(exercise_id: str = Query(...)) -> StatisticsOut:
     with get_db() as db:
@@ -424,6 +500,36 @@ def get_statistics(exercise_id: str = Query(...)) -> StatisticsOut:
             db.commit()
             db.refresh(row)
         return StatisticsOut.model_validate(row)
+
+
+@router.get("/review-history", response_model=list[StatisticsReviewDayOut])
+def get_statistics_review_history() -> list[StatisticsReviewDayOut]:
+    with get_db() as db:
+        rows = (
+            db.query(
+                func.date(StatisticsReviewEvent.reviewed_at),
+                StatisticsReviewEvent.status_at_review,
+                func.count(),
+            )
+            .filter(StatisticsReviewEvent.is_baseline.is_(False))
+            .group_by(
+                func.date(StatisticsReviewEvent.reviewed_at),
+                StatisticsReviewEvent.status_at_review,
+            )
+            .order_by(func.date(StatisticsReviewEvent.reviewed_at))
+            .all()
+        )
+
+    counts_by_day: dict[str, StatisticsReviewDayOut] = {}
+    for review_date, status, count in rows:
+        date_key = str(review_date)
+        day = counts_by_day.setdefault(
+            date_key, StatisticsReviewDayOut(date=date_key)
+        )
+        if status in {"new", "learning", "relearning", "young", "mature"}:
+            setattr(day, status, count)
+        day.total += count
+    return list(counts_by_day.values())
 
 
 @router.post("/difficulty", response_model=StatisticsOut)

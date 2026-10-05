@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from app.core.statistics_keys import statistics_exercise_id_keys
 from app.db.models import Statistics, UserSettings
-from app.db.session import get_db
+from app.db.session import _reopen_overdue_exercises_in_db, get_db
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -228,7 +228,10 @@ def update_settings(payload: UpdateUserSettingsRequest) -> UserSettingsResponse:
         if payload.enable_delete is not None:
             settings.enable_delete = bool(payload.enable_delete)
         if payload.SR_mode is not None:
+            enabling_sr_mode = bool(payload.SR_mode) and not settings.SR_mode
             settings.SR_mode = bool(payload.SR_mode)
+            if enabling_sr_mode:
+                _reopen_overdue_exercises_in_db(db)
 
         db.commit()
         db.refresh(settings)
@@ -253,7 +256,10 @@ def apply_preset(
             db.add(user_settings)
 
         previous_cheats = _normalize_cheats(user_settings.cheats)
+        was_sr_mode_enabled = user_settings.SR_mode
         _apply_settings_values(user_settings, preset)
+        if user_settings.SR_mode and not was_sr_mode_enabled:
+            _reopen_overdue_exercises_in_db(db)
         _record_cheats_disabled(
             db,
             previous_cheats,

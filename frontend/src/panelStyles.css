@@ -525,6 +525,206 @@
     padding: 14px;
 }
 
+.statistics-sr-review-subtitle {
+    margin: 0;
+    color: #475569;
+    font-size: 11px;
+}
+
+.statistics-sr-review-ranges {
+    display: flex;
+    gap: 8px;
+}
+
+.statistics-sr-review-ranges button {
+    padding: 3px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    background: transparent;
+    color: #475569;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.statistics-sr-review-ranges button.is-active {
+    border-color: #64748b;
+    background: #e2e8f0;
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.statistics-sr-review-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+}
+
+.statistics-sr-review-swatch.is-learning,
+.statistics-sr-review-segment.is-learning {
+    background: #fb923c;
+    fill: #fb923c;
+}
+
+.statistics-sr-review-swatch.is-relearning,
+.statistics-sr-review-segment.is-relearning {
+    background: #fb6b55;
+    fill: #fb6b55;
+}
+
+.statistics-sr-review-swatch.is-young,
+.statistics-sr-review-segment.is-young {
+    background: #82c77c;
+    fill: #82c77c;
+}
+
+.statistics-sr-review-swatch.is-mature,
+.statistics-sr-review-segment.is-mature {
+    background: #22a447;
+    fill: #22a447;
+}
+
+.statistics-sr-review-swatch.is-total {
+    background: rgba(100, 116, 139, 0.3);
+    border: 1px solid #94a3b8;
+}
+
+.statistics-sr-review-chart {
+    --sr-review-chart-height: 160px;
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) 54px;
+    grid-template-rows: auto var(--sr-review-chart-height) 24px auto;
+    gap: 6px;
+    width: 100%;
+}
+
+.statistics-sr-review-axis-title,
+.statistics-sr-review-right-axis-title {
+    color: #475569;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.statistics-sr-review-axis-title {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.statistics-sr-review-right-axis-title {
+    grid-column: 3;
+    grid-row: 1;
+}
+
+.statistics-sr-review-axis,
+.statistics-sr-review-right-axis {
+    position: relative;
+    grid-row: 2;
+    color: #64748b;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.statistics-sr-review-axis {
+    grid-column: 1;
+}
+
+.statistics-sr-review-axis .statistics-timeline-axis-label {
+    right: 0;
+}
+
+.statistics-sr-review-right-axis {
+    grid-column: 3;
+}
+
+.statistics-sr-review-right-axis .statistics-timeline-axis-label {
+    left: 0;
+}
+
+.statistics-sr-review-plot {
+    position: relative;
+    grid-column: 2;
+    grid-row: 2 / 4;
+    min-width: 0;
+    border-bottom: 1px solid #cbd5e1;
+}
+
+.statistics-sr-review-svg {
+    display: block;
+    width: 100%;
+    height: var(--sr-review-chart-height);
+    overflow: visible;
+}
+
+.statistics-sr-review-grid {
+    stroke: #e2e8f0;
+    stroke-width: 0.15;
+    vector-effect: non-scaling-stroke;
+}
+
+.statistics-sr-review-total-area {
+    fill: rgba(100, 116, 139, 0.25);
+}
+
+.statistics-sr-review-total-line {
+    fill: none;
+    stroke: #64748b;
+    stroke-width: 1.5;
+    vector-effect: non-scaling-stroke;
+}
+
+.statistics-sr-review-segment {
+    stroke: rgba(255, 255, 255, 0.32);
+    stroke-width: 0.08;
+}
+
+.statistics-sr-review-date-labels {
+    position: absolute;
+    right: 0;
+    bottom: 2px;
+    left: 0;
+    height: 16px;
+    color: #64748b;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.statistics-sr-review-date-labels span {
+    position: absolute;
+    bottom: 0;
+    transform: translateX(-50%);
+}
+
+.statistics-sr-review-date-labels span:first-child {
+    transform: none;
+}
+
+.statistics-sr-review-date-labels span:last-child {
+    transform: translateX(-100%);
+}
+
+.statistics-sr-review-axis-caption {
+    grid-column: 2;
+    grid-row: 4;
+    justify-self: center;
+    color: #475569;
+    font-size: 10px;
+}
+
+.statistics-sr-review-message,
+.statistics-sr-review-error {
+    margin: 0;
+    color: #64748b;
+    font-size: 11px;
+    text-align: center;
+}
+
+.statistics-sr-review-error {
+    color: #b91c1c;
+}
+
 .statistics-time-of-day-bin .statistics-time-distribution-label {
     overflow: visible;
     text-align: left;
