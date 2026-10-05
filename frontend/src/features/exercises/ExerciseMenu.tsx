@@ -247,16 +247,22 @@ export function ExerciseMenu({
       !showOnlyIncomplete || exercise.completed !== true;
     const matchesTags = (tags: string[]) => {
       if (activeTagFilters.length === 0) return true;
+      const exerciseTagNames = new Set(tags.map((tag) => tag.toLocaleLowerCase()));
+      const matchesFilter = (filter: string) => exerciseTagNames.has(filter.toLocaleLowerCase());
       if (tagFilterMode === 'AND') {
-        return activeTagFilters.every((filter) => tags.includes(filter));
+        return activeTagFilters.every(matchesFilter);
       }
-      return tags.some((tag) => activeTagFilters.includes(tag));
+      return activeTagFilters.some(matchesFilter);
     };
 
     const map = new Map<string, ExerciseSummary[]>();
     for (const exercise of exerciseSummaries) {
       const setName = normalizeExerciseSet(exercise.exercise_set);
-      if (!matchesSet(setName) || !matchesCompletion(exercise) || !matchesTags(exercise.tags)) continue;
+      if (
+        !matchesSet(setName)
+        || !matchesCompletion(exercise)
+        || !matchesTags(exercise.statistics_tags ?? exercise.tags)
+      ) continue;
       const list = map.get(setName) ?? [];
       list.push(exercise);
       map.set(setName, list);

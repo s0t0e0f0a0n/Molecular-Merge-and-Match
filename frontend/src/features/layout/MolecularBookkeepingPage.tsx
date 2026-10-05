@@ -545,7 +545,7 @@ useEffect(() => {
   window.history.replaceState(null, '', `?${params.toString()}`);
 }, [selectedExerciseId]);
 
-  const showCheatTags = normalizeCheatBits(cheatBits).padEnd(DEFAULT_CHEATS.length, '0')[8] === '1';
+  const showCheatTags = cheating.showSecretTags;
   const loadSolventPreferences = useCallback(async () => {
     setSolventsLoading(true);
     try {
@@ -604,9 +604,10 @@ useEffect(() => {
   const handleExercisesMutated = useCallback(async () => {
     await Promise.all([
       loadExerciseSummaries(),
+      loadActiveTags(),
       loadSolventPreferences(),
     ]);
-  }, [loadExerciseSummaries, loadSolventPreferences]);
+  }, [loadActiveTags, loadExerciseSummaries, loadSolventPreferences]);
 
   const handleTagsUpdated = useCallback(() => {
     void loadExerciseSummaries();

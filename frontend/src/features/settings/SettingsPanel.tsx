@@ -251,7 +251,7 @@ function TagsTab({ onTagsUpdated, onTagVisibilityUpdated, showCheatTags }: TagsT
               <div className="tag-hide" style={{ textAlign: 'center' }}>
                 <input
                   type="checkbox"
-                  checked={t.is_persistent || !t.is_hideable ? true : !t.is_hidden}
+                  checked={!t.is_hidden}
                   disabled={t.is_persistent || !t.is_hideable}
                   aria-label={`Show tag ${t.tag_name}`}
                   onChange={(e) => handleShow(t, e.target.checked)}
@@ -347,6 +347,7 @@ export function SettingsPanel({
   };
 
   const cheatsEnabled = readCheatBit(normalizedCheatBits, 1);
+  const showCheatTags = cheatsEnabled && readCheatBit(normalizedCheatBits, 9);
   const coupledMultiplicityCheatEnabled = readCheatBit(normalizedCheatBits, 4);
   const visibleTabs = cheatsEnabled ? TABS : TABS.filter((tab) => tab.id !== 'cheatstab');
   const usedSolvents = useMemo(
@@ -488,33 +489,38 @@ export function SettingsPanel({
               />
               <ToggleRow
                 id="setting-show-apt"
-                label="Show APT spectrum"
+                label="Show APT helper arrows"
                 checked={showApt}
                 onChange={onShowAptChange}
+                title="Append (CH/CH₃ ↓, CH₂ ↑) to the 'APT' label in the ¹³C spectrum title"
               />
               <ToggleRow
                 id="setting-show-source"
                 label="Show data source"
                 checked={showSource}
                 onChange={onShowSourceChange}
+                title="Show the data source folder and file ID for the ¹H-NMR and ¹³C-NMR spectra"
               />
               <ToggleRow
                 id="setting-show-tags"
-                label="Show tags"
+                label="Show exercise tags"
                 checked={showTags}
                 onChange={onShowTagsChange}
+                title="Show all the tags associated with the current exercise"
               />
               <ToggleRow
                 id="setting-enable-delete"
-                label="Enable delete"
+                label="Enable deletion of exercises"
                 checked={enableDelete}
                 onChange={onEnableDeleteChange}
+                title="Allow users to delete exercises from the database"
               />
               <ToggleRow
                 id="setting-sr-mode"
-                label="Spaced repetition mode"
+                label="Enable Spaced Repetition mode"
                 checked={srMode}
                 onChange={onSrModeChange}
+                title="Enable or disable the Spaced Repetition mode for exercise scheduling."
               />
               <SelectRow
                 id="setting-link-inherit-mode"
@@ -593,7 +599,7 @@ export function SettingsPanel({
               <TagsTab
                 onTagsUpdated={onTagsUpdated}
                 onTagVisibilityUpdated={onTagVisibilityUpdated}
-                showCheatTags={readCheatBit(normalizedCheatBits, 9)}
+                showCheatTags={showCheatTags}
               />
             </div>
           )}

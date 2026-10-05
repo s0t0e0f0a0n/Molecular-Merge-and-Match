@@ -196,6 +196,65 @@ it('loads exercise summaries and selects the first exercise by default', async (
   });
 });
 
+it('refreshes the tag filters after creating an exercise with a new tag', async () => {
+  const user = userEvent.setup();
+  let newTagCreated = false;
+  let tagFetchCount = 0;
+  const newTag = {
+    id: 99,
+    tag_name: 'new-tag',
+    description: null,
+    is_persistent: false,
+    is_hideable: true,
+    is_hidden: false,
+    is_cheat: false,
+    tag_count: 1,
+    user_tag: true,
+    allowed_stats: true,
+    progression_use: false,
+  };
+
+  vi.mocked(fetchExerciseSummaries).mockImplementation(async () => (
+    newTagCreated
+      ? [...mockSummaries, { id: 3, name: 'New exercise', exercise_set: 'New set', tags: ['new-tag'] }]
+      : mockSummaries
+  ));
+  mockFetch.mockImplementation(async (url, init) => {
+    if (url.includes('/api/v1/tags/')) {
+      tagFetchCount += 1;
+      return {
+        ok: true,
+        json: async () => newTagCreated ? [newTag] : [],
+      } as Response;
+    }
+
+    if (url.includes('/api/v1/exercises/') && init?.method === 'POST') {
+      newTagCreated = true;
+      return {
+        ok: true,
+        json: async () => ({ id: 3 }),
+      } as Response;
+    }
+
+    return {
+      ok: true,
+      json: async () => [],
+    } as Response;
+  });
+
+  renderPage();
+
+  await user.click(await screen.findByTestId('exercise-menu-button'));
+  await user.click(await screen.findByRole('button', { name: 'Create new exercise' }));
+  await user.type(screen.getByPlaceholderText(/1H-NMR/), '1H NMR data');
+  await user.type(screen.getByPlaceholderText(/13C-NMR/), '13C NMR data');
+  await user.type(screen.getByPlaceholderText('aromatic, acid'), 'new-tag');
+  await user.click(screen.getByRole('button', { name: 'Create exercise' }));
+
+  expect(await screen.findByText('new-tag')).toBeInTheDocument();
+  expect(tagFetchCount).toBeGreaterThanOrEqual(2);
+});
+
 it('renders peaks from the first selected exercise', async () => {
   renderPage();
 
