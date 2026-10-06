@@ -473,7 +473,7 @@ export function MolecularBookkeepingPage() {
 );
   const [exerciseSummaries, setExerciseSummaries] = useState<ExerciseSummary[]>([]);
   const [activeTags, setActiveTags] = useState<Tag[]>([]);
-  const [loadingExerciseSummaries, setLoadingExerciseSummaries] = useState(false);
+  const [loadingExerciseSummaries, setLoadingExerciseSummaries] = useState(true);
   const [exerciseSummariesError, setExerciseSummariesError] = useState<string | null>(null);
 
   const loadActiveTags = useCallback(async () => {

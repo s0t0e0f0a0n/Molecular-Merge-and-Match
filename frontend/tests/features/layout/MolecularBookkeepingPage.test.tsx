@@ -201,6 +201,23 @@ it('loads exercise summaries and selects the first exercise by default', async (
   });
 });
 
+it('shows the loading overlay while startup settings are still loading', async () => {
+  mockFetch.mockImplementation((url) => {
+    if (url.includes('/api/v1/settings/')) {
+      return new Promise(() => {});
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve([]),
+    } as Response);
+  });
+
+  renderPage();
+
+  expect(await screen.findByTestId('loading-exercise-overlay')).toBeInTheDocument();
+});
+
 it('refreshes the tag filters after creating an exercise with a new tag', async () => {
   const user = userEvent.setup();
   let newTagCreated = false;
