@@ -248,8 +248,8 @@
   {
     "tag_name" : "cyclic",
     "is_persistent": 0,    
-    "is_hidden": false,
-    "is_hideable": false,
+    "is_hidden": true,
+    "is_hideable": true,
     "is_cheat": true,
     "user_tag": false,
     "description": "The molecule in the exercise contains non-aromatic rings.",

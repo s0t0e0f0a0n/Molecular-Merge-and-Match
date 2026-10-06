@@ -34,7 +34,7 @@ export function InfoPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
         }
       }}
     >
-      <div className="settings-panel-surface" role="dialog" aria-modal="true" aria-label="Information panel">
+      <div className="settings-panel-surface settings-panel-surface--wide" role="dialog" aria-modal="true" aria-label="Information panel">
         <div className="settings-panel-header">
           <div className="settings-panel-tabs">
             {TABS.map((tab) => (

@@ -139,6 +139,7 @@ def encode_solvent_text(db: Session, raw_solvent_text: str | None) -> tuple[str 
     created = SolventsUsed(
         names=solvent_text,
         match=solvent_text,
+        smiles="",
         preference=0,
         count=0,
     )

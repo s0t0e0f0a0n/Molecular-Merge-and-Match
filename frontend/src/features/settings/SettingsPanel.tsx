@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SettingsIcon, SolventsIcon, TagsIcon, CheatsIcon } from '../../components/PanelIcons';
+import { useRDKit } from '../../context/RDKitContext';
 import { DEFAULT_CHEATS, normalizeCheatBits } from '../../hooks/useCheating';
 import type { SolventPreference } from '../../api/solvents';
 import type { LinkInheritMode } from '../linking/LinkInheritOptionsPopup';
@@ -15,9 +16,7 @@ type SettingsPanelProps = {
   onClose: () => void;
   linkInheritMode: LinkInheritMode;
   onLinkInheritModeChange: (value: LinkInheritMode) => void;
-//  selectedTheme: string;
-//  availableThemes: string[];
-//  onThemeChange: (value: string) => void;
+  selectedTheme: string;
   selectedPreset: string;
   availablePresets: string[];
   onPresetChange: (value: string) => void;
@@ -31,6 +30,10 @@ type SettingsPanelProps = {
   onShowSolventTextChange: (value: boolean) => void;
   showExchangeText: boolean;
   onShowExchangeTextChange: (value: boolean) => void;
+  showFormula: boolean;
+  onShowFormulaChange: (value: boolean) => void;
+  showIntegralCurves: boolean;
+  onShowIntegralCurvesChange: (value: boolean) => void;
   showMissingText: boolean;
   onShowMissingTextChange: (value: boolean) => void;
   showCreation: boolean;
@@ -74,8 +77,9 @@ type SelectRowProps = {
   label: string;
   value: string;
   options: SelectOption[];
-  onChange: (value: string) => void;
+  onChange?: (value: string) => void;
   title?: string;
+  disabled?: boolean;
 };
 
 const TABS: Array<{ id: SettingsTabId; label: React.ReactNode }> = [
@@ -138,7 +142,7 @@ function ToggleRow({ id, label, checked, onChange, title, disabled = false }: To
   );
 }
 
-function SelectRow({ id, label, value, options, onChange, title }: SelectRowProps) {
+function SelectRow({ id, label, value, options, onChange, title, disabled = false }: SelectRowProps) {
   const activeOptionTitle = options.find((option) => option.value === value)?.title;
   return (
     <div className="settings-select-row" title={title}>
@@ -147,7 +151,8 @@ function SelectRow({ id, label, value, options, onChange, title }: SelectRowProp
         id={id}
         className="settings-select"
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled}
+        onChange={(event) => onChange?.(event.target.value)}
         title={activeOptionTitle ?? title}
       >
         {options.map((option) => (
@@ -157,6 +162,44 @@ function SelectRow({ id, label, value, options, onChange, title }: SelectRowProp
         ))}
       </select>
     </div>
+  );
+}
+
+function SolventStructure({ smiles }: { smiles: string }) {
+  const { rdkit } = useRDKit();
+  const [svg, setSvg] = useState('');
+
+  useEffect(() => {
+    if (!rdkit || !smiles) {
+      setSvg('');
+      return;
+    }
+
+    const mol = rdkit.get_mol(smiles);
+    if (!mol) {
+      setSvg('');
+      return;
+    }
+
+    try {
+      if (!mol.is_valid()) {
+        setSvg('');
+        return;
+      }
+      setSvg(mol.get_svg(144, 84));
+    } finally {
+      mol.delete();
+    }
+  }, [rdkit, smiles]);
+
+  if (!svg) return null;
+
+  return (
+    <div
+      className="settings-solvent-structure"
+      aria-label="Solvent structure"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
   );
 }
 
@@ -298,9 +341,7 @@ export function SettingsPanel({
   onClose,
   linkInheritMode,
   onLinkInheritModeChange,
-//  selectedTheme,
-//  availableThemes,
-//  onThemeChange,
+  selectedTheme,
   selectedPreset,
   availablePresets,
   onPresetChange,
@@ -314,6 +355,10 @@ export function SettingsPanel({
   onShowSolventTextChange,
   showExchangeText,
   onShowExchangeTextChange,
+  showFormula,
+  onShowFormulaChange,
+  showIntegralCurves,
+  onShowIntegralCurvesChange,
   showMissingText,
   onShowMissingTextChange,
   showCreation,
@@ -362,6 +407,7 @@ export function SettingsPanel({
   const renderSolvent = (solvent: SolventPreference) => (
     <div className="settings-solvent-row" key={solvent.id}>
       <div className="settings-solvent-name">{solvent.display}</div>
+      <SolventStructure smiles={solvent.smiles} />
       <div className="settings-solvent-options">
         {solvent.options.map((option, index) => (
           <label className="settings-solvent-option" key={`${solvent.id}-${index}`}>
@@ -409,7 +455,7 @@ export function SettingsPanel({
         }
       }}
     >
-      <div className="settings-panel-surface" role="dialog" aria-modal="true" aria-label="Settings panel">
+      <div className="settings-panel-surface settings-panel-surface--wide" role="dialog" aria-modal="true" aria-label="Settings panel">
         <div className="settings-panel-header">
           <div className="settings-panel-tabs">
             {visibleTabs.map((tab) => (
@@ -430,116 +476,7 @@ export function SettingsPanel({
 
         <div className="settings-panel-content">
           {activeTab === 'settingstab' && (
-            <div className="settings-tab-content" id="settingstab">
-              <ToggleRow 
-                id="setting-show-timer" 
-                label="Show timer" 
-                checked={showTimer} 
-                onChange={onShowTimerChange}
-                title="When enabled, a timer will be displayed in the interface to track elapsed time for the active exercise. The timer starts with a 5 second delay, can be paused, and will resume after pause and switching from another exercise. The time spent is stored and is used in the statistics page."
-              />
-              <ToggleRow
-                id="setting-manual-cas-validation"
-                label="Show manual CAS validation"
-                checked={showCASValidation}
-                onChange={onShowCASValidationChange}
-                title="When enabled, a manual CAS validation input box will be displayed in the interface. If you are sure your structure is correct, or you believe it is faster to look up a CAS number, you can validate your suspicion manually through a CAS number check."
-              />
-              <ToggleRow
-                id="setting-solvent-annotation"
-                label='Show "solvent" annotation in spectra'
-                checked={showSolventText}
-                onChange={onShowSolventTextChange}
-                title='When enabled, the "solvent" label which is embedded in the spectra will be displayed in the spectra.'
-              />
-              <ToggleRow
-                id="setting-exchanges-annotation"
-                label={<>Show "exchanges with D<sub>2</sub>O" annotation in spectra</>}
-                checked={showExchangeText}
-                onChange={onShowExchangeTextChange}
-                title='When enabled, the "exchanges with D₂O" label which is embedded in the spectra will be displayed in the spectra.'
-              />
-              <ToggleRow
-                id="setting-warning-panel"
-                label="Enable Warning Panel"
-                checked={showWarnings}
-                onChange={onShowWarningsChange}
-                title="Warning symbols will be shown when too many atoms are used or too many DBE are set in the working solution, or when too many atoms are linked to a signal in the spectra."
-              />
-              <ToggleRow
-                id="setting-missing-atoms"
-                label="Show potentially missing atoms in working solution space"
-                checked={showMissingText}
-                onChange={onShowMissingTextChange}
-                title="In the Working Solution Space, a small text serves as a check if you miss any atoms and if so, which ones and how many."
-              />
-              <ToggleRow
-                id="setting-enable-cheats"
-                label="Enable cheats"
-                checked={readCheatBit(normalizedCheatBits, 1)}
-                onChange={(checked) => setCheat(1, checked)}
-                title="You wanna be like that? Enabling cheats will unlock a set op options in the Cheats tab. These options can be used to make the exercises easier, but the use of cheats is stored per exercises and its use will be shown in the statistics page."
-              />
-              <ToggleRow
-                id="setting-single-exercise-creation"
-                label="Enable single exercise creation"
-                checked={showCreation}
-                onChange={onShowCreationChange}
-                title="Enable the option to create a single exercise. This will be visible in the exercise drop-down menu, below the ZIP import function."
-              />
-              <ToggleRow
-                id="setting-show-apt"
-                label="Show APT helper arrows"
-                checked={showApt}
-                onChange={onShowAptChange}
-                title="Append (CH/CH₃ ↓, CH₂ ↑) to the 'APT' label in the ¹³C spectrum title"
-              />
-              <ToggleRow
-                id="setting-show-source"
-                label="Show data source"
-                checked={showSource}
-                onChange={onShowSourceChange}
-                title="Show the data source folder and file ID for the ¹H-NMR and ¹³C-NMR spectra"
-              />
-              <ToggleRow
-                id="setting-show-tags"
-                label="Show exercise tags"
-                checked={showTags}
-                onChange={onShowTagsChange}
-                title="Show all the tags associated with the current exercise"
-              />
-              <ToggleRow
-                id="setting-enable-delete"
-                label="Enable deletion of exercises"
-                checked={enableDelete}
-                onChange={onEnableDeleteChange}
-                title="Allow users to delete exercises from the database"
-              />
-              <ToggleRow
-                id="setting-sr-mode"
-                label="Enable Spaced Repetition mode"
-                checked={srMode}
-                onChange={onSrModeChange}
-                title="Enable or disable the Spaced Repetition mode for exercise scheduling."
-              />
-              <SelectRow
-                id="setting-link-inherit-mode"
-                label="Link inherit mode"
-                value={linkInheritMode}
-                options={LINK_INHERIT_OPTIONS}
-                onChange={(value) => onLinkInheritModeChange(value as LinkInheritMode)}
-                title="Choose what should happen with fragment links after merging two fragments."
-              />
-{/*
-              <SelectRow
-                id="setting-theme-select"
-                label="Select theme (NOT WORKING)"
-                value={selectedTheme}
-                options={availableThemes.map((theme) => ({ value: theme, label: theme }))}
-                onChange={onThemeChange}
-                title="Currently, only a light theme is available."
-              />
-*/}
+            <div className="settings-tab-content settings-main-grid" id="settingstab">
               <SelectRow
                 id="setting-preset-select"
                 label="Presets"
@@ -548,6 +485,146 @@ export function SettingsPanel({
                 onChange={onPresetChange}
                 title="Set the options back to default or one of the other presets. This will overwrite your current settings."
               />
+              <section className="settings-category statistics-graph-box" aria-labelledby="settings-function-heading">
+                <h2 className="settings-category-title" id="settings-function-heading">Function</h2>
+                <div className="settings-category-columns">
+                  <div className="settings-category-column">
+                    <ToggleRow
+                      id="setting-sr-mode"
+                      label="Enable Spaced-Repetition mode"
+                      checked={srMode}
+                      onChange={onSrModeChange}
+                      title="Enable or disable the Spaced Repetition mode for exercise scheduling."
+                    />
+                    <ToggleRow
+                      id="setting-single-exercise-creation"
+                      label="Single exercise creation"
+                      checked={showCreation}
+                      onChange={onShowCreationChange}
+                      title="Enable the option to create a single exercise. This will be visible in the exercise drop-down menu, below the ZIP import function."
+                    />
+                    <ToggleRow
+                      id="setting-enable-delete"
+                      label="Enable exercise deletion"
+                      checked={enableDelete}
+                      onChange={onEnableDeleteChange}
+                      title="Allow users to delete exercises from the database"
+                    />
+                    <ToggleRow
+                      id="setting-manual-cas-validation"
+                      label="Manual CAS validation"
+                      checked={showCASValidation}
+                      onChange={onShowCASValidationChange}
+                      title="When enabled, a manual CAS validation input box will be displayed in the interface. If you are sure your structure is correct, or you believe it is faster to look up a CAS number, you can validate your suspicion manually through a CAS number check."
+                    />
+                    <SelectRow
+                      id="setting-link-inherit-mode"
+                      label="Link inherit mode"
+                      value={linkInheritMode}
+                      options={LINK_INHERIT_OPTIONS}
+                      onChange={(value) => onLinkInheritModeChange(value as LinkInheritMode)}
+                      title="Choose what should happen with fragment links after merging two fragments."
+                    />
+                  </div>
+                  <div className="settings-category-column">
+                    <ToggleRow
+                      id="setting-show-timer"
+                      label="Show timer"
+                      checked={showTimer}
+                      onChange={onShowTimerChange}
+                      title="When enabled, a timer will be displayed in the interface to track elapsed time for the active exercise. The timer starts with a 5 second delay, can be paused, and will resume after pause and switching from another exercise. The time spent is stored and is used in the statistics page."
+                    />
+                    <ToggleRow
+                      id="setting-warning-panel"
+                      label="Warning Panel"
+                      checked={showWarnings}
+                      onChange={onShowWarningsChange}
+                      title="Warning symbols will be shown when too many atoms are used or too many DBE are set in the working solution, or when too many atoms are linked to a signal in the spectra."
+                    />
+                    <ToggleRow
+                      id="setting-missing-atoms"
+                      label="Potential Missing atoms"
+                      checked={showMissingText}
+                      onChange={onShowMissingTextChange}
+                      title="In the Working Solution Space, a small text serves as a check if you miss any atoms and if so, which ones and how many."
+                    />
+                    <ToggleRow
+                      id="setting-enable-cheats"
+                      label="Enable cheats"
+                      checked={readCheatBit(normalizedCheatBits, 1)}
+                      onChange={(checked) => setCheat(1, checked)}
+                      title="You wanna be like that? Enabling cheats will unlock a set op options in the Cheats tab. These options can be used to make the exercises easier, but the use of cheats is stored per exercises and its use will be shown in the statistics page."
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <section className="settings-category statistics-graph-box" aria-labelledby="settings-appearance-heading">
+                <h2 className="settings-category-title" id="settings-appearance-heading">Appearance</h2>
+                <div className="settings-category-columns">
+                  <div className="settings-category-column">
+                    <ToggleRow
+                      id="setting-show-apt"
+                      label="Show APT labels"
+                      checked={showApt}
+                      onChange={onShowAptChange}
+                      title="Append (CH/CH₃ ↓, CH₂ ↑) to the 'APT' label in the ¹³C spectrum title"
+                    />
+                    <ToggleRow
+                      id="setting-show-source"
+                      label="Show source"
+                      checked={showSource}
+                      onChange={onShowSourceChange}
+                      title="Show the data source folder and file ID for the ¹H-NMR and ¹³C-NMR spectra"
+                    />
+                    <ToggleRow
+                      id="setting-show-tags"
+                      label="Show tags"
+                      checked={showTags}
+                      onChange={onShowTagsChange}
+                      title="Show all the tags associated with the current exercise"
+                    />
+                    <SelectRow
+                      id="setting-theme-select"
+                      label="Theme"
+                      value={selectedTheme}
+                      options={[{ value: 'Light', label: 'Light' }]}
+                      title="Theme selection is currently inactive."
+                      disabled
+                    />
+                  </div>
+                  <div className="settings-category-column">
+                    <ToggleRow
+                      id="setting-solvent-annotation"
+                      label='Show "solvent" annotation in spectra'
+                      checked={showSolventText}
+                      onChange={onShowSolventTextChange}
+                      title='When enabled, the "solvent" label which is embedded in the spectra will be displayed in the spectra.'
+                    />
+                    <ToggleRow
+                      id="setting-exchanges-annotation"
+                      label={<>Show "exchanges with D<sub>2</sub>O" annotation in spectra</>}
+                      checked={showExchangeText}
+                      onChange={onShowExchangeTextChange}
+                      title='When enabled, the "exchanges with D₂O" label which is embedded in the spectra will be displayed in the spectra.'
+                    />
+                    <ToggleRow
+                      id="setting-show-formula"
+                      label="Show molecular formula"
+                      checked={showFormula}
+                      onChange={onShowFormulaChange}
+                      title="Show or hide the current exercise's molecular formula."
+                    />
+                    <ToggleRow
+                      id="setting-show-integral-curves"
+                      label="Show Integral Curves"
+                      checked={showIntegralCurves}
+                      onChange={onShowIntegralCurvesChange}
+                      title='Show or hide SVG elements with stroke="#ff0000" in the spectra.'
+                    />
+                  </div>
+                </div>
+              </section>
             </div>
           )}
 
@@ -566,7 +643,7 @@ export function SettingsPanel({
                 <div className="settings-solvent-sections">
                   <section className="settings-solvent-section" aria-labelledby="used-solvents-heading">
                     <h3 className="settings-solvent-section-title" id="used-solvents-heading">
-                      Currently used solvents
+                      Currently used deuterated solvents
                     </h3>
                     {usedSolvents.length > 0 ? (
                       <div className="settings-solvent-grid">{usedSolvents.map(renderSolvent)}</div>
@@ -576,7 +653,7 @@ export function SettingsPanel({
                   </section>
                   <section className="settings-solvent-section" aria-labelledby="unused-solvents-heading">
                     <h3 className="settings-solvent-section-title" id="unused-solvents-heading">
-                      Currently unused solvents
+                      Currently unused deuterated solvents
                     </h3>
                     {unusedSolvents.length > 0 ? (
                       <div className="settings-solvent-grid">{unusedSolvents.map(renderSolvent)}</div>

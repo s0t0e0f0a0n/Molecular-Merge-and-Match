@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { SpectrumViewer } from '../../../src/features/viewingSpectra/SpectraPrototype';
 
 // SpectrumViewer fetches the spectrum SVG; stub it to a no-op for these tests.
@@ -29,6 +29,33 @@ function commonProps(overrides: Partial<React.ComponentProps<typeof SpectrumView
  * so a different solvent forces React to fully unmount and remount the formatted subtree.
  */
 describe('SpectrumViewer title — italic solvent rerender', () => {
+  it('hides red-stroke integral elements when the setting is disabled', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(
+            '<svg><path id="integral" stroke="#ff0000" d="M0 0"/><path id="spectrum" stroke="#000000" d="M1 1"/></svg>',
+          ),
+        } as Response),
+      ),
+    );
+
+    const { container, rerender } = render(
+      <SpectrumViewer {...commonProps({ src: '/spectrum.svg', showIntegralCurves: false })} />,
+    );
+
+    await waitFor(() => expect(container.querySelector('#integral')).toBeNull());
+    expect(container.querySelector('#spectrum')).not.toBeNull();
+
+    rerender(
+      <SpectrumViewer {...commonProps({ src: '/spectrum.svg', showIntegralCurves: true })} />,
+    );
+
+    await waitFor(() => expect(container.querySelector('#integral')).not.toBeNull());
+  });
+
   it('always shows the APT marker and toggles its phase annotation independently', () => {
     const { container, rerender } = render(
       <SpectrumViewer {...commonProps({ type: 'C', apt: true })} />,

@@ -24,6 +24,7 @@ function renderSettingsPanel(cheatBits: string) {
       onClose={vi.fn()}
       linkInheritMode="none"
       onLinkInheritModeChange={vi.fn()}
+      selectedTheme="Light"
       selectedPreset="User"
       availablePresets={['User']}
       onPresetChange={vi.fn()}
@@ -37,6 +38,10 @@ function renderSettingsPanel(cheatBits: string) {
       onShowSolventTextChange={vi.fn()}
       showExchangeText
       onShowExchangeTextChange={vi.fn()}
+      showFormula
+      onShowFormulaChange={vi.fn()}
+      showIntegralCurves
+      onShowIntegralCurvesChange={vi.fn()}
       showMissingText
       onShowMissingTextChange={vi.fn()}
       showCreation={false}
@@ -61,6 +66,17 @@ function renderSettingsPanel(cheatBits: string) {
 }
 
 describe('SettingsPanel cheat tags', () => {
+  it('groups settings into Function and Appearance categories after the preset', () => {
+    renderSettingsPanel('000000000000');
+
+    expect(screen.getByLabelText('Presets')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Function' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Appearance' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Theme')).toBeDisabled();
+    expect(screen.getByText('Show molecular formula')).toBeInTheDocument();
+    expect(screen.getByText('Show Integral Curves')).toBeInTheDocument();
+  });
+
   it('keeps a non-hideable tag unchecked when its database record is hidden', async () => {
     vi.mocked(fetchTags).mockResolvedValue([
       {

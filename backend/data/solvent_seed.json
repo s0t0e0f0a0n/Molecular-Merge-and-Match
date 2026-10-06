@@ -3,6 +3,7 @@
     "names" : "CDCl3,chloroform-/it{d}",
     "match": "CDCl3",
     "display": "Chloroform",
+    "smiles" : "ClC(Cl)([2H])Cl",
     "preference" : 0,
     "count": 2
   },
@@ -10,6 +11,7 @@
     "names" : "(CD3)2SO,dimethylsulfoxide-/it{d6},DMSO-/it{d6}",
     "match": "DMSO",
     "display": "Dimethyl sulfoxide",
+    "smiles" : "C([2H])([2H])([2H])S(=O)C([2H])([2H])[2H]",
     "preference" : 2,
     "count": 1
   },
@@ -17,6 +19,7 @@
     "names" : "CD3CN,acetonitrile-/it{d3},ACN-/it{d3},MeCN-/it{d3}",
     "match": "CD3CN",
     "display": "Acetonitrile",
+    "smiles" : "C([2H])([2H])([2H])C#N",
     "preference" : 0,
     "count": 1
   },
@@ -24,6 +27,7 @@
     "names" : "CD3OD,methanol-/it{d4},MeOD",
     "match": "MeOD",
     "display": "Methanol",
+    "smiles" : "C([2H])([2H])([2H])O[2H]",
     "preference" : 1,
     "count": 1
   },
@@ -31,6 +35,7 @@
     "names" : "D2O,water-/it{d2},deuterium oxide",
     "match": "D2O",
     "display": "Water",
+    "smiles" : "O([2H])[2H]",
     "preference" : 0,
     "count": 2
   },
@@ -38,6 +43,7 @@
     "names" : "C6D6,benzene-/it{d6},PhD",
     "match": "C6D6",
     "display": "Benzene",
+    "smiles" : "C1([2H])C([2H])=C([2H])C([2H])=C([2H])C=1[2H]",
     "preference" : 1,
     "count": 1
   },
@@ -45,6 +51,7 @@
     "names" : "(CD3)2CO,acetone-/it{d6},Me2CO-/it{d6}",
     "match": "Acetone",
     "display": "Acetone",
+    "smiles" : "C([2H])([2H])([2H])C(=O)C([2H])([2H])[2H]",
     "preference" : 1,
     "count": 1
   },
@@ -52,84 +59,98 @@
     "names" : "CD2Cl2,dichloromethane-/it{d2},methylene dichloride-/it{d2},DCM-/it{d2}",
     "match": "DCM",
     "display": "Dichloromethane",
+    "smiles" : "ClC(Cl)([2H])[2H]",
     "preference" : 0
   },
   {
     "names" : "C5D5N,pyridine-/it{d5}",
     "match": "Pyridine",
     "display": "Pyridine",
+    "smiles" : "[2H]C1=NC([2H])=C([2H])C([2H])=C1[2H]",
     "preference" : 1
   },
   {
     "names" : "CD3COD,acetic acid-/it{d4},AcOD",
     "match": "AcOD",
     "display": "Acetic Acid",
+    "smiles" : "O=C(O[2H])C([2H])([2H])[2H]",
     "preference" : 1
   },
   {
     "names" : "CD3CD2OD,ethanol-/it{d6},EtOD",
     "match": "EtOD",
     "display": "Ethanol",
+    "smiles" : "[2H]OC([2H])([2H])C([2H])([2H])[2H]",
     "preference" : 2
   },
   {
     "names" : "CD3NO2,nitromethane-/it{d3},MeNO2-/it{d3}",
     "match": "CD3NO2",
     "display": "Nitromethane",
+    "smiles" : "[O-][N+](C([2H])([2H])[2H])=O",
     "preference" : 0
   },
   {
     "names" : "(CD3)2NCOD,dimethylformamide-/it{d7},DMF-/it{d7}",
     "match": "DMF",
     "display": "Dimethylformamide",
+    "smiles" : "[2H]C(N(C([2H])([2H])[2H])C([2H])([2H])[2H])=O",
     "preference" : 2
   },
   {
     "names" : "C5D5CD3,toluene-/it{d8},PhCD3",
     "match": "Toluene",
     "display": "Toluene",
+    "smiles" : "[2H]C1=C([2H])C([2H])=C([2H])C([2H])=C1C([2H])([2H])[2H]",
     "preference" : 1
   },
   {
     "names" : "C4D8O,tetrahydrofuran-/it{d8},THF-/it{d8}",
     "match": "THF",
     "display": "Tetrahydrofuran",
+    "smiles" : "[2H]C1(C([2H])(C(OC([2H])1[2H])([2H])[2H])[2H])[2H]",
     "preference" : 2
   },
   {
     "names" : "C4D8O2,/notsub{1}\\,/notsub{4}-dioxane-/it{d8}",
     "match": "Dioxane",
     "display": "1,4-Dioxane",
+    "smiles" : "[2H]C(OC1([2H])[2H])(C(OC([2H])1[2H])([2H])[2H])[2H]",
     "preference" : 1
   },
   {
     "names" : "CCl4,tetrachloromethane",
     "match": "CCl4",
     "display": "Tetrachloromethane",
+    "smiles" : "ClC(Cl)(Cl)Cl",
     "preference" : 0
   },
   {
     "names" : "CF3COOD,trifluoroacetic acid-/it{d},TFA-/it{d}",
     "match": "TFA",
     "display": "Trifluoroacetic Acid",
+    "smiles" : "O=C(O[2H])C(F)(F)F",
     "preference" : 0
   },
   {
     "names" : "C2D2Cl2,/notsub{1}\\,/notsub{1}\\,/notsub{2}\\,/notsub{2}-tetrachloroethane-/it{d}",
     "match": "TCE",
     "display": "1,1,2,2-Tetrachloroethane",
+    "smiles" : "ClC([2H])(Cl)C(Cl)([2H])Cl",
     "preference" : 1
   },
   {
     "names" : "C12D12,cyclohexane-/it{d12}",
     "match": "Cyclohexane",
     "display": "Cyclohexane",
+    "smiles" : "[2H]C1(C([2H])(C([2H])(C([2H])(C([2H])(C([2H])1[2H])[2H])[2H])[2H])[2H])[2H]",
     "preference" : 1
   },
   {
     "names" : "C5D5Cl,chlorobenzene-/it{d5}",
     "match": "Chlorobenzene",
     "display": "Chlorobenzene",
+    "smiles" : "ClC1=C([2H])C([2H])=C([2H])C([2H])=C1[2H]",
     "preference" : 1
   }
 ]

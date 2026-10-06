@@ -4,6 +4,7 @@ export type SolventPreference = {
   id: number;
   match: string;
   display: string;
+  smiles: string;
   names: string;
   options: string[];
   preference: number;

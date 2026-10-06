@@ -1590,7 +1590,7 @@ export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedEx
         }
       }}
     >
-      <div className="settings-panel-surface" role="dialog" aria-modal="true" aria-label="Statistics panel">
+      <div className="settings-panel-surface settings-panel-surface--wide" role="dialog" aria-modal="true" aria-label="Statistics panel">
         <div className="settings-panel-header">
           <div className="settings-panel-tabs">
             {TABS.map((tab) => (

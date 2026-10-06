@@ -287,6 +287,8 @@ export function MolecularBookkeepingPage() {
   const [showWarnings, setShowWarnings] = useState(true);
   const [showSolventText, setShowSolventText] = useState(true);
   const [showExchangeText, setShowExchangeText] = useState(true);
+  const [showFormula, setShowFormula] = useState(true);
+  const [showIntegralCurves, setShowIntegralCurves] = useState(true);
   const [showMissingText, setShowMissingText] = useState(true);
   const [showCreation, setShowCreation] = useState(true);
   const [showApt, setShowApt] = useState(false);
@@ -815,6 +817,8 @@ useEffect(() => {
     setShowWarnings(settings.show_warnings ?? true);
     setShowSolventText(settings.show_solvent ?? true);
     setShowExchangeText(settings.show_exchange ?? true);
+    setShowFormula(settings.show_formula ?? true);
+    setShowIntegralCurves(settings.show_integral_curves ?? true);
     setShowMissingText(settings.show_missing ?? true);
     setShowCreation(settings.show_creation ?? true);
     setShowApt(settings.show_apt ?? false);
@@ -850,6 +854,8 @@ useEffect(() => {
       if (overrides.show_warnings !== undefined) payload.show_warnings = overrides.show_warnings;
       if (overrides.show_solvent !== undefined) payload.show_solvent = overrides.show_solvent;
       if (overrides.show_exchange !== undefined) payload.show_exchange = overrides.show_exchange;
+      if (overrides.show_formula !== undefined) payload.show_formula = overrides.show_formula;
+      if (overrides.show_integral_curves !== undefined) payload.show_integral_curves = overrides.show_integral_curves;
       if (overrides.show_missing !== undefined) payload.show_missing = overrides.show_missing;
       if (overrides.show_creation !== undefined) payload.show_creation = overrides.show_creation;
       if (overrides.show_apt !== undefined) payload.show_apt = overrides.show_apt;
@@ -896,6 +902,8 @@ useEffect(() => {
         setShowWarnings(true);
         setShowSolventText(true);
         setShowExchangeText(true);
+        setShowFormula(true);
+        setShowIntegralCurves(true);
         setShowMissingText(true);
         setShowCreation(true);
         setSelectedTheme('Light');
@@ -1024,6 +1032,24 @@ const handleShowExchangeTextChange = useCallback(
     setShowExchangeText(value);
     setSelectedPreset('User');
     void persistUserSettings({ show_exchange: value });
+  },
+  [persistUserSettings],
+);
+
+const handleShowFormulaChange = useCallback(
+  (value: boolean) => {
+    setShowFormula(value);
+    setSelectedPreset('User');
+    void persistUserSettings({ show_formula: value });
+  },
+  [persistUserSettings],
+);
+
+const handleShowIntegralCurvesChange = useCallback(
+  (value: boolean) => {
+    setShowIntegralCurves(value);
+    setSelectedPreset('User');
+    void persistUserSettings({ show_integral_curves: value });
   },
   [persistUserSettings],
 );
@@ -1917,7 +1943,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
             {/*  <span style={{ fontWeight: 600 }}>
                 {selectedExercise.name ?? `Exercise ${selectedExercise.id}`}
               </span> */}
-              {selectedExercise.molecular_formula && (
+              {showFormula && selectedExercise.molecular_formula && (
                 <span style={{ fontSize: 20, fontWeight: 700, color: '#555' }}>
                   {formatChemistryText(selectedExercise.molecular_formula.replace(/\[2\]H/g, 'D'))}
                 </span>
@@ -2101,7 +2127,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
                       title={tag}
                       style={{
                         minWidth: 0,
-                        maxWidth: 76,
+                        maxWidth: 100,
                         fontFamily: 'var(--font-mono)',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -2287,6 +2313,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
               dataSource={selectedExercise?.h1_data_source ?? null}
               showSolventText={showSolventText}
               showExchangeText={showExchangeText}
+              showIntegralCurves={showIntegralCurves}
               solvent={selectedExercise?.h1_solvent ?? null}
               frequencyMhz={selectedExercise?.h1_frequency_mhz ?? null}
               peaks={currentPeaks
@@ -2312,6 +2339,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
               dataSource={selectedExercise?.c13_data_source ?? null}
               showSolventText={showSolventText}
               showExchangeText={showExchangeText}
+              showIntegralCurves={showIntegralCurves}
               solvent={selectedExercise?.c13_solvent ?? null}
               frequencyMhz={selectedExercise?.c13_frequency_mhz ?? null}
               apt={selectedExercise?.c13_apt === true}
@@ -2573,9 +2601,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         onClose={() => setSettingsPanelOpen(false)}
         linkInheritMode={linkInheritMode}
         onLinkInheritModeChange={handleChangeLinkInheritMode}
-       // selectedTheme={selectedTheme}
-       // availableThemes={['Light']}
-       // onThemeChange={handleThemeChange}
+        selectedTheme={selectedTheme}
         selectedPreset={selectedPreset}
         availablePresets={availablePresets}
         onPresetChange={handleApplyPreset}
@@ -2589,6 +2615,10 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         onShowSolventTextChange={handleShowSolventTextChange}
         showExchangeText={showExchangeText}
         onShowExchangeTextChange={handleShowExchangeTextChange}
+        showFormula={showFormula}
+        onShowFormulaChange={handleShowFormulaChange}
+        showIntegralCurves={showIntegralCurves}
+        onShowIntegralCurvesChange={handleShowIntegralCurvesChange}
         showMissingText={showMissingText}
         onShowMissingTextChange={handleShowMissingTextChange}
         showCreation={showCreation}

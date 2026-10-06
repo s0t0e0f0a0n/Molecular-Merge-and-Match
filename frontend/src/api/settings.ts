@@ -9,6 +9,8 @@ export type UserSettings = {
   show_warnings?: boolean;
   show_solvent?: boolean;
   show_exchange?: boolean;
+  show_formula?: boolean;
+  show_integral_curves?: boolean;
   show_missing?: boolean;
   show_creation?: boolean;
   show_apt?: boolean;
@@ -30,6 +32,8 @@ export type UpdateUserSettingsRequest = {
   show_warnings?: boolean;
   show_solvent?: boolean;
   show_exchange?: boolean;
+  show_formula?: boolean;
+  show_integral_curves?: boolean;
   show_missing?: boolean;
   show_creation?: boolean;
   show_apt?: boolean;

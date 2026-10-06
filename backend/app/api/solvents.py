@@ -15,6 +15,7 @@ class SolventPreferenceOut(BaseModel):
     id: int
     match: str
     display: str
+    smiles: str
     names: str
     options: list[str]
     preference: int
@@ -39,6 +40,7 @@ def _to_response(row: SolventsUsed) -> SolventPreferenceOut:
         id=row.id,
         match=row.match,
         display=row.display,
+        smiles=row.smiles or "",
         names=row.names,
         options=options,
         preference=preference,

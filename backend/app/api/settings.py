@@ -34,6 +34,8 @@ def _serialize_settings(settings: UserSettings) -> dict[str, object]:
         "show_warnings": bool(getattr(settings, "show_warnings", True)),
         "show_solvent": bool(getattr(settings, "show_solvent", True)),
         "show_exchange": bool(getattr(settings, "show_exchange", True)),
+        "show_formula": bool(getattr(settings, "show_formula", True)),
+        "show_integral_curves": bool(getattr(settings, "show_integral_curves", True)),
         "show_missing": bool(getattr(settings, "show_missing", True)),
         "show_creation": bool(getattr(settings, "show_creation", True)),
         "show_apt": bool(getattr(settings, "show_apt", False)),
@@ -53,6 +55,8 @@ def _apply_settings_values(target: UserSettings, source: UserSettings) -> None:
     target.show_warnings = bool(getattr(source, "show_warnings", True))
     target.show_solvent = bool(getattr(source, "show_solvent", True))
     target.show_exchange = bool(getattr(source, "show_exchange", True))
+    target.show_formula = bool(getattr(source, "show_formula", True))
+    target.show_integral_curves = bool(getattr(source, "show_integral_curves", True))
     target.show_missing = bool(getattr(source, "show_missing", True))
     target.show_creation = bool(getattr(source, "show_creation", True))
     target.show_apt = bool(getattr(source, "show_apt", False))
@@ -86,6 +90,8 @@ class UserSettingsResponse(BaseModel):
     show_warnings: bool
     show_solvent: bool
     show_exchange: bool
+    show_formula: bool
+    show_integral_curves: bool
     show_missing: bool
     show_creation: bool
     show_apt: bool
@@ -109,6 +115,8 @@ class UpdateUserSettingsRequest(BaseModel):
     show_warnings: bool | None = None
     show_solvent: bool | None = None
     show_exchange: bool | None = None
+    show_formula: bool | None = None
+    show_integral_curves: bool | None = None
     show_missing: bool | None = None
     show_creation: bool | None = None
     show_apt: bool | None = None
@@ -142,6 +150,8 @@ def _build_response(settings: UserSettings, active_preset: str = _ACTIVE_SETTING
         show_warnings=bool(serialized["show_warnings"]),
         show_solvent=bool(serialized["show_solvent"]),
         show_exchange=bool(serialized["show_exchange"]),
+        show_formula=bool(serialized["show_formula"]),
+        show_integral_curves=bool(serialized["show_integral_curves"]),
         show_missing=bool(serialized["show_missing"]),
         show_creation=bool(serialized["show_creation"]),
         show_apt=bool(serialized["show_apt"]),
@@ -215,6 +225,10 @@ def update_settings(payload: UpdateUserSettingsRequest) -> UserSettingsResponse:
             settings.show_solvent = bool(payload.show_solvent)
         if payload.show_exchange is not None:
             settings.show_exchange = bool(payload.show_exchange)
+        if payload.show_formula is not None:
+            settings.show_formula = bool(payload.show_formula)
+        if payload.show_integral_curves is not None:
+            settings.show_integral_curves = bool(payload.show_integral_curves)
         if payload.show_missing is not None:
             settings.show_missing = bool(payload.show_missing)
         if payload.show_creation is not None:

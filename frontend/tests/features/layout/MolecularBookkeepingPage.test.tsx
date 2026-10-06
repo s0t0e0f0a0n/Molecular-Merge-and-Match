@@ -59,15 +59,20 @@ vi.mock('../../../src/features/viewingSpectra/SpectraPrototype', async (importOr
   const actual = await importOriginal<typeof import('../../../src/features/viewingSpectra/SpectraPrototype')>();
   return {
     ...actual,
-    SpectrumViewer: ({ title, type, apt, showAptDetails, showSpectrumDataSource, dataSource }: {
+    SpectrumViewer: ({ title, type, apt, showAptDetails, showSpectrumDataSource, showIntegralCurves, dataSource }: {
       title?: string;
       type?: 'H' | 'C';
       apt?: boolean;
       showAptDetails?: boolean;
       showSpectrumDataSource?: boolean;
+      showIntegralCurves?: boolean;
       dataSource?: string | null;
     }) => (
-      <div data-testid="spectrum-mock" data-show-source={showSpectrumDataSource}>
+      <div
+        data-testid="spectrum-mock"
+        data-show-source={showSpectrumDataSource}
+        data-show-integral-curves={showIntegralCurves}
+      >
         {title ?? (type === 'H' ? '1H-NMR Spectrum' : '13C-NMR Spectrum')}
         {apt && type === 'C' && (
           <span>{`APT${showAptDetails ? ' (CH/CH₃ ↓, CH₂ ↑)' : ''}`}</span>
@@ -439,6 +444,42 @@ it('shows the APT phase annotation when enabled in settings', async () => {
 
   expect(await screen.findByText('APT (CH/CH₃ ↓, CH₂ ↑)')).toBeInTheDocument();
   await waitFor(() => expect(settingsPayloads).toContainEqual({ show_apt: true }));
+});
+
+it('persists formula and integral curve visibility settings', async () => {
+  const user = userEvent.setup();
+  const settingsPayloads: Array<Record<string, boolean>> = [];
+  mockFetch.mockImplementation(async (url, init) => {
+    if (url.includes('/api/v1/settings/')) {
+      const payload = init?.method === 'PUT'
+        ? JSON.parse(String(init.body)) as Record<string, boolean>
+        : {};
+      if (init?.method === 'PUT') settingsPayloads.push(payload);
+      return {
+        ok: true,
+        json: async () => ({
+          show_formula: payload.show_formula ?? true,
+          show_integral_curves: payload.show_integral_curves ?? true,
+        }),
+      } as Response;
+    }
+    return { ok: true, json: async () => [] } as Response;
+  });
+
+  renderPage();
+  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(1));
+  await waitFor(() => expect(document.querySelector('[aria-label="Current exercise"]')).toHaveTextContent('C4H8O'));
+  const currentExercise = document.querySelector('[aria-label="Current exercise"]');
+  expect(screen.getAllByTestId('spectrum-mock')[0]).toHaveAttribute('data-show-integral-curves', 'true');
+
+  await user.click(await screen.findByRole('button', { name: 'Open settings' }));
+  await user.click(document.querySelector<HTMLLabelElement>('label[for="setting-show-formula"]')!);
+  await waitFor(() => expect(currentExercise).not.toHaveTextContent('C4H8O'));
+  await waitFor(() => expect(settingsPayloads).toContainEqual({ show_formula: false }));
+
+  await user.click(document.querySelector<HTMLLabelElement>('label[for="setting-show-integral-curves"]')!);
+  await waitFor(() => expect(settingsPayloads).toContainEqual({ show_integral_curves: false }));
+  expect(screen.getAllByTestId('spectrum-mock')[0]).toHaveAttribute('data-show-integral-curves', 'false');
 });
 
 it('keeps spectrum source labels independent from delete progression cheat bit 10', async () => {

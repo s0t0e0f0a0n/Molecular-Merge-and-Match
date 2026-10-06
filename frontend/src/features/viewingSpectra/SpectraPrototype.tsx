@@ -95,6 +95,8 @@ export interface SpectrumViewerProps {
   showSolventText?: boolean;
   /** Toggle literal "exchanges with D2O / D₂O" text in 1H source SVGs. */
   showExchangeText?: boolean;
+  /** Toggle integral curve elements in source SVGs. */
+  showIntegralCurves?: boolean;
   /** Show the cheat segmentation overlay for this spectrum. */
   showCheatSegmentsOverlay?: boolean;
   /** Show the spectrum data source label in the bottom-left corner. */
@@ -120,11 +122,12 @@ function ppmToPercent(ppm: number, axisRange: [number, number]): number {
   return clampPercent(((maxPpm - ppm) / total) * 100);
 }
 /** Replace "solvent" and "exchanges with D2O" as setting, with additional variations in the latter */
-function applySvgTextVisibility(
+function applySvgDisplaySettings(
   text: string,
   type: 'H' | 'C',
   showSolventText: boolean,
   showExchangeText: boolean,
+  showIntegralCurves: boolean,
 ): string {
   let processed = text;
 
@@ -147,6 +150,13 @@ function applySvgTextVisibility(
   }
 // clean up empty text elements anyway
   processed = processed.replace(/<text\b[^>]*>\s*<\/text>/gis, '');  
+
+  if (!showIntegralCurves) {
+    processed = processed.replace(
+      /<([a-z][\w:.-]*)\b(?=[^>]*\bstroke\s*=\s*(["'])#ff0000\2)[^>]*(?:\/\s*>|>[\s\S]*?<\/\1\s*>)/gi,
+      '',
+    );
+  }
 
   return processed;
 }
@@ -436,7 +446,7 @@ function SpectrumCanvas({
   );
 }
 
-export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRange, onHoverPeak, onSelectPeak, isHighlighted, embedded = false, solvent, frequencyMhz, apt, showAptDetails, showSolventText = true, showExchangeText = true, showCheatSegmentsOverlay = false, showSpectrumDataSource = false, dataSource = null }: SpectrumViewerProps) {
+export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRange, onHoverPeak, onSelectPeak, isHighlighted, embedded = false, solvent, frequencyMhz, apt, showAptDetails, showSolventText = true, showExchangeText = true, showIntegralCurves = true, showCheatSegmentsOverlay = false, showSpectrumDataSource = false, dataSource = null }: SpectrumViewerProps) {
   // Built-in title: `<sup>n</sup>X-NMR Spectrum [solvent] [freq] [APT]`.
   // Callers can still pass an explicit `title` to override (used by tests).
   const renderedTitle: React.ReactNode = title ?? renderSpectrumTitle(type, solvent, frequencyMhz, apt, showAptDetails);
@@ -455,7 +465,7 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
     .then((res) => res.text())
     .then((text) => {
       const processed = forceSvgFontFamily(
-        applySvgTextVisibility(text, type, showSolventText, showExchangeText),
+        applySvgDisplaySettings(text, type, showSolventText, showExchangeText, showIntegralCurves),
         {},
       )
         .replace(/<title[\s\S]*?<\/title>/gi, '')
@@ -468,7 +478,7 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
       setSvgContent(processed)
     })
     .catch((err) => console.error('Failed to load SVG', err))
-}, [src, type, showSolventText, showExchangeText])
+}, [src, type, showSolventText, showExchangeText, showIntegralCurves])
 
   const highlightWidthPPM = useMemo(() => {
     if (type === 'H') return 0.21; // was 0.18 ppm
@@ -667,5 +677,3 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
     </>
   )
 }
-
-

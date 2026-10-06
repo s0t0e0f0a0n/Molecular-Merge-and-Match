@@ -232,6 +232,7 @@ class SolventsUsed(Base):
     names: Mapped[str] = mapped_column(String(255), nullable=False)
     match: Mapped[str] = mapped_column(String(50), nullable=False, default="solvent")
     display: Mapped[str] = mapped_column(String(100), nullable=False, default="solvent")
+    smiles: Mapped[str] = mapped_column(String(100), nullable=False, default="")
     preference: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     count: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
 
@@ -345,6 +346,8 @@ class UserSettings(Base):
     show_CAS_input: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     show_solvent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     show_exchange: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    show_formula: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    show_integral_curves: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     show_missing: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     show_warnings: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     show_creation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

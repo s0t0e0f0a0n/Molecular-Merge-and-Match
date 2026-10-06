@@ -29,6 +29,8 @@ def test_new_display_settings_can_be_saved_and_fetched(client):
             "show_apt": True,
             "show_source": True,
             "show_tags": True,
+            "show_formula": False,
+            "show_integral_curves": False,
             "enable_delete": True,
             "SR_mode": True,
         },
@@ -38,6 +40,8 @@ def test_new_display_settings_can_be_saved_and_fetched(client):
     assert response.json()["show_apt"] is True
     assert response.json()["show_source"] is True
     assert response.json()["show_tags"] is True
+    assert response.json()["show_formula"] is False
+    assert response.json()["show_integral_curves"] is False
     assert response.json()["enable_delete"] is True
     assert response.json()["SR_mode"] is True
 
@@ -46,6 +50,8 @@ def test_new_display_settings_can_be_saved_and_fetched(client):
     assert fetched.json()["show_apt"] is True
     assert fetched.json()["show_source"] is True
     assert fetched.json()["show_tags"] is True
+    assert fetched.json()["show_formula"] is False
+    assert fetched.json()["show_integral_curves"] is False
     assert fetched.json()["enable_delete"] is True
     assert fetched.json()["SR_mode"] is True
 

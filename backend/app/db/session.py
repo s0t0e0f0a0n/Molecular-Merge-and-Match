@@ -37,11 +37,18 @@ _USER_SETTINGS_PRESETS: tuple[dict[str, object], ...] = (
         "show_CAS_input": False,
         "show_solvent": True,
         "show_exchange": True,
+        "show_formula": True,
+        "show_integral_curves": True,
         "show_missing": False,
         "show_warnings": True,
         "show_timer": True,
         "cheats": "000000000000",
         "show_creation": False,
+        "show_apt": False,
+        "show_source": False,
+        "show_tags": False,
+        "enable_delete": False,
+        "SR_mode": False,
     },
     {
         "name": "Beginner",
@@ -51,11 +58,18 @@ _USER_SETTINGS_PRESETS: tuple[dict[str, object], ...] = (
         "show_CAS_input": True,
         "show_solvent": True,
         "show_exchange": True,
+        "show_formula": True,
+        "show_integral_curves": True,
         "show_missing": True,
         "show_warnings": True,
         "show_timer": True,
         "cheats": "110100000000",
         "show_creation": False,
+        "show_apt": True,
+        "show_source": False,
+        "show_tags": True,
+        "enable_delete": False,
+        "SR_mode": False,
     },
     {
         "name": "Exam",
@@ -65,11 +79,18 @@ _USER_SETTINGS_PRESETS: tuple[dict[str, object], ...] = (
         "show_CAS_input": False,
         "show_solvent": False,
         "show_exchange": False,
+        "show_formula": True,
+        "show_integral_curves": True,
         "show_missing": False,
         "show_warnings": False,
         "show_timer": True,
         "cheats": "000000000000",
         "show_creation": False,
+        "show_apt": False,
+        "show_source": False,
+        "show_tags": False,
+        "enable_delete": False,
+        "SR_mode": False,
     },
     {
         "name": "User",
@@ -79,11 +100,18 @@ _USER_SETTINGS_PRESETS: tuple[dict[str, object], ...] = (
         "show_CAS_input": False,
         "show_solvent": True,
         "show_exchange": True,
+        "show_formula": True,
+        "show_integral_curves": True,
         "show_missing": False,
         "show_warnings": True,
         "show_timer": True,
         "cheats": "000000000000",
         "show_creation": False,
+        "show_apt": False,
+        "show_source": False,
+        "show_tags": False,
+        "enable_delete": False,
+        "SR_mode": False,
     },
 )
 
@@ -144,21 +172,25 @@ def _seed_solvents() -> None:
 
     db = SessionLocal()
     try:
-        if db.query(SolventsUsed).count() > 0:
-            return
         seed_path = _get_seed_file_path("solvent_seed.json")
         if not os.path.exists(seed_path):
             return
         with open(seed_path) as f:
             solvents = json.load(f)
-        for sol in solvents:
-            db.add(SolventsUsed(
-                names=sol["names"],
-                match=sol["match"],
-                display=sol["display"],
-                preference=sol["preference"],
-                count=sol.get("count", 0),
-            ))
+        if db.query(SolventsUsed).count() == 0:
+            for sol in solvents:
+                db.add(SolventsUsed(
+                    names=sol["names"],
+                    match=sol["match"],
+                    display=sol["display"],
+                    smiles=sol["smiles"],
+                    preference=sol["preference"],
+                    count=sol.get("count", 0),
+                ))
+        else:
+            smiles_by_match = {sol["match"]: sol["smiles"] for sol in solvents}
+            for row in db.query(SolventsUsed).filter(SolventsUsed.smiles.is_(None)).all():
+                row.smiles = smiles_by_match.get(row.match, "")
         db.commit()
     finally:
         db.close()
@@ -468,6 +500,12 @@ def _migrate_add_missing_columns() -> None:
         if "show_exchange" not in existing_settings:
             conn.execute(text("ALTER TABLE user_settings ADD COLUMN show_exchange BOOLEAN"))
             conn.commit()
+        if "show_formula" not in existing_settings:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN show_formula BOOLEAN NOT NULL DEFAULT 1"))
+            conn.commit()
+        if "show_integral_curves" not in existing_settings:
+            conn.execute(text("ALTER TABLE user_settings ADD COLUMN show_integral_curves BOOLEAN NOT NULL DEFAULT 1"))
+            conn.commit()
         if "show_missing" not in existing_settings:
             conn.execute(text("ALTER TABLE user_settings ADD COLUMN show_missing BOOLEAN"))
             conn.commit()
@@ -512,6 +550,9 @@ def _migrate_add_missing_columns() -> None:
             conn.commit()
         if "display" not in existing_solvents:
             conn.execute(text("ALTER TABLE solvents_used ADD COLUMN display STRING(100)"))
+            conn.commit()
+        if "smiles" not in existing_solvents:
+            conn.execute(text("ALTER TABLE solvents_used ADD COLUMN smiles STRING(100) NOT NULL DEFAULT ''"))
             conn.commit()
 
         # Update TagsUsed model
