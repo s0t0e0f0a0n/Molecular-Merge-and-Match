@@ -60,7 +60,7 @@ def calculate_spaced_repetition_interval(
     c_confidence = (confidence_level - 1.0) / 4.0
     # sigma = 30.0 (bepaalt de snelheid van de helling)
     gauss_base = math.exp(-0.5 * (time_min / 25.0)**2)
-    gauss_at_40 = math.exp(-0.5 * (40.0 / 25.0)**2)  
+    gauss_at_40 = math.exp(-0.5 * (40.0 / 25.0)**2)
     # Herschaald zodat t=0 -> 1.0 en t=40 -> -1.0
     c_time = 1.0 - 2.0 * (1.0 - gauss_base) / (1.0 - gauss_at_40)
 

@@ -541,7 +541,7 @@ function DueDistributionGraph({ exerciseSummaries }: { exerciseSummaries: Exerci
               ))}
             </div>
             <div className="statistics-time-of-day-distribution" style={{ '--timeline-days': bins.length } as React.CSSProperties}>
-              {bins.map((bin, index) => {
+              {bins.map((bin) => {
                 const endDay = bin.startDay + bin.size - 1;
                 const range = bin.size === 1 ? `Day ${bin.startDay}` : `Days ${bin.startDay} to ${endDay}`;
                 const showLabel = bin.labeled;

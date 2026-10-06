@@ -138,7 +138,7 @@ async function selectExerciseViaMenu(user: ReturnType<typeof userEvent.setup>, e
 it('renders the top bar with title, current exercise display, and editor button', async () => {
   renderPage();
 
-  expect(await screen.findByAltText('Molecular Merge and Match')).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Open information' })).toBeInTheDocument();
   expect(await screen.findByRole('button', { name: /Open molecule editor/ })).toBeInTheDocument();
   expect(await screen.findByTestId('exercise-menu-button')).toBeInTheDocument();
 });
@@ -388,11 +388,13 @@ it('uses the spaced-repetition menu when SR_mode is enabled', async () => {
   }) as Response);
 
   renderPage();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Validate CAS' })).toBeEnabled());
+  await user.click(screen.getByRole('button', { name: 'Validate CAS' }));
   await user.click(await screen.findByTestId('exercise-menu-button'));
 
   expect(await screen.findByRole('button', { name: 'Go to next exercise' })).toBeInTheDocument();
   expect(screen.getByText('Past exercises')).toBeInTheDocument();
-  expect(screen.getAllByText('Exercise 1').length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/Exercise 1/).length).toBeGreaterThan(0);
   expect(screen.queryByText('Exercise 6')).not.toBeInTheDocument();
   expect(screen.queryByText('Exercise 7')).not.toBeInTheDocument();
   expect(screen.getByText('Exercise 2')).toBeInTheDocument();
@@ -406,10 +408,14 @@ it('uses the spaced-repetition menu when SR_mode is enabled', async () => {
 
   await user.click(screen.getByRole('button', { name: 'Go to next exercise' }));
   await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(4));
-  await user.click(screen.getByRole('button', { name: 'Go to next exercise' }));
-  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(2));
+  await user.click(screen.getByRole('button', { name: 'Validate CAS' }));
+  await user.click(await screen.findByTitle('Show exercises'));
   await user.click(screen.getByRole('button', { name: 'Go to next exercise' }));
   await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(5));
+  await user.click(screen.getByRole('button', { name: 'Validate CAS' }));
+  await user.click(await screen.findByTitle('Show exercises'));
+  await user.click(screen.getByRole('button', { name: 'Go to next exercise' }));
+  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(2));
 });
 
 it('shows the APT phase annotation when enabled in settings', async () => {
@@ -439,7 +445,7 @@ it('shows the APT phase annotation when enabled in settings', async () => {
   const showAptSwitch = document.querySelector<HTMLLabelElement>(
     'label[for="setting-show-apt"]',
   );
-  expect(screen.getByText('Show APT spectrum')).toBeInTheDocument();
+  expect(screen.getByText('Show APT labels')).toBeInTheDocument();
   await user.click(showAptSwitch!);
 
   expect(await screen.findByText('APT (CH/CH₃ ↓, CH₂ ↑)')).toBeInTheDocument();
@@ -527,7 +533,7 @@ it('keeps spectrum source labels independent from delete progression cheat bit 1
   const showSourceSwitch = document.querySelector<HTMLLabelElement>(
     'label[for="setting-show-source"]',
   );
-  expect(screen.getByText('Show data source')).toBeInTheDocument();
+  expect(screen.getByText('Show source')).toBeInTheDocument();
   await user.click(showSourceSwitch!);
 
   expect(await screen.findByText('Data source: H source')).toBeInTheDocument();
@@ -631,7 +637,7 @@ it('dismisses the exhausted-queue dialog temporarily when staying in SR mode', a
   await user.click(screen.getByRole('button', { name: 'Stay in spaced repetition' }));
 
   expect(screen.queryByRole('dialog', { name: 'Done for today' })).not.toBeInTheDocument();
-  expect(screen.getAllByText('Completed history exercise').length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/Completed history exercise/).length).toBeGreaterThan(0);
   expect(settingsRequests.some(({ init }) => init?.method === 'PUT')).toBe(false);
 });
 
@@ -646,6 +652,7 @@ it('shows the done-for-today dialog after deferring the last due exercise', asyn
   };
   vi.mocked(fetchExerciseSummaries)
     .mockResolvedValueOnce([eligibleExercise])
+    .mockResolvedValueOnce([eligibleExercise])
     .mockResolvedValueOnce([{
       ...eligibleExercise,
       due_time: new Date(Date.now() + 6 * 60 * 60_000).toISOString(),
@@ -656,7 +663,10 @@ it('shows the done-for-today dialog after deferring the last due exercise', asyn
   }) as Response);
 
   renderPage();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Validate CAS' })).toBeEnabled());
+  await user.click(screen.getByRole('button', { name: 'Validate CAS' }));
   await user.click(await screen.findByTestId('exercise-menu-button'));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Go to next exercise' })).toBeEnabled());
   await user.click(await screen.findByRole('button', { name: 'Go to next exercise' }));
 
   expect(await screen.findByRole('dialog', { name: 'Done for today' })).toBeInTheDocument();
@@ -665,7 +675,7 @@ it('shows the done-for-today dialog after deferring the last due exercise', asyn
 
 it('treats an SR exercise without a due time as ready immediately', async () => {
   const user = userEvent.setup();
-  vi.mocked(fetchExerciseSummaries).mockResolvedValueOnce([
+  vi.mocked(fetchExerciseSummaries).mockResolvedValue([
     { ...mockSummaries[1], id: 21, name: 'New SR exercise', in_SR: 1, due_time: null },
     { ...mockSummaries[1], id: 22, name: 'Next new SR exercise', in_SR: 2, due_time: null },
     { ...mockSummaries[1], id: 23, name: 'Zero SR exercise', in_SR: 0, due_time: null },
@@ -677,8 +687,9 @@ it('treats an SR exercise without a due time as ready immediately', async () => 
   }) as Response);
 
   renderPage();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Validate CAS' })).toBeEnabled());
+  await user.click(screen.getByRole('button', { name: 'Validate CAS' }));
   await user.click(await screen.findByTestId('exercise-menu-button'));
-
   expect(screen.queryByRole('dialog', { name: 'Done for today' })).not.toBeInTheDocument();
   const goButton = await screen.findByRole('button', { name: 'Go to next exercise' });
   expect(goButton).toBeEnabled();
@@ -985,7 +996,7 @@ it('shows incorrect solution feedback when validation fails', async () => {
       expect(await screen.findByText(/No actions yet/)).toBeInTheDocument();
 
       // Click on the title of the page (so outside the panel).
-      await user.click(screen.getByAltText('Molecular Merge and Match'));
+      await user.click(screen.getByRole('button', { name: 'Open information' }));
 
       await waitFor(() => {
         expect(screen.queryByText(/No actions yet/)).not.toBeInTheDocument();
@@ -1843,7 +1854,7 @@ it('shows incorrect solution feedback when validation fails', async () => {
       'label[for="setting-enable-delete"]',
     );
     expect(enableDeleteInput).not.toBeNull();
-    expect(screen.getByText('Enable delete')).toBeInTheDocument();
+    expect(screen.getByText('Enable exercise deletion')).toBeInTheDocument();
     await user.click(enableDeleteSwitch!);
 
     await waitFor(() => expect(settingsPayloads).toContainEqual({ enable_delete: true }));
@@ -1851,7 +1862,7 @@ it('shows incorrect solution feedback when validation fails', async () => {
     const srModeInput = document.querySelector<HTMLInputElement>('#setting-sr-mode');
     const srModeSwitch = document.querySelector<HTMLLabelElement>('label[for="setting-sr-mode"]');
     expect(srModeInput).not.toBeNull();
-    expect(screen.getByText('Spaced repetition mode')).toBeInTheDocument();
+    expect(screen.getByText('Enable Spaced-Repetition mode')).toBeInTheDocument();
     await user.click(srModeSwitch!);
 
     await waitFor(() => expect(settingsPayloads).toContainEqual({ SR_mode: true }));
