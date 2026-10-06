@@ -51,7 +51,7 @@ import {
 } from '../../api/solvents';
 import { fetchTags, type Tag } from '../../api/tags';
 import { SettingsPanel } from '../settings/SettingsPanel';
-import { InfoPanel } from '../information/InfoPanel';
+import { InfoPanel } from '../../info/InfoPanel';
 import { StatisticsPanel } from '../statistics/StatisticsPanel';
 import {
   ExerciseTimerDisplay,

@@ -27,6 +27,7 @@ export type ExerciseCreatePayload = {
   alt2_cas_number: string | null;
   name: string | null;
   exercise_set?: string | null;
+  in_SR?: number;
   tags: string[];
   additional_spectra: AdditionalSpectrum[];
   solvent?: string | null;
@@ -214,6 +215,8 @@ export function buildPayloadFromCsvRow(
   const problemStr = getFirstValueByAliases(headers, row, ["problem", "number", "num", "id"]);
   const parsedProblemNumber = problemStr !== "" ? parseInt(problemStr, 10) : Number.NaN;
   const problemNumber = Number.isInteger(parsedProblemNumber) ? parsedProblemNumber : null;
+  const srRaw = getFirstValueByAliases(headers, row, ["SR"]);
+  const inSr = srRaw ? Number(srRaw) : 0;
 
   const molecularFormula = getFirstValueByAliases(headers, row, [
     "formula",
@@ -316,6 +319,10 @@ export function buildPayloadFromCsvRow(
   const alt1CasNumber = alt1CasNumberRaw.trim().toLowerCase();
   const alt2CasNumber = alt2CasNumberRaw.trim().toLowerCase();
 
+  if (!Number.isInteger(inSr)) {
+    return { payload: null, error: "Invalid SR value. Expected an integer.", displayName, problemNumber };
+  }
+
   if (!h1NmrText) {
     return { payload: null, error: "Missing 1H NMR text.", displayName, problemNumber };
   }
@@ -395,6 +402,7 @@ export function buildPayloadFromCsvRow(
     alt2_cas_number: alt2CasNumber || null,
     name: problemNumber !== null ? `Exercise ${problemNumber}` : null,
     exercise_set: exerciseSet?.trim() || null,
+    in_SR: inSr,
     tags,
     additional_spectra: [],
     solvent: solventRaw.trim() || null,

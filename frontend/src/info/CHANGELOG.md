@@ -8,10 +8,11 @@ Changes and additions since release version 1.0.0 are grouped by:
 4. Other
 
 ### Versions in this document:  
-[v1.4.0](#v1.4.0)  
-[v1.3.0](#v1.3.0)  
-[v1.2.1](#v1.2.1)  
-[v1.1.2](#v1.1.2)  
+[v1.5.0](#v150)  
+[v1.4.0](#v140)  
+[v1.3.0](#v130)  
+[v1.2.1](#version-121)  
+[v1.1.2](#feature-and-file-changes-in-version-112)  
 
 ## v1.5.0
 Changes since version 1.4.0
@@ -33,6 +34,16 @@ Tags included in statistics is fixed
 Changed tags from "hide" option, to "show" option.
 
 Exercisemenu now correctly handles deleting visually, the tags list is expanded equally and the annoying dynamic scrollbar and div change behaviour is fixed.
+
+Cheat tag behaviour is corrected.
+
+Settings, Statistics and Infopanel have been updated.
+
+New settings added.
+
+New statistics added.
+
+Space repetition implemented.
 
 ## v1.4.0
 Changes since version 1.3.0
