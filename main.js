@@ -1,4 +1,4 @@
-const { app, BrowserWindow, protocol, net, ipcMain, globalShortcut, dialog } = require('electron');
+const { app, BrowserWindow, nativeImage, protocol, net, ipcMain, globalShortcut, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -231,11 +231,25 @@ function setupApiProxy() {
 }
 
 function createWindow() {
+    let iconAsset;
+
+    if (process.platform === 'linux') {
+        const rawIcon = nativeImage.createFromPath(path.join(__dirname, 'build-assets', 'icon.png'));
+        iconAsset = rawIcon.resize({ width: 64, height: 64, quality: 'good' });
+    }
+    // Windows shows the context icon somewhat smaller somehow, the cropped version looks best
+    else if (process.platform === 'win32') {
+        iconAsset = path.join(__dirname, 'build-assets', 'icon_crop.png');
+    }
+    else {
+        iconAsset = path.join(__dirname, 'build-assets', 'icon_mac.png');
+    }
+
     const win = new BrowserWindow({
         show: false,
         minWidth: 1280,
         minHeight: 660,
-        icon: path.join(__dirname, 'build-assets', 'icon.png'),
+        icon: iconAsset,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -350,7 +364,7 @@ function openNmrWindow() {
         minWidth: 900,
         minHeight: 650,
         title: 'nmrglue Test Bench',
-        icon: path.join(__dirname, 'build-assets', 'icon.png'),
+        icon: path.join(__dirname, 'build-assets', 'context-icon.png'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,

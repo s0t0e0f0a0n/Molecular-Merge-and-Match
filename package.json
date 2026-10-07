@@ -1,6 +1,6 @@
 {
   "name": "molecular-merge-and-match",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Molecular Bookkeeping for Structural Analysis",
   "main": "main.js",
   "devDependencies": {
@@ -66,19 +66,16 @@
         "dmg"
       ],
       "artifactName": "${name}-Setup-${version}-${arch}.${ext}",
-      "icon": "build-assets/icon.icns",
+      "icon": "build-assets/icon_mac.icns",
       "category": "public.app-category.education"
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb",
-        "rpm",
-        "pacman"
+        "AppImage"
       ],
       "executableName": "molecularmergeandmatch",
       "artifactName": "${name}-Setup-${version}-x86_64.${ext}",
-      "icon": "build-assets/icon.icns",
+      "icon": "build-assets/icon.png",
       "category": "Education",
       "synopsis": "Molecular Bookkeeping for Structural Analysis",
       "description": "An interactive NMR-based structure elucidation tool for university-level organic chemistry students..."
