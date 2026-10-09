@@ -8,6 +8,7 @@ let backendProcess = null;
 let backendPort = 8000;
 let mainWindow = null;
 let nmrWindow = null;
+let nmriumWindow = null;
 let activeExerciseId = null;
 let mainWindowCloseAuthorized = false;
 let mainWindowCloseInProgress = false;
@@ -351,6 +352,29 @@ async function flushActiveExerciseTimerBeforeClose(win) {
     mainWindowCloseInProgress = false;
 }
 
+function openNmriumWindow() {
+    if (nmriumWindow && !nmriumWindow.isDestroyed()) {
+        nmriumWindow.show();
+        nmriumWindow.focus();
+        return;
+    }
+
+    nmriumWindow = new BrowserWindow({
+        width: 1500,
+        height: 950,
+        title: 'NMRium',
+        icon: path.join(__dirname, 'build-assets', 'context-icon.png'),
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+        },
+    });
+
+    nmriumWindow.on('closed', () => { nmriumWindow = null; });
+    nmriumWindow.loadFile(path.join(__dirname, 'frontend', 'dist', 'NMRium.html'));
+}
+
 function openNmrWindow() {
     if (nmrWindow && !nmrWindow.isDestroyed()) {
         nmrWindow.show();
@@ -391,6 +415,10 @@ app.whenReady().then(async () => {
     const nmrShortcut = process.platform === 'darwin' ? 'Command+F8' : 'F8';
     if (!globalShortcut.register(nmrShortcut, openNmrWindow)) {
         console.warn(`Could not register ${nmrShortcut} for the NMR test bench.`);
+    }
+    const nmriumShortcut = process.platform === 'darwin' ? 'Command+F2' : 'F2';
+    if (!globalShortcut.register(nmriumShortcut, openNmriumWindow)) {
+        console.warn(`Could not register ${nmriumShortcut} for NMRium.`);
     }
 });
 

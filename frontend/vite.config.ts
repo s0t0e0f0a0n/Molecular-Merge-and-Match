@@ -21,8 +21,8 @@ export default defineConfig(() => ({
     define: {
       'process.env.PUBLIC_URL': JSON.stringify(''),
       'process.env.MODE': JSON.stringify('standalone'),
-      'global': 'window',
-    },
+      'global': 'globalThis', //  Changed from 'window' to 'globalThis'
+},
     resolve: {
       alias: {
         // Force all references to raphael to point to the actual module
@@ -43,6 +43,7 @@ export default defineConfig(() => ({
         input: {
           main: 'index.html',
           nmrglueGUI: 'nmrglueGUI.html',
+          NMRium: 'NMRium.html',
         },
       },
       commonjsOptions: {

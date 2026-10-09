@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
-import './index.css';
+import '../index.css';
 import './nmrglueGUI.css';
 
 type NmrPreview = {
