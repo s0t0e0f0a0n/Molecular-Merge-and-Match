@@ -29,10 +29,17 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router, prefix=settings.api_v1_prefix)
+    nmrium_temp_dir = Path(__file__).resolve().parents[1] / "data" / "NMRiumtemp"
+    nmrium_temp_dir.mkdir(parents=True, exist_ok=True)
     Path("data/uploads").mkdir(parents=True, exist_ok=True)
     Path("data/examples").mkdir(parents=True, exist_ok=True)
     Path("data/references").mkdir(parents=True, exist_ok=True)
     app.mount("/uploads", StaticFiles(directory="data/uploads"), name="uploads")
+    app.mount(
+        "/nmrium-temp",
+        StaticFiles(directory=str(nmrium_temp_dir)),
+        name="nmrium-temp",
+    )
     app.mount("/examples", StaticFiles(directory="data/examples"), name="examples")
     app.mount("/references", StaticFiles(directory="data/references"), name="references")
 

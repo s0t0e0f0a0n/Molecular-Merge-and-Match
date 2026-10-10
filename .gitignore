@@ -32,6 +32,7 @@ frontend/tsconfig.tsbuildinfo
 backend/data/app.db
 backend/data/test.db
 backend/data/uploads/
+backend/data/NMRiumtemp/*.svg
 
 backend/req-local-dev.txt
 

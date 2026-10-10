@@ -16,6 +16,17 @@ export type NMRiumDraftMolecule = {
   molfile: string;
 };
 
+export type NMRiumSvgExport = {
+  id: string;
+  name: string;
+  nucleus: string;
+  file_name: string;
+  url: string;
+  selected: boolean;
+  ppmRange: [number, number];
+  integralVerticalPosition: number;
+};
+
 export type ExerciseDraftStructure = {
   smiles: string;
   inchi: string;
@@ -38,6 +49,7 @@ export type NMRiumDraftData = {
   assignment?: ExerciseDraftAssignment;
   sourcePaths?: string[];
   sourceMetadata?: unknown[];
+  svgExports?: NMRiumSvgExport[];
 };
 
 export type ExerciseCreationDraft = {
@@ -104,4 +116,30 @@ export async function fetchExerciseCreationDraft(
     `/api/v1/exercise-creation/drafts/${encodeURIComponent(draftId)}`,
   );
   return readDraftResponse(response);
+}
+
+export async function storeTemporaryNMRiumSvgs(
+  draftId: string,
+  spectra: Array<{
+    id: string;
+    name: string;
+    nucleus: string;
+    svg_text: string;
+  }>,
+): Promise<Array<Omit<NMRiumSvgExport, 'selected'>>> {
+  const response = await fetch('/api/v1/nmrium-svg-exports/temp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ draft_id: draftId, spectra }),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as
+      | { detail?: string }
+      | null;
+    throw new ExerciseCreationDraftError(
+      body?.detail ?? 'Could not store the temporary SVG exports.',
+      response.status,
+    );
+  }
+  return (await response.json()) as Array<Omit<NMRiumSvgExport, 'selected'>>;
 }

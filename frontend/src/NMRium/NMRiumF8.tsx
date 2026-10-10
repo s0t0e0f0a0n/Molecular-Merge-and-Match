@@ -22,16 +22,22 @@ import '@blueprintjs/icons/lib/css/blueprint-icons.css';
 
 import {
   createExerciseCreationDraft,
-  fetchExerciseCreationDraft,
   updateExerciseCreationDraft,
+  storeTemporaryNMRiumSvgs,
   ExerciseCreationDraftError,
   type ExerciseCreationDraft,
   type NMRiumDraftData,
   type NMRiumDraftSpectrum,
+  type NMRiumSvgExport,
 } from '../api/exerciseCreation';
 import { RDKitProvider } from '../context/RDKitContext';
-import { ExerciseCreationKetcherStep } from './ExerciseCreationKetcherStep';
+import { ExerciseCreationStructureStep } from './ExerciseCreationStructureStep';
 import { ExerciseCreationSummary } from './ExerciseCreationSummary';
+import { NMRiumSvgPreview } from './NMRiumSvgPreview';
+import {
+  generateSpectrumSvg,
+  type GeneratedSpectrumSvg,
+} from './nmriumSvgExport';
 
 const DRAFT_ID_KEY = 'nmriumExerciseCreationDraftId';
 
@@ -53,7 +59,9 @@ type SpectrumRecord = {
   info?: Record<string, unknown> & { dimension?: number; nucleus?: string | string[] };
   customInfo?: Record<string, unknown>;
   solvent?: unknown;
+  data?: { x?: unknown; re?: unknown };
   ranges?: { values?: unknown[] };
+  integrals?: { values?: unknown[] };
   peaks?: { values?: unknown[] };
 };
 
@@ -267,6 +275,14 @@ function getNMRiumDraftData(
     sourcePaths,
     sourceMetadata,
   };
+}
+
+function getSpectrumValues(spectra: unknown): unknown[] {
+  return Array.isArray(spectra)
+    ? spectra
+    : spectra && typeof spectra === 'object'
+      ? Object.values(spectra)
+      : [];
 }
 
 function AutomationDispatchBridge() {
@@ -548,10 +564,19 @@ function NMRiumF8App() {
   const [sources, setSources] = useState<unknown>([]);
   const [molecules, setMolecules] = useState<unknown>([]);
   const [draft, setDraft] = useState<ExerciseCreationDraft | null>(null);
-  const [step, setStep] = useState<'nmrium' | 'ketcher' | 'summary'>('nmrium');
+  const [step, setStep] = useState<
+    'nmrium' | 'svg-preview' | 'ketcher' | 'summary'
+  >('nmrium');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [skippedTwoDimensionalCount, setSkippedTwoDimensionalCount] = useState(0);
+  const [generatedSvgSpectra, setGeneratedSvgSpectra] = useState<
+    GeneratedSpectrumSvg[]
+  >([]);
+  const [svgSourceSpectra, setSvgSourceSpectra] = useState<
+    Map<string, unknown>
+  >(() => new Map());
 
   function runAutomaticFormatting() {
     if (!automationRef.current) {
@@ -624,18 +649,69 @@ function NMRiumF8App() {
     setError('');
     setNotice('');
     try {
-      const draftId = draft?.id ?? window.localStorage.getItem(DRAFT_ID_KEY);
-      if (!draftId) {
-        throw new Error('Store the NMRium data before continuing.');
+      const currentDraftData = getNMRiumDraftData(spectra, sources, molecules);
+      const spectraToExport = getSpectrumValues(spectra).filter((value) => {
+        if (!value || typeof value !== 'object') return false;
+        const spectrum = value as SpectrumRecord;
+        return spectrum.info?.dimension === 1;
+      });
+      setSkippedTwoDimensionalCount(
+        getSpectrumValues(spectra).filter((value) => {
+          if (!value || typeof value !== 'object') return false;
+          return (value as SpectrumRecord).info?.dimension === 2;
+        }).length,
+      );
+      if (spectraToExport.length === 0) {
+        throw new Error('Load at least one 1D spectrum before continuing.');
       }
-      const savedDraft = await fetchExerciseCreationDraft(draftId);
+      const generated = spectraToExport.map((spectrum) =>
+        generateSpectrumSvg(spectrum),
+      );
+      setGeneratedSvgSpectra(generated);
+      setSvgSourceSpectra(
+        new Map(generated.map((item, index) => [item.id, spectraToExport[index]])),
+      );
+      const storedId = window.localStorage.getItem(DRAFT_ID_KEY);
+      let savedDraft: ExerciseCreationDraft;
+      if (storedId) {
+        try {
+          savedDraft = await updateExerciseCreationDraft(storedId, currentDraftData);
+        } catch (caught) {
+          if (!(caught instanceof ExerciseCreationDraftError) || caught.status !== 404) {
+            throw caught;
+          }
+          savedDraft = await createExerciseCreationDraft(currentDraftData);
+        }
+      } else {
+        savedDraft = await createExerciseCreationDraft(currentDraftData);
+      }
+      const storedExports = await storeTemporaryNMRiumSvgs(
+        savedDraft.id,
+        generated.map(({ id, name, nucleus, svgText }) => ({
+          id,
+          name,
+          nucleus,
+          svg_text: svgText,
+        })),
+      );
+      const svgExports: NMRiumSvgExport[] = storedExports.map((item, index) => ({
+        ...item,
+        selected: true,
+        ppmRange: generated[index].ppmRange,
+        integralVerticalPosition: generated[index].integralVerticalPosition,
+      }));
+      savedDraft = await updateExerciseCreationDraft(savedDraft.id, {
+        ...savedDraft.nmrium_data,
+        svgExports,
+      });
+      window.localStorage.setItem(DRAFT_ID_KEY, savedDraft.id);
       setDraft(savedDraft);
-      setStep('ketcher');
+      setStep('svg-preview');
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : 'Could not load the saved exercise draft.',
+          : 'Could not generate and store the SVG spectra.',
       );
     } finally {
       setBusy(false);
@@ -650,6 +726,110 @@ function NMRiumF8App() {
     setDraft(savedDraft);
   };
 
+  const handleSvgExportsChange = (svgExports: NMRiumSvgExport[]) => {
+    setDraft((current) =>
+      current
+        ? { ...current, nmrium_data: { ...current.nmrium_data, svgExports } }
+        : current,
+    );
+  };
+
+  const handleSvgSettingsUpdate = async (
+    id: string,
+    ppmRange: [number, number],
+    integralVerticalPosition: number,
+  ) => {
+    if (!draft) return;
+    setBusy(true);
+    setError('');
+    try {
+      const source = svgSourceSpectra.get(id);
+      if (!source) {
+        throw new Error('The source spectrum is no longer available; regenerate exports from NMRium.');
+      }
+      const regenerated = generateSpectrumSvg(source, {
+        ppmRange,
+        integralVerticalPosition,
+      });
+      const nextGenerated = generatedSvgSpectra.map((item) =>
+        item.id === id ? regenerated : item,
+      );
+      const storedExports = await storeTemporaryNMRiumSvgs(
+        draft.id,
+        nextGenerated.map(({ id: spectrumId, name, nucleus, svgText }) => ({
+          id: spectrumId,
+          name,
+          nucleus,
+          svg_text: svgText,
+        })),
+      );
+      const previousExports = draft.nmrium_data.svgExports ?? [];
+      const svgExports: NMRiumSvgExport[] = storedExports.map((item, index) => ({
+        ...item,
+        selected: previousExports[index]?.selected ?? true,
+        ppmRange: nextGenerated[index].ppmRange,
+        integralVerticalPosition: nextGenerated[index].integralVerticalPosition,
+      }));
+      const savedDraft = await updateExerciseCreationDraft(draft.id, {
+        ...draft.nmrium_data,
+        svgExports,
+      });
+      setGeneratedSvgSpectra(nextGenerated);
+      setDraft(savedDraft);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Could not update the SVG settings.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSvgPreviewContinue = async () => {
+    if (!draft) return;
+    setBusy(true);
+    setError('');
+    try {
+      const svgExports = draft.nmrium_data.svgExports ?? [];
+      if (!svgExports.some((item) => item.selected)) {
+        throw new Error('Select at least one spectrum to include.');
+      }
+      const savedDraft = await updateExerciseCreationDraft(draft.id, {
+        ...draft.nmrium_data,
+        svgExports,
+      });
+      setDraft(savedDraft);
+      setStep('ketcher');
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Could not save the selected SVG spectra.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (step === 'svg-preview' && draft) {
+    return (
+      <NMRiumSvgPreview
+        data={draft.nmrium_data}
+        exports={draft.nmrium_data.svgExports ?? []}
+        skippedTwoDimensionalCount={skippedTwoDimensionalCount}
+        busy={busy}
+        error={error}
+        onBack={() => setStep('nmrium')}
+        onExportsChange={handleSvgExportsChange}
+        onUpdateSettings={handleSvgSettingsUpdate}
+        onDataChange={handlePeakMultipletChange}
+        onContinue={handleSvgPreviewContinue}
+      />
+    );
+  }
+
   if (step === 'summary' && draft) {
     return (
       <ExerciseCreationSummary
@@ -662,9 +842,11 @@ function NMRiumF8App() {
 
   if (step === 'ketcher' && draft) {
     return (
-      <ExerciseCreationKetcherStep
+      <ExerciseCreationStructureStep
         data={draft.nmrium_data}
-        onPrevious={() => setStep('nmrium')}
+        onPrevious={() =>
+          setStep(draft.nmrium_data.svgExports?.length ? 'svg-preview' : 'nmrium')
+        }
         onNext={() => setStep('summary')}
         onDataChange={handlePeakMultipletChange}
       />
