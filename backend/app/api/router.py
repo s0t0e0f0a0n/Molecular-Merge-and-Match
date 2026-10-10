@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.exercise_creation import router as exercise_creation_router
 from app.api.exercises import router as exercises_router
 from app.api.fragments import router as fragments_router
 from app.api.health import router as health_router
@@ -19,6 +20,7 @@ api_router = APIRouter()
 api_router.include_router(health_router)
 api_router.include_router(info_router)
 api_router.include_router(exercises_router)
+api_router.include_router(exercise_creation_router)
 api_router.include_router(fragments_router)
 api_router.include_router(working_solution_router)
 api_router.include_router(logbook_router)

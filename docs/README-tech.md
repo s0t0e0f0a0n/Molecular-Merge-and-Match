@@ -35,6 +35,7 @@ Molecular Merge and Match
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── exercises.py         # GET /api/v1/exercises/ and POST /api/v1/exercises
+│   │   │   ├── exercise_creation.py # Save and fetch NMRium exercise-creation drafts
 │   │   │   ├── fragments.py         # CRUD API for working fragments per exercise
 │   │   │   ├── health.py            # GET /api/v1/health
 │   │   │   ├── info.py              # GET /api/v1/info
@@ -77,6 +78,7 @@ Molecular Merge and Match
 │   ├── tests/
 │   │   ├── conftest.py              # TestClient fixture
 │   │   ├── test_exercises_api.py    # Exercises endpoint tests
+│   │   ├── test_exercise_creation_api.py # NMRium draft persistence tests
 │   │   ├── test_fragments_api.py    # Tests regarding to fragments, logbook and EP/BVA tests
 │   │   ├── test_health.py           # Health endpoint tests
 │   │   ├── test_logbook_api.py      # Logbook testing
@@ -244,7 +246,7 @@ Molecular Merge and Match
 │   ├── eslint.config.js             # ESLint v9 flat config (TypeScript + React rules)
 │   ├── index.html                   # html which is used during the built
 │   ├── NMRium.html                  # Standalone NMRium window (F2)
-│   ├── NMRiumF8.html                # Second standalone NMRium window (F8)
+│   ├── NMRiumF8.html                # F8 exercise authoring: NMRium draft then Ketcher
 │   ├── nginx.conf                   # nginx: SPA fallback + /api/ reverse-proxy to backend
 │   ├── package.json
 │   ├── package-lock.json
@@ -365,7 +367,7 @@ python -m pytest           # Pytest (runs from backend/ so app imports resolve c
 | Double bond configuration choice | Implemented | After merge, detects new stereogenic double bonds via a graph-level CIP-priority comparison (sphere-by-sphere expansion with multi-bond phantom atoms and ring-closure handling) and prompts the user to choose between the two possible geometric configurations (Option 1 / Option 2). Handles conjugated dienes by reusing shared slashes between adjacent stereo bonds. |
 | Send to fragments (unsolution) | Implemented | Send the working solution back to the fragment list, with option to keep or clear the solution |
 | Exercise/bundle/spectra API | Implemented | Create exercises, parse ACS NMR text, persist spectra files, store peaks |
-| Exercise creation (teacher) | Implemented | Frontend form supports single and bulk CSV exercise creation; bulk import maps `{N}_<label>.svg` files to additional spectra automatically |
+| Exercise creation (teacher) | Implemented | Frontend supports single and bulk CSV creation plus an F8 NMRium draft workflow that stores 1D peaks, multiplets with rounded integrals, carbon counts, peak-to-multiplet links, Bruker source metadata, a validated Ketcher structure (SMILES, InChI, and molfile), and page-three exercise assignment metadata (set, iterated name number, CAS lookup through PubChem, six tags, and spaced-repetition priority); the summary displays solvent per spectrum, a compact ppm/integral/multiplicity/coupling list, the InChI molecular formula, and an RDKit-rendered structure |
 | ZIP exercise import | Implemented | Bulk import via `.zip` containing a CSV manifest plus spectra folders; export is not implemented |
 | Additional spectra popup | Implemented | "Additional Spectra" button opens a modal with one tab per spectrum (IR, MS, …); supports Fit and Scroll (150% default zoom) view modes |
 | Atom count and DBE warning (fragments) | Implemented | From all linked fragments the SMILES are send to the backend when an extra fragment is linked or a fragment is no longer linked, where the atoms are counted and compared the the atoms in the molecule formula, H's are ignored. The DBE is calculated and compared with the student entered DBE. If there are too many H's of DBEs then the warning appears |

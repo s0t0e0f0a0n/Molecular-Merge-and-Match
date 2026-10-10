@@ -7,6 +7,7 @@ from app.db.models import (
     ExerciseAdditionalSpectrum,
     ExerciseC13Coupling,
     ExerciseC13Peak,
+    ExerciseCreationDraft,
     ExerciseH1Peak,
     Fragment,
     LogbookState,
@@ -26,6 +27,7 @@ def _ensure_tables_and_clean():
     init_db()
     db = SessionLocal()
     try:
+        db.query(ExerciseCreationDraft).delete()
         db.query(ExerciseAdditionalNuclei).delete()
         db.query(ExerciseC13Coupling).delete()
         db.query(ExerciseAdditionalSpectrum).delete()
