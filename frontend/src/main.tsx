@@ -12,7 +12,7 @@ window.addEventListener('keydown', (event) => {
   }
   if (window.location.protocol !== 'file:' && event.key === 'F8') {
     event.preventDefault();
-    window.open('/nmrglueGUI.html', 'nmrglue-test-bench');
+    window.open('/NMRiumF8.html', 'nmrium-f8');
   }
 });
 

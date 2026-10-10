@@ -7,8 +7,8 @@ const nodeNet = require('net');
 let backendProcess = null;
 let backendPort = 8000;
 let mainWindow = null;
-let nmrWindow = null;
 let nmriumWindow = null;
+let nmriumF8Window = null;
 let activeExerciseId = null;
 let mainWindowCloseAuthorized = false;
 let mainWindowCloseInProgress = false;
@@ -23,10 +23,6 @@ ipcMain.on('toggle-fullscreen', (event) => {
         const isFullScreen = win.isFullScreen();
         win.setFullScreen(!isFullScreen);
     }
-});
-
-ipcMain.on('open-nmr-preview', () => {
-    openNmrWindow();
 });
 
 ipcMain.on('set-active-exercise-id', (_event, exerciseId) => {
@@ -375,32 +371,29 @@ function openNmriumWindow() {
     nmriumWindow.loadFile(path.join(__dirname, 'frontend', 'dist', 'NMRium.html'));
 }
 
-function openNmrWindow() {
-    if (nmrWindow && !nmrWindow.isDestroyed()) {
-        nmrWindow.show();
-        nmrWindow.focus();
+function openNmriumF8Window() {
+    if (nmriumF8Window && !nmriumF8Window.isDestroyed()) {
+        nmriumF8Window.show();
+        nmriumF8Window.focus();
         return;
     }
 
-    nmrWindow = new BrowserWindow({
-        width: 1400,
-        height: 900,
-        minWidth: 900,
-        minHeight: 650,
-        title: 'nmrglue Test Bench',
+    nmriumF8Window = new BrowserWindow({
+        width: 1500,
+        height: 950,
+        title: 'NMRium (F8)',
         icon: path.join(__dirname, 'build-assets', 'context-icon.png'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
             nodeIntegration: false,
-            sandbox: true
-        }
+        },
     });
 
-    nmrWindow.on('closed', () => { nmrWindow = null; });
-    const nmrPath = path.join(__dirname, 'frontend', 'dist', 'nmrglueGUI.html');
-    nmrWindow.loadFile(nmrPath);
+    nmriumF8Window.on('closed', () => { nmriumF8Window = null; });
+    nmriumF8Window.loadFile(path.join(__dirname, 'frontend', 'dist', 'NMRiumF8.html'));
 }
+
 
 app.whenReady().then(async () => {
     try {
@@ -412,13 +405,13 @@ app.whenReady().then(async () => {
     setupUserData();
     startBackend();
     createWindow();
-    const nmrShortcut = process.platform === 'darwin' ? 'Command+F8' : 'F8';
-    if (!globalShortcut.register(nmrShortcut, openNmrWindow)) {
-        console.warn(`Could not register ${nmrShortcut} for the NMR test bench.`);
-    }
     const nmriumShortcut = process.platform === 'darwin' ? 'Command+F2' : 'F2';
     if (!globalShortcut.register(nmriumShortcut, openNmriumWindow)) {
         console.warn(`Could not register ${nmriumShortcut} for NMRium.`);
+    }
+    const nmriumF8Shortcut = process.platform === 'darwin' ? 'Command+F8' : 'F8';
+    if (!globalShortcut.register(nmriumF8Shortcut, openNmriumF8Window)) {
+        console.warn(`Could not register ${nmriumF8Shortcut} for NMRium.`);
     }
 });
 

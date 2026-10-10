@@ -7,7 +7,6 @@
 │   │   │   ├── health.py
 │   │   │   ├── info.py
 │   │   │   ├── logbook.py
-│   │   │   ├── nmr_preview.py
 │   │   │   ├── predefined_fragments.py
 │   │   │   ├── reset.py
 │   │   │   ├── router.py
@@ -212,8 +211,6 @@
 │   │   ├── App.tsx
 │   │   ├── index.css
 │   │   ├── main.tsx
-│   │   ├── nmrglueGUI.css
-│   │   ├── nmrglueGUI.tsx
 │   │   ├── panelStyles.css
 │   │   └── vite-env.d.ts
 │   ├── tests/
@@ -248,7 +245,6 @@
 │   ├── eslint.config.js
 │   ├── index.html
 │   ├── nginx.conf
-│   ├── nmrglueGUI.html
 │   ├── package.json
 │   ├── package-lock.json
 │   ├── README.md

@@ -39,7 +39,6 @@ Molecular Merge and Match
 │   │   │   ├── health.py            # GET /api/v1/health
 │   │   │   ├── info.py              # GET /api/v1/info
 │   │   │   ├── logbook.py           # GET/PUT/DELETE for logbook state
-│   │   │   ├── nmr_preview.py
 │   │   │   ├── predefined_fragments.py # CRUD API for predefined fragment library
 │   │   │   ├── reset.py             # POST to delete fragments, working solution, logbook with current exercise id.
 │   │   │   ├── router.py            # Aggregates all v1 routers under /api/v1
@@ -211,8 +210,6 @@ Molecular Merge and Match
 │   │   ├── App.tsx                  # Root component
 │   │   ├── index.css                # General style file
 │   │   ├── main.tsx                 # React entry point
-│   │   ├── nmrglueGUI.css
-│   │   ├── nmrglueGUI.tsx
 │   │   ├── panelStyles.css
 │   │   └── vite-env.d.ts            # TypeScript declarations for Vite-specific features
 │   ├── tests/
@@ -246,8 +243,9 @@ Molecular Merge and Match
 │   ├── Dockerfile                   # Multi-stage image: Node build → nginx serve
 │   ├── eslint.config.js             # ESLint v9 flat config (TypeScript + React rules)
 │   ├── index.html                   # html which is used during the built
+│   ├── NMRium.html                  # Standalone NMRium window (F2)
+│   ├── NMRiumF8.html                # Second standalone NMRium window (F8)
 │   ├── nginx.conf                   # nginx: SPA fallback + /api/ reverse-proxy to backend
-│   ├── nmrglueGUI.html
 │   ├── package.json
 │   ├── package-lock.json
 │   ├── README.md                     # Frontend README

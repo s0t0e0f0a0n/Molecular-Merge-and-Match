@@ -40,6 +40,7 @@ backend/req-local-dev.txt
 
 # Local docs
 docs/local/
+temp/
 
 # Packaging
 resources/bin/*
