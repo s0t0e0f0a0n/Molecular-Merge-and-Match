@@ -3,6 +3,8 @@ export type NMRiumDraftSpectrum = {
   dimension: number;
   nucleus: string | string[];
   info: Record<string, unknown>;
+  label?: string;
+  isPrimary?: boolean;
   peaks: unknown[];
   multiplets: unknown[];
   spectrometer: string | null;
@@ -23,7 +25,9 @@ export type NMRiumSvgExport = {
   file_name: string;
   url: string;
   selected: boolean;
+  dimension?: number;
   ppmRange: [number, number];
+  secondPpmRange?: [number, number];
   integralVerticalPosition: number;
 };
 
@@ -70,13 +74,51 @@ export class ExerciseCreationDraftError extends Error {
   }
 }
 
+function getErrorDetail(detail: unknown): string | undefined {
+  if (typeof detail === 'string' && detail.trim()) return detail.trim();
+  if (Array.isArray(detail)) {
+    const messages = detail.flatMap((item) => {
+      if (typeof item === 'string') return [item];
+      if (!item || typeof item !== 'object') return [];
+      const error = item as Record<string, unknown>;
+      const message =
+        typeof error.msg === 'string'
+          ? error.msg
+          : typeof error.message === 'string'
+            ? error.message
+            : undefined;
+      if (!message) return [];
+      const location = Array.isArray(error.loc)
+        ? error.loc.filter((part) => typeof part === 'string' || typeof part === 'number').join(' → ')
+        : '';
+      return [location ? `${location}: ${message}` : message];
+    });
+    if (messages.length > 0) return messages.join('; ');
+  }
+  if (detail && typeof detail === 'object') {
+    const error = detail as Record<string, unknown>;
+    for (const key of ['message', 'msg', 'error']) {
+      const message = getErrorDetail(error[key]);
+      if (message) return message;
+    }
+    try {
+      return JSON.stringify(detail);
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
 async function readDraftResponse(response: Response): Promise<ExerciseCreationDraft> {
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as
-      | { detail?: string }
+      | { detail?: unknown; message?: unknown }
       | null;
     throw new ExerciseCreationDraftError(
-      body?.detail ?? `Exercise draft request failed (${response.status}).`,
+      getErrorDetail(body?.detail) ??
+        getErrorDetail(body?.message) ??
+        `Exercise draft request failed (${response.status}).`,
       response.status,
     );
   }
@@ -134,10 +176,12 @@ export async function storeTemporaryNMRiumSvgs(
   });
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as
-      | { detail?: string }
+      | { detail?: unknown; message?: unknown }
       | null;
     throw new ExerciseCreationDraftError(
-      body?.detail ?? 'Could not store the temporary SVG exports.',
+      getErrorDetail(body?.detail) ??
+        getErrorDetail(body?.message) ??
+        `Could not store the temporary SVG exports (${response.status}).`,
       response.status,
     );
   }

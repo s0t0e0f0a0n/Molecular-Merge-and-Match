@@ -4,12 +4,12 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     Float,
     ForeignKey,
     Integer,
-    JSON,
     String,
     Text,
     func,

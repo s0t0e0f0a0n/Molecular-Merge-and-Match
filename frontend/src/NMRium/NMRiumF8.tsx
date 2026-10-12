@@ -1,4 +1,8 @@
-import { isSpectrum1D, isSpectrum2D } from '@zakodium/nmrium-core';
+import {
+  isSpectrum1D,
+  isSpectrum1DFt,
+  isSpectrum2D,
+} from '@zakodium/nmrium-core';
 import initNmriumCore from '@zakodium/nmrium-core-plugins';
 import { default1DApodization } from 'nmr-processing';
 import {
@@ -36,8 +40,13 @@ import { ExerciseCreationSummary } from './ExerciseCreationSummary';
 import { NMRiumSvgPreview } from './NMRiumSvgPreview';
 import {
   generateSpectrumSvg,
+  isMatchingTwoDimensionalTab,
+  toDescendingPpmRange,
   type GeneratedSpectrumSvg,
+  type SpectrumSvgOptions,
+  type TwoDimensionalContourOptions,
 } from './nmriumSvgExport';
+import { initializePrimarySpectrumSelections } from './spectrumMetadata';
 
 const DRAFT_ID_KEY = 'nmriumExerciseCreationDraftId';
 
@@ -49,7 +58,11 @@ type AutomationResult = {
 };
 
 type AutomationBridgeValue = {
-  register: (automation: (() => AutomationResult) | null) => void;
+  register: (
+    automation: (() => AutomationResult) | null,
+    deleteAllSpectra: (() => void) | null,
+    getSvgOptions: ((spectrumId: string) => SpectrumSvgOptions) | null,
+  ) => void;
 };
 
 const AutomationBridgeContext = createContext<AutomationBridgeValue | null>(null);
@@ -72,6 +85,44 @@ type NMRiumSource = {
     originalRelativePath?: string;
   }>;
 };
+
+type SvgSourceSpectrum = {
+  spectrum: unknown;
+  options: SpectrumSvgOptions;
+};
+
+function isContourItem(value: unknown): value is {
+  contourLevels: [number, number];
+  numberOfLayers: number;
+} {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Record<string, unknown>;
+  return (
+    Array.isArray(item.contourLevels) &&
+    item.contourLevels.length === 2 &&
+    item.contourLevels.every(
+      (level) => typeof level === 'number' && Number.isFinite(level),
+    ) &&
+    typeof item.numberOfLayers === 'number' &&
+    Number.isFinite(item.numberOfLayers)
+  );
+}
+
+function getContourOptions(
+  view: unknown,
+  spectrumId: string,
+): TwoDimensionalContourOptions | undefined {
+  if (!view || typeof view !== 'object') return undefined;
+  const levels = (view as Record<string, unknown>).spectraContourLevels;
+  if (!levels || typeof levels !== 'object') return undefined;
+  const spectrumLevels = (levels as Record<string, unknown>)[spectrumId];
+  if (!spectrumLevels || typeof spectrumLevels !== 'object') return undefined;
+  const record = spectrumLevels as Record<string, unknown>;
+  return {
+    ...(isContourItem(record.positive) ? { positive: record.positive } : {}),
+    ...(isContourItem(record.negative) ? { negative: record.negative } : {}),
+  };
+}
 
 function getSourcePaths(sources: unknown): string[] {
   if (!Array.isArray(sources)) return [];
@@ -221,13 +272,13 @@ function getNMRiumDraftData(
       ? Object.values(spectra)
       : [];
 
-  const oneDimensionalSpectra = values.filter((value): value is SpectrumRecord => {
+  const nmriumSpectra = values.filter((value): value is SpectrumRecord => {
     if (!value || typeof value !== 'object') return false;
     const spectrum = value as SpectrumRecord;
-    return spectrum.info?.dimension === 1;
+    return spectrum.info?.dimension === 1 || spectrum.info?.dimension === 2;
   });
 
-  const mappedSpectra: NMRiumDraftSpectrum[] = oneDimensionalSpectra.map(
+  const mappedSpectra: NMRiumDraftSpectrum[] = nmriumSpectra.map(
     (spectrum, index) => {
       const experiment =
         typeof spectrum.info?.experimentNumber === 'string' ||
@@ -242,18 +293,21 @@ function getNMRiumDraftData(
       );
       return {
         id: spectrum.id ?? `spectrum-${index + 1}`,
-        dimension: 1,
+        dimension: spectrum.info?.dimension ?? 1,
         nucleus: spectrum.info?.nucleus ?? 'Unknown',
         info: spectrum.info ?? {},
         solvent: getSpectrumSolvent(spectrum),
-        peaks: Array.isArray(spectrum.peaks?.values)
+        peaks: spectrum.info?.dimension === 1 && Array.isArray(spectrum.peaks?.values)
           ? spectrum.peaks.values
           : [],
-        multiplets: addRoundedIntegrals(
-          Array.isArray(spectrum.ranges?.values)
-            ? spectrum.ranges.values
+        multiplets:
+          spectrum.info?.dimension === 1
+            ? addRoundedIntegrals(
+                Array.isArray(spectrum.ranges?.values)
+                  ? spectrum.ranges.values
+                  : [],
+              )
             : [],
-        ),
         spectrometer: source.spectrometer,
         sourceSession: source.session,
         experimentNumber: source.experimentNumber,
@@ -277,6 +331,33 @@ function getNMRiumDraftData(
   };
 }
 
+function preserveDraftSpectrumEdits(
+  nextData: NMRiumDraftData,
+  previousData: NMRiumDraftData | undefined,
+): NMRiumDraftData {
+  const previousSpectra = new Map(
+    (previousData?.spectra ?? []).map((spectrum) => [spectrum.id, spectrum]),
+  );
+  const data: NMRiumDraftData = {
+    ...nextData,
+    spectra: nextData.spectra.map((spectrum) => {
+      const previous = previousSpectra.get(spectrum.id);
+      if (!previous) return spectrum;
+      return {
+        ...spectrum,
+        label: previous.label,
+        isPrimary: previous.isPrimary,
+        peaks: previous.peaks,
+        multiplets: previous.multiplets,
+      };
+    }),
+  };
+  return {
+    ...data,
+    spectra: initializePrimarySpectrumSelections(data.spectra),
+  };
+}
+
 function getSpectrumValues(spectra: unknown): unknown[] {
   return Array.isArray(spectra)
     ? spectra
@@ -293,10 +374,86 @@ function AutomationDispatchBridge() {
   const dispatchRef = useRef(dispatch);
   stateRef.current = state;
   dispatchRef.current = dispatch;
+  const viewportsRef = useRef(
+    new Map<string, { tab: string; xDomain: number[]; yDomain: number[] }>(),
+  );
+
+  // NMRium keeps one global viewport, so remember it for each 2D spectrum while it is shown.
+  useEffect(() => {
+    const { displayerMode, xDomain, yDomain, view } = state;
+    const tab = view.spectra.activeTab;
+    if (displayerMode !== '2D' || !tab || xDomain.length !== 2 || yDomain.length !== 2) {
+      return;
+    }
+    const viewport = { tab, xDomain: [...xDomain], yDomain: [...yDomain] };
+    viewportsRef.current.set(`tab:${tab}`, viewport);
+    const selection = view.spectra.activeSpectra[tab];
+    if (selection?.length === 1) {
+      viewportsRef.current.set(`id:${selection[0].id}`, viewport);
+    }
+  }, [state]);
 
   if (!bridge) {
     throw new Error('NMRium automation bridge is not available.');
   }
+
+  function getExportOptions(spectrumId: string): SpectrumSvgOptions {
+    const currentState = stateRef.current;
+    const spectrum = currentState.data.find((item) => item.id === spectrumId);
+    if (!spectrum || !isSpectrum2D(spectrum)) return {};
+
+    const nucleus = spectrum.info.nucleus ?? [];
+    const remembered =
+      viewportsRef.current.get(`id:${spectrumId}`) ??
+      [...viewportsRef.current.values()].find((item) =>
+        isMatchingTwoDimensionalTab(nucleus, item.tab),
+      );
+    const ppmRange = remembered
+      ? toDescendingPpmRange(remembered.xDomain)
+      : undefined;
+    const secondPpmRange = remembered
+      ? toDescendingPpmRange(remembered.yDomain)
+      : undefined;
+
+    function getTrace(nucleus: string) {
+      const selection = currentState.view.spectra.activeSpectra[nucleus];
+      const selectedTrace =
+        selection?.length === 1
+          ? currentState.data.find((item) => item.id === selection[0].id)
+          : undefined;
+      const visibleTraces = currentState.data.filter(
+        (item) =>
+          isSpectrum1DFt(item) &&
+          item.info.nucleus === nucleus &&
+          item.display.isVisible,
+      );
+      const trace =
+        selectedTrace ??
+        (visibleTraces.length === 1 ? visibleTraces[0] : undefined);
+      if (!isSpectrum1DFt(trace)) return undefined;
+      return {
+        x: Array.from(trace.data.x),
+        re: Array.from(trace.data.re),
+      };
+    }
+
+    const [xNucleus, yNucleus] = Array.isArray(spectrum.info.nucleus)
+      ? spectrum.info.nucleus
+      : [];
+    const topTrace = xNucleus ? getTrace(xNucleus) : undefined;
+    const leftTrace = yNucleus ? getTrace(yNucleus) : undefined;
+    return {
+      ppmRange,
+      secondPpmRange,
+      contourOptions: getContourOptions(currentState.view, spectrumId),
+      traces: {
+        ...(topTrace ? { top: topTrace } : {}),
+        ...(leftTrace ? { left: leftTrace } : {}),
+      },
+    };
+  }
+  const getExportOptionsRef = useRef(getExportOptions);
+  getExportOptionsRef.current = getExportOptions;
 
   useEffect(() => {
     bridge.register(() => {
@@ -526,9 +683,17 @@ function AutomationDispatchBridge() {
         phasedCount,
         skippedPhaseCount,
       };
-    });
+    }, () => {
+      const ids = stateRef.current.data.map((spectrum) => spectrum.id);
+      if (ids.length > 0) {
+        dispatchRef.current({
+          type: 'DELETE_SPECTRA',
+          payload: { ids },
+        });
+      }
+    }, (spectrumId) => getExportOptionsRef.current(spectrumId));
 
-    return () => bridge.register(null);
+    return () => bridge.register(null, null, null);
   }, [bridge]);
 
   return null;
@@ -546,10 +711,16 @@ const automationPlugin: NMRiumPlugin = {
 
 function NMRiumF8App() {
   const automationRef = useRef<(() => AutomationResult) | null>(null);
+  const deleteAllSpectraRef = useRef<(() => void) | null>(null);
+  const getSvgOptionsRef = useRef<
+    ((spectrumId: string) => SpectrumSvgOptions) | null
+  >(null);
   const bridge = useMemo<AutomationBridgeValue>(
     () => ({
-      register: (automation) => {
+      register: (automation, deleteAllSpectra, getSvgOptions) => {
         automationRef.current = automation;
+        deleteAllSpectraRef.current = deleteAllSpectra;
+        getSvgOptionsRef.current = getSvgOptions;
       },
     }),
     [],
@@ -558,11 +729,12 @@ function NMRiumF8App() {
     const nmriumCore = initNmriumCore();
     nmriumCore.registerPlugin(automationPlugin);
     return nmriumCore;
-  }, []);
+  }, []  );
   const [status, setStatus] = useState('');
-  const [spectra, setSpectra] = useState<unknown>([]);
-  const [sources, setSources] = useState<unknown>([]);
-  const [molecules, setMolecules] = useState<unknown>([]);
+  const [hasSpectra, setHasSpectra] = useState(false);
+  const spectraRef = useRef<unknown>([]);
+  const sourcesRef = useRef<unknown>([]);
+  const moleculesRef = useRef<unknown>([]);
   const [draft, setDraft] = useState<ExerciseCreationDraft | null>(null);
   const [step, setStep] = useState<
     'nmrium' | 'svg-preview' | 'ketcher' | 'summary'
@@ -570,12 +742,11 @@ function NMRiumF8App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [skippedTwoDimensionalCount, setSkippedTwoDimensionalCount] = useState(0);
   const [generatedSvgSpectra, setGeneratedSvgSpectra] = useState<
     GeneratedSpectrumSvg[]
   >([]);
   const [svgSourceSpectra, setSvgSourceSpectra] = useState<
-    Map<string, unknown>
+    Map<string, SvgSourceSpectrum>
   >(() => new Map());
 
   function runAutomaticFormatting() {
@@ -598,13 +769,16 @@ function NMRiumF8App() {
 
   const handleNMRiumChange = useCallback(
     (
-      state: { data: { spectra: unknown; sources?: unknown; molecules?: unknown } },
+      state: {
+        data: { spectra: unknown; sources?: unknown; molecules?: unknown };
+      },
       source: string,
     ) => {
       if (source === 'data') {
-        setSpectra(state.data.spectra);
-        setSources(state.data.sources ?? []);
-        setMolecules(state.data.molecules ?? []);
+        spectraRef.current = state.data.spectra;
+        sourcesRef.current = state.data.sources ?? [];
+        moleculesRef.current = state.data.molecules ?? [];
+        setHasSpectra(getSpectrumValues(state.data.spectra).length > 0);
       }
     },
     [],
@@ -615,7 +789,14 @@ function NMRiumF8App() {
     setError('');
     setNotice('');
     try {
-      const data = getNMRiumDraftData(spectra, sources, molecules);
+      const data = preserveDraftSpectrumEdits(
+        getNMRiumDraftData(
+          spectraRef.current,
+          sourcesRef.current,
+          moleculesRef.current,
+        ),
+        draft?.nmrium_data,
+      );
       const storedId = window.localStorage.getItem(DRAFT_ID_KEY);
       let savedDraft: ExerciseCreationDraft;
       if (storedId) {
@@ -649,27 +830,41 @@ function NMRiumF8App() {
     setError('');
     setNotice('');
     try {
-      const currentDraftData = getNMRiumDraftData(spectra, sources, molecules);
-      const spectraToExport = getSpectrumValues(spectra).filter((value) => {
+      const currentDraftData = preserveDraftSpectrumEdits(
+        getNMRiumDraftData(
+          spectraRef.current,
+          sourcesRef.current,
+          moleculesRef.current,
+        ),
+        draft?.nmrium_data,
+      );
+      const spectraToExport = getSpectrumValues(spectraRef.current).filter((value) => {
         if (!value || typeof value !== 'object') return false;
         const spectrum = value as SpectrumRecord;
-        return spectrum.info?.dimension === 1;
+        return spectrum.info?.dimension === 1 || spectrum.info?.dimension === 2;
       });
-      setSkippedTwoDimensionalCount(
-        getSpectrumValues(spectra).filter((value) => {
-          if (!value || typeof value !== 'object') return false;
-          return (value as SpectrumRecord).info?.dimension === 2;
-        }).length,
-      );
       if (spectraToExport.length === 0) {
-        throw new Error('Load at least one 1D spectrum before continuing.');
+        throw new Error('Load at least one NMR spectrum before continuing.');
       }
-      const generated = spectraToExport.map((spectrum) =>
-        generateSpectrumSvg(spectrum),
-      );
+      const generatedSources = spectraToExport.map((spectrum) => {
+        const spectrumId =
+          spectrum && typeof spectrum === 'object'
+            ? (spectrum as SpectrumRecord).id
+            : undefined;
+        const options = spectrumId
+          ? getSvgOptionsRef.current?.(spectrumId) ?? {}
+          : {};
+        return {
+          generated: generateSpectrumSvg(spectrum, options),
+          source: { spectrum, options },
+        };
+      });
+      const generated = generatedSources.map(({ generated: item }) => item);
       setGeneratedSvgSpectra(generated);
       setSvgSourceSpectra(
-        new Map(generated.map((item, index) => [item.id, spectraToExport[index]])),
+        new Map(
+          generatedSources.map(({ generated: item, source }) => [item.id, source]),
+        ),
       );
       const storedId = window.localStorage.getItem(DRAFT_ID_KEY);
       let savedDraft: ExerciseCreationDraft;
@@ -694,12 +889,21 @@ function NMRiumF8App() {
           svg_text: svgText,
         })),
       );
-      const svgExports: NMRiumSvgExport[] = storedExports.map((item, index) => ({
-        ...item,
-        selected: true,
-        ppmRange: generated[index].ppmRange,
-        integralVerticalPosition: generated[index].integralVerticalPosition,
-      }));
+      const generatedById = new Map(generated.map((item) => [item.id, item]));
+      const svgExports: NMRiumSvgExport[] = storedExports.map((item) => {
+        const generatedItem = generatedById.get(item.id);
+        if (!generatedItem) {
+          throw new Error(`The stored SVG "${item.file_name}" has no matching spectrum.`);
+        }
+        return {
+          ...item,
+          selected: true,
+          dimension: generatedItem.dimension,
+          ppmRange: generatedItem.ppmRange,
+          secondPpmRange: generatedItem.secondPpmRange,
+          integralVerticalPosition: generatedItem.integralVerticalPosition,
+        };
+      });
       savedDraft = await updateExerciseCreationDraft(savedDraft.id, {
         ...savedDraft.nmrium_data,
         svgExports,
@@ -738,6 +942,7 @@ function NMRiumF8App() {
     id: string,
     ppmRange: [number, number],
     integralVerticalPosition: number,
+    secondPpmRange?: [number, number],
   ) => {
     if (!draft) return;
     setBusy(true);
@@ -747,8 +952,10 @@ function NMRiumF8App() {
       if (!source) {
         throw new Error('The source spectrum is no longer available; regenerate exports from NMRium.');
       }
-      const regenerated = generateSpectrumSvg(source, {
+      const regenerated = generateSpectrumSvg(source.spectrum, {
+        ...source.options,
         ppmRange,
+        secondPpmRange,
         integralVerticalPosition,
       });
       const nextGenerated = generatedSvgSpectra.map((item) =>
@@ -764,12 +971,26 @@ function NMRiumF8App() {
         })),
       );
       const previousExports = draft.nmrium_data.svgExports ?? [];
-      const svgExports: NMRiumSvgExport[] = storedExports.map((item, index) => ({
-        ...item,
-        selected: previousExports[index]?.selected ?? true,
-        ppmRange: nextGenerated[index].ppmRange,
-        integralVerticalPosition: nextGenerated[index].integralVerticalPosition,
-      }));
+      const nextGeneratedById = new Map(
+        nextGenerated.map((item) => [item.id, item]),
+      );
+      const previousExportsById = new Map(
+        previousExports.map((item) => [item.id, item]),
+      );
+      const svgExports: NMRiumSvgExport[] = storedExports.map((item) => {
+        const generatedItem = nextGeneratedById.get(item.id);
+        if (!generatedItem) {
+          throw new Error(`The stored SVG "${item.file_name}" has no matching spectrum.`);
+        }
+        return {
+          ...item,
+          selected: previousExportsById.get(item.id)?.selected ?? true,
+          dimension: generatedItem.dimension,
+          ppmRange: generatedItem.ppmRange,
+          secondPpmRange: generatedItem.secondPpmRange,
+          integralVerticalPosition: generatedItem.integralVerticalPosition,
+        };
+      });
       const savedDraft = await updateExerciseCreationDraft(draft.id, {
         ...draft.nmrium_data,
         svgExports,
@@ -813,86 +1034,110 @@ function NMRiumF8App() {
     }
   };
 
-  if (step === 'svg-preview' && draft) {
-    return (
-      <NMRiumSvgPreview
-        data={draft.nmrium_data}
-        exports={draft.nmrium_data.svgExports ?? []}
-        skippedTwoDimensionalCount={skippedTwoDimensionalCount}
-        busy={busy}
-        error={error}
-        onBack={() => setStep('nmrium')}
-        onExportsChange={handleSvgExportsChange}
-        onUpdateSettings={handleSvgSettingsUpdate}
-        onDataChange={handlePeakMultipletChange}
-        onContinue={handleSvgPreviewContinue}
-      />
-    );
-  }
-
-  if (step === 'summary' && draft) {
-    return (
-      <ExerciseCreationSummary
-        data={draft.nmrium_data}
-        onPrevious={() => setStep('ketcher')}
-        onDataChange={handlePeakMultipletChange}
-      />
-    );
-  }
-
-  if (step === 'ketcher' && draft) {
-    return (
-      <ExerciseCreationStructureStep
-        data={draft.nmrium_data}
-        onPrevious={() =>
-          setStep(draft.nmrium_data.svgExports?.length ? 'svg-preview' : 'nmrium')
-        }
-        onNext={() => setStep('summary')}
-        onDataChange={handlePeakMultipletChange}
-      />
-    );
-  }
-
   return (
     <AutomationBridgeContext.Provider value={bridge}>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw' }}>
-        <div
-          role="toolbar"
-          aria-label="Exercise creation steps"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '8px 12px',
-            borderBottom: '1px solid #d8dee4',
-            background: '#f6f8fa',
-          }}
-        >
-          <button type="button" onClick={runAutomaticFormatting}>
-            Automatic formatting
-          </button>
-          <strong style={{ marginRight: 'auto' }}>Step 1: Prepare NMRium data</strong>
-          <button type="button" onClick={handleStore} disabled={busy}>
-            {busy ? 'Working…' : 'Store'}
-          </button>
-          <button type="button" onClick={handleNext} disabled={busy}>
-            Next
-          </button>
-          {notice && <span role="status" aria-live="polite">{notice}</span>}
-          {error && <span role="alert">{error}</span>}
-          {status && <span role="status" aria-live="polite">{status}</span>}
-        </div>
+      <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
         <div
           style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: step === 'nmrium' ? 1 : 0,
+            visibility: step === 'nmrium' ? 'visible' : 'hidden',
+            pointerEvents: step === 'nmrium' ? 'auto' : 'none',
             display: 'flex',
-            flex: 1,
+            flexDirection: 'column',
             height: '100%',
-            minHeight: 0,
             width: '100%',
           }}
         >
-          <NMRium core={core} onChange={handleNMRiumChange} />
+          <div
+            role="toolbar"
+            aria-label="Exercise creation steps"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 12px',
+              borderBottom: '1px solid #d8dee4',
+              background: '#f6f8fa',
+            }}
+          >
+            <button type="button" onClick={runAutomaticFormatting}>
+              Automatic formatting
+            </button>
+            <strong style={{ marginRight: 'auto' }}>Step 1: Prepare NMRium data</strong>
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  hasSpectra &&
+                  window.confirm('Delete all loaded spectra? This cannot be undone.')
+                ) {
+                  deleteAllSpectraRef.current?.();
+                }
+              }}
+              disabled={busy || !hasSpectra}
+            >
+              Delete all spectra
+            </button>
+            <button type="button" onClick={handleStore} disabled={busy}>
+              {busy ? 'Working…' : 'Store'}
+            </button>
+            <button type="button" onClick={handleNext} disabled={busy}>
+              Next
+            </button>
+            {notice && <span role="status" aria-live="polite">{notice}</span>}
+            {error && <span role="alert">{error}</span>}
+            {status && <span role="status" aria-live="polite">{status}</span>}
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              flex: 1,
+              height: '100%',
+              minHeight: 0,
+              width: '100%',
+            }}
+          >
+            <NMRium core={core} onChange={handleNMRiumChange} />
+          </div>
         </div>
+        {step === 'svg-preview' && draft && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
+            <NMRiumSvgPreview
+              data={draft.nmrium_data}
+              exports={draft.nmrium_data.svgExports ?? []}
+              busy={busy}
+              error={error}
+              onBack={() => setStep('nmrium')}
+              onExportsChange={handleSvgExportsChange}
+              onUpdateSettings={handleSvgSettingsUpdate}
+              onDataChange={handlePeakMultipletChange}
+              onContinue={handleSvgPreviewContinue}
+            />
+          </div>
+        )}
+        {step === 'summary' && draft && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
+            <ExerciseCreationSummary
+              data={draft.nmrium_data}
+              onPrevious={() => setStep('ketcher')}
+              onDataChange={handlePeakMultipletChange}
+            />
+          </div>
+        )}
+        {step === 'ketcher' && draft && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
+            <ExerciseCreationStructureStep
+              data={draft.nmrium_data}
+              onPrevious={() =>
+                setStep(draft.nmrium_data.svgExports?.length ? 'svg-preview' : 'nmrium')
+              }
+              onNext={() => setStep('summary')}
+              onDataChange={handlePeakMultipletChange}
+            />
+          </div>
+        )}
       </div>
     </AutomationBridgeContext.Provider>
   );

@@ -88,6 +88,10 @@ function isCarbon13(spectrum: NMRiumDraftSpectrum): boolean {
 }
 
 function getFrequency(spectrum: NMRiumDraftSpectrum): string {
+  const formatter = new Intl.NumberFormat('en-US', {
+    maximumSignificantDigits: 4,
+    minimumSignificantDigits: 4,
+  });
   const frequencyKeys = [
     'originFrequency',
     'baseFrequency',
@@ -98,11 +102,28 @@ function getFrequency(spectrum: NMRiumDraftSpectrum): string {
   ];
   for (const key of frequencyKeys) {
     const value = spectrum.info[key];
+    if (Array.isArray(value)) {
+      const formatted = value.flatMap((item) => {
+        if (typeof item === 'number' && Number.isFinite(item)) {
+          return [formatter.format(item)];
+        }
+        if (typeof item === 'string') {
+          const match = item.match(/-?\d+(?:\.\d+)?/);
+          return match ? [formatter.format(Number(match[0]))] : [];
+        }
+        return [];
+      });
+      if (formatted.length > 0) return `${formatted.join(' / ')} MHz`;
+    }
     if (typeof value === 'number' && Number.isFinite(value)) {
-      return `${value} MHz`;
+      return `${formatter.format(value)} MHz`;
     }
     if (typeof value === 'string' && value.trim()) {
-      return /mhz/i.test(value) ? value.trim() : `${value.trim()} MHz`;
+      const match = value.match(/-?\d+(?:\.\d+)?/);
+      if (!match) return value.trim();
+      const formatted = formatter.format(Number(match[0]));
+      const rest = value.slice(match[0].length).trim();
+      return `${formatted}${rest ? ` ${rest}` : /mhz/i.test(value) ? '' : ' MHz'}`;
     }
   }
   return '—';
@@ -119,6 +140,7 @@ export function ExerciseCreationDataConfirmation({
   const [carbonCountValues, setCarbonCountValues] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const spectra = data.spectra
+    .filter((spectrum) => spectrum.dimension === 1)
     .map((spectrum, index) => ({ spectrum, index }))
     .sort((left, right) => {
       const priority = (spectrum: NMRiumDraftSpectrum) => {
@@ -134,6 +156,7 @@ export function ExerciseCreationDataConfirmation({
       );
     })
     .map(({ spectrum }) => spectrum);
+
   async function savePeakChanges(
     spectrum: NMRiumDraftSpectrum,
     peakIndex: number,
@@ -174,7 +197,7 @@ export function ExerciseCreationDataConfirmation({
       <p>Review multiplets and picked peaks. Carbon counts and peak-to-multiplet links are editable.</p>
       {error && <p role="alert">{error}</p>}
       {spectra.length === 0 && (
-        <p>No one-dimensional spectra were saved.</p>
+        <p>No 1D spectra were saved.</p>
       )}
       {spectra.map((spectrum, spectrumIndex) => (
         <section
@@ -344,12 +367,13 @@ export function ExerciseCreationDataConfirmation({
                                         : '1')
                                     }
                                     disabled={savingPeakAssignment}
-                                    onChange={(event) =>
+                                    onChange={(event) => {
+                                      const value = event.currentTarget.value;
                                       setCarbonCountValues((values) => ({
                                         ...values,
-                                        [valueKey]: event.currentTarget.value,
-                                      }))
-                                    }
+                                        [valueKey]: value,
+                                      }));
+                                    }}
                                     onBlur={async (event) => {
                                       const rawValue = event.currentTarget.value;
                                       const carbonCount =
