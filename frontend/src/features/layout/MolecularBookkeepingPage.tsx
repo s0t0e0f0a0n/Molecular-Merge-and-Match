@@ -473,6 +473,7 @@ export function MolecularBookkeepingPage() {
 );
   const [exerciseSummaries, setExerciseSummaries] = useState<ExerciseSummary[]>([]);
   const [activeTags, setActiveTags] = useState<Tag[]>([]);
+  const [activeTagsLoaded, setActiveTagsLoaded] = useState(false);
   const [loadingExerciseSummaries, setLoadingExerciseSummaries] = useState(true);
   const [exerciseSummariesError, setExerciseSummariesError] = useState<string | null>(null);
 
@@ -482,6 +483,8 @@ export function MolecularBookkeepingPage() {
     } catch (error) {
       console.error('failed to load tags', error);
       setActiveTags([]);
+    } finally {
+      setActiveTagsLoaded(true);
     }
   }, []);
 
@@ -566,6 +569,12 @@ useEffect(() => {
 }, [selectedExerciseId]);
 
   const showCheatTags = cheating.showSecretTags;
+  const visibleExerciseTags = useMemo(
+    () => (selectedExercise?.tags ?? []).filter((tagName) => (
+      showCheatTags || activeTags.some((tag) => tag.tag_name === tagName && !tag.is_cheat)
+    )),
+    [activeTags, selectedExercise?.tags, showCheatTags],
+  );
   const loadSolventPreferences = useCallback(async () => {
     setSolventsLoading(true);
     try {
@@ -2071,7 +2080,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
               )}
             </div>
           )}
-          {showTags && selectedExercise && selectedExercise.tags.length > 0 && (
+          {showTags && activeTagsLoaded && visibleExerciseTags.length > 0 && (
             <div
               role="group"
               aria-label="Current exercise tags"
@@ -2083,12 +2092,12 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
                 flexShrink: 0,
               }}
             >
-              {Array.from({ length: Math.ceil(Math.min(selectedExercise.tags.length, 6) / 3) }, (_, row) => (
+              {Array.from({ length: Math.ceil(Math.min(visibleExerciseTags.length, 6) / 3) }, (_, row) => (
                 <div
                   key={row}
                   style={{ display: 'flex', alignItems: 'center', gap: 4 }}
                 >
-                  {selectedExercise.tags.slice(row * 3, row * 3 + 3).map((tag, index) => (
+                  {visibleExerciseTags.slice(row * 3, row * 3 + 3).map((tag, index) => (
                     <span
                       key={`${tag}-${row * 3 + index}`}
                       title={tag}
