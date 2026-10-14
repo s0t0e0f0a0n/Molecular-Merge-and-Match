@@ -570,9 +570,13 @@ useEffect(() => {
 
   const showCheatTags = cheating.showSecretTags;
   const visibleExerciseTags = useMemo(
-    () => (selectedExercise?.tags ?? []).filter((tagName) => (
-      showCheatTags || activeTags.some((tag) => tag.tag_name === tagName && !tag.is_cheat)
-    )),
+    () => (selectedExercise?.tags ?? []).filter((tagName) => {
+      if (showCheatTags) return true;
+      const matches = activeTags.filter(
+        (tag) => tag.tag_name.toLowerCase() === tagName.toLowerCase(),
+      );
+      return matches.length > 0 && matches.every((tag) => !tag.is_cheat);
+    }),
     [activeTags, selectedExercise?.tags, showCheatTags],
   );
   const loadSolventPreferences = useCallback(async () => {
@@ -2625,6 +2629,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         selectedExerciseId={selectedExerciseId}
         enableDelete={enableDelete}
         deleteProgression={cheating.isEnabled(10)}
+        showCheatTags={showCheatTags}
       />
       {/* Cis/trans stereo choice dialog */}
       {stereoDialogState && (

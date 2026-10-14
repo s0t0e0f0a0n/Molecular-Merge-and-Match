@@ -573,7 +573,9 @@ it('shows up to six current-exercise tags beside the cheats indicator when enabl
             cheats: '100000000000',
             show_tags: payload.show_tags ?? false,
           }
-        : [],
+        : url.includes('/api/v1/tags/')
+          ? tags.map((tag, id) => ({ id: id + 1, tag_name: tag, is_cheat: false }))
+          : [],
     } as Response;
   });
 

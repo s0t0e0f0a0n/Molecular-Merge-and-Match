@@ -20,6 +20,7 @@ type StatisticsPanelProps = {
   selectedExerciseId: number | null;
   enableDelete?: boolean;
   deleteProgression?: boolean;
+  showCheatTags?: boolean;
 };
 // tab 1 contains progression overview and graph.
 // tab 2 contains timing tables
@@ -1217,10 +1218,10 @@ function ExerciseSetProgression({ exerciseSummaries }: { exerciseSummaries: Exer
   );
 }
 
-function TagProgression({ exerciseSummaries, tags }: { exerciseSummaries: ExerciseSummary[]; tags: Tag[] }) {
+function TagProgression({ exerciseSummaries, tags, showCheatTags }: { exerciseSummaries: ExerciseSummary[]; tags: Tag[]; showCheatTags: boolean }) {
   const trackedExercises = exerciseSummaries.filter(isTrackedExerciseSet);
   const progressionTags = tags
-    .filter((tag) => tag.progression_use)
+    .filter((tag) => tag.progression_use && (showCheatTags || !tag.is_cheat))
     .sort((left, right) => left.tag_name.localeCompare(right.tag_name));
 
   return (
@@ -1242,7 +1243,7 @@ function TagProgression({ exerciseSummaries, tags }: { exerciseSummaries: Exerci
   );
 }
 
-function ProgressionTab({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
+function ProgressionTab({ exerciseSummaries, showCheatTags }: { exerciseSummaries: ExerciseSummary[]; showCheatTags: boolean }) {
   const [tags, setTags] = useState<Tag[]>([]);
   useEffect(() => {
     fetchTags().then(setTags).catch(() => setTags([]));
@@ -1260,7 +1261,7 @@ function ProgressionTab({ exerciseSummaries }: { exerciseSummaries: ExerciseSumm
             <ExerciseSetProgression exerciseSummaries={exerciseSummaries} />
           </div>
           <div className="statistics-progression-column">
-            <TagProgression exerciseSummaries={exerciseSummaries} tags={tags} />
+            <TagProgression exerciseSummaries={exerciseSummaries} tags={tags} showCheatTags={showCheatTags} />
           </div>
         </div>
       </div>
@@ -1270,7 +1271,7 @@ function ProgressionTab({ exerciseSummaries }: { exerciseSummaries: ExerciseSumm
 
 type ResetRowId = 'current' | 'set' | 'tag' | 'age' | 'difficulty' | 'all';
 
-function ResetTab({ exerciseSummaries, selectedExerciseId, enableDelete, deleteProgression }: { exerciseSummaries: ExerciseSummary[]; selectedExerciseId: number | null; enableDelete: boolean; deleteProgression: boolean }) {
+function ResetTab({ exerciseSummaries, selectedExerciseId, enableDelete, deleteProgression, showCheatTags }: { exerciseSummaries: ExerciseSummary[]; selectedExerciseId: number | null; enableDelete: boolean; deleteProgression: boolean; showCheatTags: boolean }) {
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedSet, setSelectedSet] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
@@ -1356,7 +1357,7 @@ function ResetTab({ exerciseSummaries, selectedExerciseId, enableDelete, deleteP
       <div className="statistics-reset-list">
         <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset current exercise</span>{scopeSelect('current', 'Reset level for current exercise')}{resetButton('current', selectedExerciseId === null ? [] : [selectedExerciseId])}</div>
         <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises from the <select className="statistics-reset-select" value={selectedSet} onChange={(event) => setSelectedSet(event.target.value)} aria-label="Exercise set"><option value="" disabled>Select exercise set</option>{exerciseSets.map((set) => <option key={set} value={set}>{set}</option>)}</select> exercise set</span>{scopeSelect('set', 'Reset level for exercise set')}{resetButton('set', exerciseSummaries.filter((exercise) => exercise.exercise_set?.trim() === selectedSet).map((exercise) => exercise.id))}</div>
-        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises with the <select className="statistics-reset-select" value={selectedTag} onChange={(event) => setSelectedTag(event.target.value)} aria-label="Tag"><option value="" disabled>Select tag</option>{tags.map((tag) => <option key={tag.id} value={tag.tag_name}>{tag.tag_name}</option>)}</select> tag</span>{scopeSelect('tag', 'Reset level for tag')}{resetButton('tag', exerciseSummaries.filter((exercise) => exercise.tags.includes(selectedTag)).map((exercise) => exercise.id))}</div>
+        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises with the <select className="statistics-reset-select" value={selectedTag} onChange={(event) => setSelectedTag(event.target.value)} aria-label="Tag"><option value="" disabled>Select tag</option>{tags.filter((tag) => showCheatTags || !tag.is_cheat).map((tag) => <option key={tag.id} value={tag.tag_name}>{tag.tag_name}</option>)}</select> tag</span>{scopeSelect('tag', 'Reset level for tag')}{resetButton('tag', exerciseSummaries.filter((exercise) => exercise.tags.includes(selectedTag)).map((exercise) => exercise.id))}</div>
         <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises between <input className="statistics-reset-number" type="number" min="0" aria-label="Youngest age in days" value={minimumAge} onChange={(event) => setMinimumAge(event.target.value)} /> and <input className="statistics-reset-number" type="number" min="0" aria-label="Oldest age in days" value={maximumAge} onChange={(event) => setMaximumAge(event.target.value)} /> days old</span>{scopeSelect('age', 'Reset level for age range')}{resetButton('age', idsForDateRange(Number(minimumAge) || 0, Number(maximumAge) || Number.POSITIVE_INFINITY))}</div>
         <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises with <select className="statistics-reset-select" value={selectedDifficulty} onChange={(event) => setSelectedDifficulty(event.target.value)} aria-label="Difficulty"><option value="" disabled>Select difficulty</option><option value="E">Easy</option><option value="M">Medium</option><option value="D">Hard</option></select> difficulty</span>{scopeSelect('difficulty', 'Reset level for difficulty')}{resetButton('difficulty', exerciseSummaries.filter((exercise) => exercise.difficulty?.startsWith(selectedDifficulty)).map((exercise) => exercise.id))}</div>
         <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset all exercises</span>{scopeSelect('all', 'Reset level for all exercises')}{resetButton('all', exerciseSummaries.map((exercise) => exercise.id))}</div>
@@ -1574,7 +1575,7 @@ function LevelAnalysisGraph({ exerciseSummaries }: { exerciseSummaries: Exercise
   );
 }
 
-export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedExerciseId, enableDelete = false, deleteProgression = false }: StatisticsPanelProps) {
+export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedExerciseId, enableDelete = false, deleteProgression = false, showCheatTags = false }: StatisticsPanelProps) {
   const [activeTab, setActiveTab] = useState<StatisticsTabId>('1');
 
   if (!isOpen) {
@@ -1611,7 +1612,7 @@ export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedEx
 
         <div className="settings-panel-content">
           <div className="settings-tab-content" id={`statisticstab-${activeTab}`}>
-            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><TimeDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><TimeOfDayDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '4' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><DueDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><SRReviewHistoryGraph /></div></div> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} enableDelete={enableDelete} deleteProgression={deleteProgression} /> : activeTab === '6' ? <TempTab exerciseSummaries={exerciseSummaries} /> : activeTab === '7' ? <MasteryListTab exerciseSummaries={exerciseSummaries} /> : activeTab === '8' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LevelAnalysisGraph exerciseSummaries={exerciseSummaries} /></div></div> : null}
+            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} showCheatTags={showCheatTags} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><TimeDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><TimeOfDayDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '4' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><DueDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><SRReviewHistoryGraph /></div></div> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} enableDelete={enableDelete} deleteProgression={deleteProgression} showCheatTags={showCheatTags} /> : activeTab === '6' ? <TempTab exerciseSummaries={exerciseSummaries} /> : activeTab === '7' ? <MasteryListTab exerciseSummaries={exerciseSummaries} /> : activeTab === '8' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LevelAnalysisGraph exerciseSummaries={exerciseSummaries} /></div></div> : null}
           </div>
         </div>
       </div>
