@@ -573,7 +573,9 @@ it('shows up to six current-exercise tags beside the cheats indicator when enabl
             cheats: '100000000000',
             show_tags: payload.show_tags ?? false,
           }
-        : [],
+        : url.includes('/api/v1/tags/')
+          ? tags.map((tag, id) => ({ id: id + 1, tag_name: tag, is_cheat: false }))
+          : [],
     } as Response;
   });
 
@@ -596,6 +598,49 @@ it('shows up to six current-exercise tags beside the cheats indicator when enabl
     screen.getByRole('button', { name: 'Cheats are enabled' }).compareDocumentPosition(tagGroup)
       & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
+});
+
+it('hides cheat tags unless cheat bit 9 is enabled', async () => {
+  const user = userEvent.setup();
+  vi.mocked(fetchExerciseDetail).mockResolvedValue({
+    ...mockExercise1,
+    tags: ['ordinary', 'secret'],
+  });
+  mockFetch.mockImplementation(async (url, init) => {
+    const payload = init?.method === 'PUT'
+      ? JSON.parse(String(init.body)) as Record<string, unknown>
+      : {};
+    return {
+      ok: true,
+      json: async () => url.includes('/api/v1/settings/')
+        ? {
+            cheats: typeof payload.cheats === 'string' ? payload.cheats : '100000000000',
+            show_tags: payload.show_tags ?? true,
+          }
+        : url.includes('/api/v1/tags/')
+          ? [
+              { id: 1, tag_name: 'ordinary', is_cheat: false },
+              { id: 2, tag_name: 'secret', is_cheat: true },
+            ]
+          : [],
+    } as Response;
+  });
+
+  renderPage();
+  const tagGroup = await screen.findByRole('group', { name: 'Current exercise tags' });
+  expect(tagGroup).toHaveTextContent('ordinary');
+  expect(tagGroup).not.toHaveTextContent('secret');
+
+  await user.click(await screen.findByRole('button', { name: 'Open settings' }));
+  await user.click(await screen.findByRole('button', { name: /^Cheats$/ }));
+  const showCheatTagsSwitch = document.querySelector<HTMLLabelElement>(
+    'label[for="setting-cheat-tags"]',
+  );
+  await user.click(showCheatTagsSwitch!);
+
+  await waitFor(() => {
+    expect(screen.getByRole('group', { name: 'Current exercise tags' })).toHaveTextContent('secret');
+  });
 });
 
 it('offers to switch modes when no SR exercises are currently due', async () => {

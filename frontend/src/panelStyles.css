@@ -1006,7 +1006,7 @@
 
 .statistics-contribution-grid {
     display: grid;
-    grid-template-columns: repeat(20, 10px);
+    grid-template-columns: repeat(25, 10px);
     grid-auto-rows: 10px;
     justify-content: space-between;
     gap: 3px 0;
