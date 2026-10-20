@@ -1,20 +1,18 @@
 #!/usr/bin/env sh
 
-# 1. CONTROLEER OF DIT HET HOOFDPROCES IS
-# Als er geen argumenten worden meegegeven, start het de twee aparte terminal-tabbladen
+# 1. check if this is the main process
 if [ -z "$1" ]; then
-    # Haal de huidige actieve shell van de gebruiker op (bijv. /bin/bash of /bin/zsh)
     CURRENT_SHELL="${SHELL:-/bin/sh}"
 
-    # Open het backend-tabblad in de huidige shell
+    # Open backend-tab in current shell
     gnome-terminal --tab --title="MMM - Backend" -- "$CURRENT_SHELL" -c "$0 run_backend; exec $CURRENT_SHELL"
     
-    # Open het frontend-tabblad in de huidige shell
+    # Open frontend-tab in current shell
     gnome-terminal --tab --title="MMM - Frontend" -- "$CURRENT_SHELL" -c "$0 run_frontend; exec $CURRENT_SHELL"
 
-    # Wacht 10 seconden totdat de processen (zoals Uvicorn) zijn opgestart
+    # Wait 10 seconds  until background process have started
     echo "Waiting for local servers to start..."
-    sleep 4
+    sleep 10
     
     # Start the browser (1. Edge -> 2. Falkon Flatpak -> 3. Standard browser)
     if command -v microsoft-edge >/dev/null 2>&1; then
@@ -30,7 +28,7 @@ if [ -z "$1" ]; then
 
 fi
 
-# 2. ROUTEER DE NIEUWE VENSTERS NAAR HUN CODE
+# 2. Route new commands to their windows
 case "$1" in
     run_backend)
         echo "========================================================="
@@ -39,7 +37,7 @@ case "$1" in
 
         echo "Initializing Python Virtual Environment"
 
-        # Maak poort 8000 vrij als er nog een oud proces op hangt
+        # Clear port 8000 if stale process is used
         fuser -k 8000/tcp >/dev/null 2>&1
         cd backend || exit 1
         
@@ -48,11 +46,9 @@ case "$1" in
             python -m venv venv
         fi
         
-        # Gebruik . in plaats van source (source is specifiek voor Bash/Zsh, . werkt in ELKE shell)
         . venv/bin/activate
         
-        # Controleer of fastapi is geïnstalleerd
-        # Wildcards (*) werken in POSIX-shells soms anders in IF-statements, daarom gebruiken we find of test
+        # Check if fastapi is installed
         if [ ! -d "venv/lib" ] || [ -z "$(find venv/lib -type d -name fastapi 2>/dev/null)" ]; then
             echo "Installing dependencies..."
             python -m pip install -r requirements.txt

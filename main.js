@@ -1,4 +1,4 @@
-const { app, BrowserWindow, protocol, net, ipcMain, globalShortcut, dialog } = require('electron');
+const { app, BrowserWindow, nativeImage, protocol, net, ipcMain, globalShortcut, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -102,9 +102,6 @@ function setupUserData() {
         // The data folder exists, but we must keep seed files up to date, without overwriting the user's custom app.db.
         const seedFiles = [
             'examples_seed.json',
-            'exercises_seed.json', //doesn't exist anymore?
-            'exercise_h1_peaks_seed.json', //doesn't exist anymore?
-            'exercise_c13_peaks_seed.json', //doesn't exist anymore?
             'predefined_fragments_seed.json',
             'preloaded_fragments_seed.json',
             'preloaded_solutions_seed.json',
@@ -141,7 +138,7 @@ function startBackend() {
                 if (process.env.SNAP || process.env.FLATPAK_ID) {
                     console.log("Running inside Snap/Flatpak sandbox, skipping chmod (read-only filesystem).");
                 } else {
-                    fs.chmodSync(backendPath, 511); // Veilig decimaal 511 voor Flatpak/macOS
+                    fs.chmodSync(backendPath, 511); // Safe decimal 511 for Flatpak/macOS
                     console.log("Successfully set 755 execution permissions on backend binary.");
                 }
             }
@@ -231,11 +228,25 @@ function setupApiProxy() {
 }
 
 function createWindow() {
+    let iconAsset;
+    // Linux doesn't scale the .png or .icns very well, unless using nativeImage to smooth rescale.
+    if (process.platform === 'linux') {
+        const rawIcon = nativeImage.createFromPath(path.join(__dirname, 'build-assets', 'icon.png'));
+        iconAsset = rawIcon.resize({ width: 64, height: 64, quality: 'good' });
+    }
+    // Windows shows the context icon somewhat smaller somehow, the cropped version looks best
+    else if (process.platform === 'win32') {
+        iconAsset = path.join(__dirname, 'build-assets', 'icon_crop.png');
+    }
+    else {
+        iconAsset = path.join(__dirname, 'build-assets', 'icon_mac.png');
+    }
+
     const win = new BrowserWindow({
         show: false,
         minWidth: 1280,
         minHeight: 660,
-        icon: path.join(__dirname, 'build-assets', 'icon.png'),
+        icon: iconAsset,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -350,7 +361,7 @@ function openNmrWindow() {
         minWidth: 900,
         minHeight: 650,
         title: 'nmrglue Test Bench',
-        icon: path.join(__dirname, 'build-assets', 'icon.png'),
+        icon: path.join(__dirname, 'build-assets', 'context-icon.png'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,

@@ -33,9 +33,9 @@ if [ ! -d "venv" ]; then
     python -m venv venv
 fi
 . venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
-pip install pyinstaller
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m pip install pyinstaller
 # Force a true fresh rebuild by wiping old PyInstaller cache
 echo "Purging old PyInstaller cache and build artifacts..."
 rm -rf build dist

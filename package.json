@@ -1,6 +1,6 @@
 {
   "name": "molecular-merge-and-match",
-  "version": "1.5.1",
+  "version": "1.5.4",
   "description": "Molecular Bookkeeping for Structural Analysis",
   "main": "main.js",
   "devDependencies": {
@@ -55,18 +55,18 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "${name}-Setup-${version}-x86_64.${ext}"
+      "artifactName": "${name}-Setup-${version}-${arch}.${ext}"
     },
 
     "portable": {
-      "artifactName": "${name}-Portable-${version}-x86_64.${ext}"
+      "artifactName": "${name}-Portable-${version}-${arch}.${ext}"
     },
     "mac": {
       "target": [
         "dmg"
       ],
       "artifactName": "${name}-Setup-${version}-${arch}.${ext}",
-      "icon": "build-assets/icon.icns",
+      "icon": "build-assets/icon_mac.icns",
       "category": "public.app-category.education"
     },
     "linux": {
@@ -77,20 +77,11 @@
         "pacman"
       ],
       "executableName": "molecularmergeandmatch",
-      "artifactName": "${name}-Setup-${version}-x86_64.${ext}",
-      "icon": "build-assets/icon.icns",
+      "artifactName": "${name}-Setup-${version}-${arch}.${ext}",
+      "icon": "build-assets/icon.png",
       "category": "Education",
       "synopsis": "Molecular Bookkeeping for Structural Analysis",
       "description": "An interactive NMR-based structure elucidation tool for university-level organic chemistry students..."
-    },
-    "snapcraft": {
-      "base": "core24",
-      "core24": {
-        "confinement": "strict",
-        "grade": "stable",
-        "extensions": ["gnome"],
-        "plugs": ["default", "opengl", "desktop", "desktop-legacy", "x11", "wayland"]
-      }
     },
     "flatpak": {
       "base": "org.electronjs.Electron2.BaseApp",
@@ -103,10 +94,8 @@
         "--share=ipc",
         "--socket=x11",
         "--socket=wayland",
-        "--socket=pulseaudio",
-        "--filesystem=host",
-        "--device=dri",
-        "--socket=system-bus"
+        "--filesystem=home",
+        "--device=dri"
       ]
     },
     "publish": {

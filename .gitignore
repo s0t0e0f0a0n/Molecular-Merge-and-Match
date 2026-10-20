@@ -7,7 +7,6 @@ venv/
 .idea
 .pytest_cache/
 .ruff_cache/
-backend/pytest.ini
 
 #VSCODE
 .vscode/
@@ -32,6 +31,7 @@ frontend/tsconfig.tsbuildinfo
 backend/data/app.db
 backend/data/test.db
 backend/data/uploads/
+backend/data/NMRiumtemp/*.svg
 
 backend/req-local-dev.txt
 
@@ -40,6 +40,8 @@ backend/req-local-dev.txt
 
 # Local docs
 docs/local/
+temp/
+.localfiles/
 
 # Packaging
 resources/bin/*
