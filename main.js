@@ -7,7 +7,6 @@ const nodeNet = require('net');
 let backendProcess = null;
 let backendPort = 8000;
 let mainWindow = null;
-let nmrWindow = null;
 let activeExerciseId = null;
 let mainWindowCloseAuthorized = false;
 let mainWindowCloseInProgress = false;
@@ -24,20 +23,10 @@ ipcMain.on('toggle-fullscreen', (event) => {
     }
 });
 
-ipcMain.on('open-nmr-preview', () => {
-    openNmrWindow();
-});
-
 ipcMain.on('set-active-exercise-id', (_event, exerciseId) => {
     activeExerciseId =
         Number.isSafeInteger(exerciseId) && exerciseId > 0 ? exerciseId : null;
 });
-
-// Controleer of de app binnen een Snap-omgeving draait
-if (process.platform === 'linux' && process.env.SNAP) {
-    app.commandLine.appendSwitch('no-sandbox');
-    app.commandLine.appendSwitch('disable-dev-shm-usage');
-}
 
 
 function getFreePort() {
@@ -348,32 +337,6 @@ async function flushActiveExerciseTimerBeforeClose(win) {
     mainWindowCloseInProgress = false;
 }
 
-function openNmrWindow() {
-    if (nmrWindow && !nmrWindow.isDestroyed()) {
-        nmrWindow.show();
-        nmrWindow.focus();
-        return;
-    }
-
-    nmrWindow = new BrowserWindow({
-        width: 1400,
-        height: 900,
-        minWidth: 900,
-        minHeight: 650,
-        title: 'nmrglue Test Bench',
-        icon: path.join(__dirname, 'build-assets', 'context-icon.png'),
-        webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
-            contextIsolation: true,
-            nodeIntegration: false,
-            sandbox: true
-        }
-    });
-
-    nmrWindow.on('closed', () => { nmrWindow = null; });
-    const nmrPath = path.join(__dirname, 'frontend', 'dist', 'nmrglueGUI.html');
-    nmrWindow.loadFile(nmrPath);
-}
 
 app.whenReady().then(async () => {
     try {
@@ -385,10 +348,6 @@ app.whenReady().then(async () => {
     setupUserData();
     startBackend();
     createWindow();
-    const nmrShortcut = process.platform === 'darwin' ? 'Command+F8' : 'F8';
-    if (!globalShortcut.register(nmrShortcut, openNmrWindow)) {
-        console.warn(`Could not register ${nmrShortcut} for the NMR test bench.`);
-    }
 });
 
 app.on('window-all-closed', () => {
