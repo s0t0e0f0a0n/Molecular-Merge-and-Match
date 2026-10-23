@@ -4,6 +4,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+# The default Node heap is too small for the Vite production build
+ENV NODE_OPTIONS=--max-old-space-size=4096
 # VITE_BASE_PATH=/ so the app is served from the root (no repo sub-path)
 RUN VITE_BASE_PATH=/ npm run build
 

@@ -1,6 +1,7 @@
-fastapi==0.115.6
-uvicorn[standard]==0.30.6
-pydantic-settings==2.6.1
-python-multipart==0.0.12
+fastapi==0.161.1
+uvicorn[standard]==0.54.0
+pydantic-settings==2.16.1
+python-multipart==0.0.32
 SQLAlchemy==2.0.36
 rdkit==2025.9.6
+psutil==7.2.2

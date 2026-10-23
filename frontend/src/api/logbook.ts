@@ -3,6 +3,7 @@ export type ApiLogbookState = {
   cursor: number;
   links_json: string;
   restarts?: string;
+  archived?: string | null;
   timer_checkpointed?: boolean;
 };
 
@@ -22,6 +23,14 @@ export async function fetchAllLogbooks(): Promise<Record<string, ApiLogbookState
     throw new Error(`Failed to load logbooks (${response.status})`);
   }
   return (await response.json()) as Record<string, ApiLogbookState>;
+}
+
+export async function fetchLogbookHistory(): Promise<Record<string, ApiLogbookState[]>> {
+  const response = await fetch('/api/v1/logbook/history');
+  if (!response.ok) {
+    throw new Error(`Failed to load logbook history (${response.status})`);
+  }
+  return (await response.json()) as Record<string, ApiLogbookState[]>;
 }
 
 export async function saveLogbook(

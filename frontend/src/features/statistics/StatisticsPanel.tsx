@@ -6,7 +6,7 @@ import {
   type ExerciseSummary,
   type StatisticsReviewDay,
 } from '../../api/exercises';
-import { fetchAllLogbooks, type ApiLogbookState } from '../../api/logbook';
+import { fetchLogbookHistory, type ApiLogbookState } from '../../api/logbook';
 import { resetExercises, type ResetLevel } from '../../api/reset';
 import { fetchTags, type Tag } from '../../api/tags';
 import '../../panelStyles.css';
@@ -319,9 +319,16 @@ function parseLogbookRestarts(value: unknown): Array<{ start: number; stop: numb
   }
 }
 
+function exerciseLogbooks(
+  logbooks: Record<string, ApiLogbookState[]>,
+  exercise: ExerciseSummary,
+): ApiLogbookState[] {
+  return [...(logbooks[String(exercise.id)] ?? []), ...(logbooks[`exercise-${exercise.id}`] ?? [])];
+}
+
 function buildLogbookDistribution(
   exerciseSummaries: ExerciseSummary[],
-  logbooks: Record<string, ApiLogbookState>,
+  logbooks: Record<string, ApiLogbookState[]>,
 ): LogbookDistributionBucket[] {
   const buckets = Array.from({ length: LOGBOOK_BIN_COUNT }, () => ({
     createFragment: 0,
@@ -331,15 +338,15 @@ function buildLogbookDistribution(
   }));
   const eventKinds = new Set(['create-fragment', 'link', 'merge-fragments', 'set-dbe']);
 
-  exerciseSummaries
-    .filter((exercise) => exercise.completed_at != null)
-    .forEach((exercise) => {
-      const startedAt = parseExerciseDate(exercise.started_at);
-      const completedAt = parseExerciseDate(exercise.completed_at);
-      if (!startedAt || !completedAt || completedAt <= startedAt) return;
+  exerciseSummaries.forEach((exercise) => {
+    const startedAt = parseExerciseDate(exercise.started_at);
+    const completedAt = parseExerciseDate(exercise.completed_at);
+    const hasCurrentRange = Boolean(startedAt && completedAt && completedAt > startedAt);
 
-      const logbook = logbooks[String(exercise.id)] ?? logbooks[`exercise-${exercise.id}`];
-      if (!logbook) return;
+    exerciseLogbooks(logbooks, exercise).forEach((logbook) => {
+      const isArchived = Boolean(logbook.archived);
+      // The active attempt counts once completed; archived attempts have their own timing.
+      if (!isArchived && !hasCurrentRange) return;
 
       let entries: Array<{ kind?: string; ts?: unknown }> = [];
       try {
@@ -351,7 +358,8 @@ function buildLogbookDistribution(
 
       const restarts = parseLogbookRestarts(logbook.restarts);
       const activeDuration = restarts.reduce((sum, interval) => sum + interval.stop - interval.start, 0);
-      const duration = completedAt.getTime() - startedAt.getTime();
+      if (isArchived && !(restarts.length > 0 && activeDuration > 0)) return;
+      const duration = hasCurrentRange ? completedAt!.getTime() - startedAt!.getTime() : 0;
       entries.forEach((entry) => {
         if (!eventKinds.has(entry.kind ?? '')) return;
         const timestamp = parseLogbookTimestamp(entry.ts);
@@ -366,8 +374,8 @@ function buildLogbookDistribution(
             }
             elapsedBeforeInterval += interval.stop - interval.start;
           }
-        } else if (timestamp >= startedAt.getTime() && timestamp <= completedAt.getTime()) {
-          normalizedPosition = (timestamp - startedAt.getTime()) / duration;
+        } else if (timestamp >= startedAt!.getTime() && timestamp <= completedAt!.getTime()) {
+          normalizedPosition = (timestamp - startedAt!.getTime()) / duration;
         }
         if (normalizedPosition === null) return;
         const bucket = buckets[Math.min(LOGBOOK_BIN_COUNT - 1, Math.floor(normalizedPosition * LOGBOOK_BIN_COUNT))];
@@ -377,18 +385,19 @@ function buildLogbookDistribution(
         if (entry.kind === 'set-dbe') bucket.dbe += 1;
       });
     });
+  });
 
   return buckets;
 }
 
 function LogbookDistributionGraph({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
-  const [logbooks, setLogbooks] = useState<Record<string, ApiLogbookState>>({});
+  const [logbooks, setLogbooks] = useState<Record<string, ApiLogbookState[]>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isCurrent = true;
     setIsLoading(true);
-    fetchAllLogbooks()
+    fetchLogbookHistory()
       .then((data) => {
         if (isCurrent) setLogbooks(data);
       })
@@ -899,14 +908,13 @@ const TIME_OF_DAY_BIN_COUNT = 96;
 
 function buildTimeOfDayDistribution(
   exerciseSummaries: ExerciseSummary[],
-  logbooks: Record<string, ApiLogbookState>,
+  logbooks: Record<string, ApiLogbookState[]>,
 ): Array<{ easy: number; medium: number; difficult: number }> {
   const buckets = Array.from({ length: TIME_OF_DAY_BIN_COUNT }, () => ({ easy: 0, medium: 0, difficult: 0 }));
   exerciseSummaries.forEach((exercise) => {
     const difficulty = exerciseDifficulty(exercise);
-    const logbook = logbooks[String(exercise.id)] ?? logbooks[`exercise-${exercise.id}`];
-    if (!difficulty || !logbook) return;
-    parseLogbookRestarts(logbook.restarts).forEach(({ start, stop }) => {
+    if (!difficulty) return;
+    exerciseLogbooks(logbooks, exercise).forEach((logbook) => parseLogbookRestarts(logbook.restarts).forEach(({ start, stop }) => {
       let cursor = start;
       while (cursor < stop) {
         const date = new Date(cursor);
@@ -916,7 +924,7 @@ function buildTimeOfDayDistribution(
         buckets[bin][difficulty] += (segmentEnd - cursor) / 1000;
         cursor = segmentEnd;
       }
-    });
+    }));
   });
   return buckets;
 }
@@ -927,11 +935,11 @@ function formatTimeOfDayBin(index: number): string {
 }
 
 function TimeOfDayDistributionGraph({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
-  const [logbooks, setLogbooks] = useState<Record<string, ApiLogbookState>>({});
+  const [logbooks, setLogbooks] = useState<Record<string, ApiLogbookState[]>>({});
 
   useEffect(() => {
     let isCurrent = true;
-    fetchAllLogbooks()
+    fetchLogbookHistory()
       .then((data) => {
         if (isCurrent) setLogbooks(data);
       })

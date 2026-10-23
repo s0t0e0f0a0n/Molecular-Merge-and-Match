@@ -25,41 +25,48 @@ class ResetExercisesRequest(BaseModel):
     level: Literal["logbook", "workspace", "completion", "progression", "exercise"]
 
 
+def reset_exercise_data(db, exercise_id: int, level: str) -> None:
+    keys = (str(exercise_id), f"exercise-{exercise_id}")
+    if level in {"logbook", "workspace", "completion"}:
+        # Keep the logbook data, but mark it as archived; the next write starts a new row.
+        db.query(LogbookState).filter(
+            LogbookState.exercise_id.in_(keys),
+            LogbookState.archived.is_(None),
+        ).update(
+            {LogbookState.archived: datetime.now()},
+            synchronize_session=False,
+        )
+    if level in {"progression", "exercise"}:
+        db.query(LogbookState).filter(LogbookState.exercise_id.in_(keys)).delete(synchronize_session=False)
+    if level in {"workspace", "completion", "progression", "exercise"}:
+        db.query(Fragment).filter(Fragment.exercise_id.in_(keys)).delete(synchronize_session=False)
+        db.query(WorkingSolution).filter(WorkingSolution.exercise_id.in_(keys)).delete(synchronize_session=False)
+    exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()
+    if level in {"completion", "progression", "exercise"} and exercise is not None:
+        exercise.completed = False
+    if level == "completion":
+        db.query(Statistics).filter(Statistics.exercise_id.in_(keys)).update(
+            {
+                Statistics.started_at: None,
+                Statistics.timer_total: 0,
+                Statistics.completed_at: None,
+            },
+            synchronize_session=False,
+        )
+    if level in {"progression", "exercise"}:
+        db.query(StatisticsReviewEvent).filter(
+            StatisticsReviewEvent.exercise_id.in_(keys)
+        ).delete(synchronize_session=False)
+        db.query(Statistics).filter(Statistics.exercise_id.in_(keys)).delete(synchronize_session=False)
+    if level == "exercise" and exercise is not None:
+        db.delete(exercise)
+
+
 @router.post("/reset-batch", status_code=204, response_model=None)
 def reset_exercises(body: ResetExercisesRequest) -> None:
     with get_db() as db:
         for exercise_id in set(body.exercise_ids):
-            keys = (str(exercise_id), f"exercise-{exercise_id}")
-            if body.level in {"logbook", "workspace", "completion"}:
-                # Keep the logbook data, but mark it as archived.
-                db.query(LogbookState).filter(LogbookState.exercise_id.in_(keys)).update(
-                    {LogbookState.archived: datetime.now()},
-                    synchronize_session=False,
-                )
-            if body.level in {"progression", "exercise"}:
-                db.query(LogbookState).filter(LogbookState.exercise_id.in_(keys)).delete(synchronize_session=False)
-            if body.level in {"workspace", "completion", "progression", "exercise"}:
-                db.query(Fragment).filter(Fragment.exercise_id.in_(keys)).delete(synchronize_session=False)
-                db.query(WorkingSolution).filter(WorkingSolution.exercise_id.in_(keys)).delete(synchronize_session=False)
-            exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()
-            if body.level in {"completion", "progression", "exercise"} and exercise is not None:
-                exercise.completed = False
-            if body.level == "completion":
-                db.query(Statistics).filter(Statistics.exercise_id.in_(keys)).update(
-                    {
-                        Statistics.started_at: None,
-                        Statistics.timer_total: 0,
-                        Statistics.completed_at: None,
-                    },
-                    synchronize_session=False,
-                )
-            if body.level in {"progression", "exercise"}:
-                db.query(StatisticsReviewEvent).filter(
-                    StatisticsReviewEvent.exercise_id.in_(keys)
-                ).delete(synchronize_session=False)
-                db.query(Statistics).filter(Statistics.exercise_id.in_(keys)).delete(synchronize_session=False)
-            if body.level == "exercise" and exercise is not None:
-                db.delete(exercise)
+            reset_exercise_data(db, exercise_id, body.level)
         if body.level == "exercise":
             db.flush()
             recount_exercise_usage(db)
@@ -78,6 +85,7 @@ def reset_exercise(exercise_id: str = Query(...)) -> None:
         ).delete(synchronize_session=False)
         logbook = db.query(LogbookState).filter(
             LogbookState.exercise_id == exercise_id,
+            LogbookState.archived.is_(None),
         ).first()
         if logbook is not None:
             logbook.entries_json = "[]"

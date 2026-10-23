@@ -1,17 +1,17 @@
 {
   "name": "molecular-merge-and-match",
-  "version": "1.5.6",
+  "version": "1.5.8",
   "description": "Molecular Bookkeeping for Structural Analysis",
   "main": "main.js",
   "devDependencies": {
-    "electron": "^41.6.1",
+    "electron": "41.6.1",
     "electron-builder": "26.14.0"
   },
   "scripts": {
     "clean:win": "if exist dist-electron rmdir /s /q dist-electron && if exist frontend\\dist rmdir /s /q frontend\\dist",
     "clean:unix": "rm -rf dist-electron frontend/dist",
     "clean": "npm run clean:win 2>nul || npm run clean:unix",
-    "dist": "electron-builder",
+    "dist": "electron-builder --publish never",
     "postinstall": "electron-builder install-app-deps"
   },
   "build": {
@@ -26,7 +26,7 @@
       "main.js",
       "preload.js",
       "frontend/dist/**/*",
-      "build-assets/*"
+      "build-assets/**/*"
     ],
     "extraResources": [
       {
@@ -49,7 +49,7 @@
         "nsis",
         "portable"
       ],
-      "icon": "build-assets/icon.png"
+      "icon": "build-assets/win/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -66,11 +66,12 @@
         "dmg"
       ],
       "artifactName": "${name}-Setup-${version}-${arch}.${ext}",
-      "icon": "build-assets/icon_mac.icns",
+      "icon": "build-assets/mac/icon_mac.icns",
       "category": "public.app-category.education"
     },
     "linux": {
       "target": [
+        "flatpak",
         "AppImage",
         "deb",
         "rpm",
@@ -78,23 +79,21 @@
       ],
       "executableName": "molecularmergeandmatch",
       "artifactName": "${name}-Setup-${version}-${arch}.${ext}",
-      "icon": "build-assets/icon.png",
+      "icon": "build-assets/icons/",
       "category": "Education",
       "synopsis": "Molecular Bookkeeping for Structural Analysis",
       "description": "An interactive NMR-based structure elucidation tool for university-level organic chemistry students..."
     },
     "flatpak": {
-      "base": "org.electronjs.Electron2.BaseApp",
-      "baseVersion": "24.08",
       "runtime": "org.freedesktop.Platform",
-      "runtimeVersion": "24.08",
+      "runtimeVersion": "25.08",
       "sdk": "org.freedesktop.Sdk",
       "finishArgs": [
         "--share=network",
         "--share=ipc",
         "--socket=x11",
         "--socket=wayland",
-        "--filesystem=home",
+        "--filesystem=xdg-documents",
         "--device=dri"
       ]
     },

@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-22.04]
+        os: [windows-latest, macos-latest, ubuntu-latest]
 
     steps:
       - name: Checkout code
@@ -92,7 +92,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.VERIFY_ACTIONS_RELEASE }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
-        # Passing --${{ matrix.arch }} forces electron-builder to strictly compile for the matrix host's architecture
         shell: bash
         run: npm run dist -- -p always
 

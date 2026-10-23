@@ -42,7 +42,6 @@ export default defineConfig(() => ({
       rollupOptions: {
         input: {
           main: 'index.html',
-          nmrglueGUI: 'nmrglueGUI.html',
         },
       },
       commonjsOptions: {

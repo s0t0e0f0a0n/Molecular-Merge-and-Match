@@ -1,8 +1,20 @@
 #!/bin/bash
 set -e # Exit immediately if any command fails
 
+case "$(uname -s)" in
+    Darwin) OS_NAME="macOS" ;;
+    Linux) OS_NAME="Linux" ;;
+    *) echo "Unsupported OS: $(uname -s). Use build.bat on Windows."; exit 1 ;;
+esac
+# Look for python first, then python3. If neither is found, exit with an error.
+PYTHON="$(command -v python || command -v python3)"
+if [ -z "$PYTHON" ]; then
+    echo "CRITICAL ERROR: Python 3 was not found on PATH."
+    exit 1
+fi
+
 echo "===================================================="
-echo "  [LINUX BUILD] Molecular Merge and Match"
+echo "  [$OS_NAME BUILD] Molecular Merge and Match"
 echo "===================================================="
 
 export PYTHONNOUSERSITE=1
@@ -30,18 +42,25 @@ echo "[2/4] Initializing Python Virtual Environment and PyInstaller..."
 cd backend
 if [ ! -d "venv" ]; then
     echo "Creating virtual environment..."
-    python -m venv venv
+    "$PYTHON" -m venv venv
 fi
 . venv/bin/activate
-python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-python -m pip install pyinstaller
+python -m pip install pyinstaller==6.22.3
 # Force a true fresh rebuild by wiping old PyInstaller cache
 echo "Purging old PyInstaller cache and build artifacts..."
 rm -rf build dist
-# structure containing the bare binary, avoiding accidental .app generation.
+echo "Purging local development app.db files..."
+rm -f backend/data/app.db
+rm -rf backend/data/uploads
+mkdir -p backend/data/uploads
 echo "Freezing fresh Python binary..."
-pyinstaller --noconsole --collect-all rdkit --collect-all fastapi --collect-all uvicorn --name molecular-backend main_electron.py
+# Only Linux hides the console; on a local build Intel macOS --noconsole would produce a faulty build.
+PYINSTALLER_ARGS=""
+if [ "$OS_NAME" = "Linux" ]; then
+    PYINSTALLER_ARGS="--noconsole"
+fi
+pyinstaller $PYINSTALLER_ARGS --collect-all rdkit --collect-all fastapi --collect-all uvicorn --name molecular-backend main_electron.py
 deactivate
 cd ..
 

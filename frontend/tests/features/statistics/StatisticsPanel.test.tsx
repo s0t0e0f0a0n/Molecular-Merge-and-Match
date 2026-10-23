@@ -3,14 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StatisticsPanel } from '../../../src/features/statistics/StatisticsPanel';
 import { resetExercises } from '../../../src/api/reset';
-import { fetchAllLogbooks } from '../../../src/api/logbook';
+import { fetchLogbookHistory } from '../../../src/api/logbook';
 
 vi.mock('../../../src/api/reset', () => ({
   resetExercises: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../../src/api/logbook', () => ({
-  fetchAllLogbooks: vi.fn().mockResolvedValue({}),
+  fetchLogbookHistory: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock('../../../src/api/tags', () => ({
@@ -247,8 +247,8 @@ describe('Exercise overview DBE input totals', () => {
 
 describe('Advanced logbook distribution', () => {
   it('normalizes event positions across active intervals and excludes multi-day pauses', async () => {
-    vi.mocked(fetchAllLogbooks).mockResolvedValue({
-      '71': {
+    vi.mocked(fetchLogbookHistory).mockResolvedValue({
+      '71': [{
         entries_json: JSON.stringify([
           { kind: 'link', ts: Date.parse('2026-08-01T00:00:30Z') },
           { kind: 'set-dbe', before: null, after: 2.5, ts: Date.parse('2026-08-01T00:00:30Z') },
@@ -260,7 +260,7 @@ describe('Advanced logbook distribution', () => {
           { start: '2026-08-01T00:00:00Z', stop: '2026-08-01T00:01:00Z' },
           { start: '2026-08-03T00:00:00Z', stop: '2026-08-03T00:01:00Z' },
         ]),
-      },
+      }],
     });
     const user = userEvent.setup();
     render(

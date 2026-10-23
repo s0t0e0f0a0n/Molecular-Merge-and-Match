@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Dict
 
 from fastapi import APIRouter, Query
@@ -27,6 +28,12 @@ class LogbookStateOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class LogbookHistoryOut(LogbookStateOut):
+    archived: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class LogbookStateSaveOut(LogbookStateOut):
     timer_checkpointed: bool = False
 
@@ -36,11 +43,21 @@ class LogbookStateSaveOut(LogbookStateOut):
 @router.get("/all", response_model=Dict[str, LogbookStateOut])
 def get_all_logbooks() -> dict[str, LogbookStateOut]:
     with get_db() as db:
-        rows = db.query(LogbookState).all()
+        rows = db.query(LogbookState).filter(LogbookState.archived.is_(None)).all()
         return {
             row.exercise_id: LogbookStateOut.model_validate(row)
             for row in rows
         }
+
+
+@router.get("/history", response_model=Dict[str, list[LogbookHistoryOut]])
+def get_logbook_history() -> dict[str, list[LogbookHistoryOut]]:
+    # Every attempt, archived ones included, for statistics.
+    with get_db() as db:
+        history: dict[str, list[LogbookHistoryOut]] = {}
+        for row in db.query(LogbookState).order_by(LogbookState.id).all():
+            history.setdefault(row.exercise_id, []).append(LogbookHistoryOut.model_validate(row))
+        return history
 
 
 @router.get("/", response_model=LogbookStateOut)
@@ -48,7 +65,10 @@ def get_logbook(exercise_id: str = Query(...)) -> LogbookStateOut:
     with get_db() as db:
         row = (
             db.query(LogbookState)
-            .filter(LogbookState.exercise_id == exercise_id)
+            .filter(
+                LogbookState.exercise_id == exercise_id,
+                LogbookState.archived.is_(None),
+            )
             .first()
         )
         if not row:
@@ -63,7 +83,10 @@ def set_logbook(
     with get_db() as db:
         row = (
             db.query(LogbookState)
-            .filter(LogbookState.exercise_id == exercise_id)
+            .filter(
+                LogbookState.exercise_id == exercise_id,
+                LogbookState.archived.is_(None),
+            )
             .first()
         )
         previous_entries_json = row.entries_json if row else "[]"
@@ -97,7 +120,8 @@ def clear_logbook(exercise_id: str = Query(...)) -> None:
     # After clearing, undo should not be able to bring deleted fragments back.
     with get_db() as db:
         row = db.query(LogbookState).filter(
-            LogbookState.exercise_id == exercise_id
+            LogbookState.exercise_id == exercise_id,
+            LogbookState.archived.is_(None),
         ).first()
         if row is not None:
             row.entries_json = "[]"

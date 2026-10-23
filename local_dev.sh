@@ -2,6 +2,16 @@
 
 # 1. check if this is the main process
 if [ -z "$1" ]; then
+    # macOS has no gnome-terminal: backend in the background, frontend in the foreground
+    if [ "$(uname)" = "Darwin" ]; then
+        "$0" run_backend &
+        BACKEND_PID=$!
+        trap 'kill $BACKEND_PID 2>/dev/null' EXIT INT TERM
+        (sleep 10; open http://localhost:5173) &
+        "$0" run_frontend
+        exit 0
+    fi
+
     CURRENT_SHELL="${SHELL:-/bin/sh}"
 
     # Open backend-tab in current shell
@@ -38,12 +48,13 @@ case "$1" in
         echo "Initializing Python Virtual Environment"
 
         # Clear port 8000 if stale process is used
-        fuser -k 8000/tcp >/dev/null 2>&1
+        STALE_PIDS=$(lsof -ti:8000 2>/dev/null)
+        [ -n "$STALE_PIDS" ] && kill $STALE_PIDS 2>/dev/null
         cd backend || exit 1
         
         if [ ! -d "venv" ]; then
             echo "Creating virtual environment..."
-            python -m venv venv
+            "$(command -v python || command -v python3)" -m venv venv
         fi
         
         . venv/bin/activate
@@ -51,14 +62,13 @@ case "$1" in
         # Check if fastapi is installed
         if [ ! -d "venv/lib" ] || [ -z "$(find venv/lib -type d -name fastapi 2>/dev/null)" ]; then
             echo "Installing dependencies..."
-            python -m pip install -r requirements.txt
-            python -m pip install -r requirements-dev.txt
-            python -m pip install tzdata pyinstaller fonttools brotli
+            python -m pip install -r requirements.txt -r requirements-dev.txt
+            python -m pip install pyinstaller==6.22.3
         fi
         echo ""
 
         echo "Initializing local backend"
-        uvicorn app.main:app --reload
+        exec uvicorn app.main:app --reload
         exit 0
         ;;
 

@@ -35,7 +35,7 @@ call venv\Scripts\activate
 if not exist venv\Lib\site-packages\fastapi (
     echo Installing dependencies...
     python -m pip install -r requirements.txt -r requirements-dev.txt
-    python -m pip install pyinstaller
+    python -m pip install pyinstaller==6.22.3
 )
 echo 
 

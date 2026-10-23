@@ -4,6 +4,8 @@ An interactive NMR-based structure elucidation tool for university-level organic
 
 Built for the Software Engineering course at Leiden University (2026).
 
+This is the developer documentation. For installing and using the app, see the [user README](../README.md).
+
 ## Tech Stack
 
 | Layer        | Technology                                                   |
@@ -35,11 +37,11 @@ Molecular Merge and Match
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── exercises.py         # GET /api/v1/exercises/ and POST /api/v1/exercises
+│   │   │   ├── exercise_creation.py # Save and fetch NMRium exercise-creation drafts
 │   │   │   ├── fragments.py         # CRUD API for working fragments per exercise
 │   │   │   ├── health.py            # GET /api/v1/health
 │   │   │   ├── info.py              # GET /api/v1/info
 │   │   │   ├── logbook.py           # GET/PUT/DELETE for logbook state
-│   │   │   ├── nmr_preview.py
 │   │   │   ├── predefined_fragments.py # CRUD API for predefined fragment library
 │   │   │   ├── reset.py             # POST to delete fragments, working solution, logbook with current exercise id.
 │   │   │   ├── router.py            # Aggregates all v1 routers under /api/v1
@@ -78,6 +80,7 @@ Molecular Merge and Match
 │   ├── tests/
 │   │   ├── conftest.py              # TestClient fixture
 │   │   ├── test_exercises_api.py    # Exercises endpoint tests
+│   │   ├── test_exercise_creation_api.py # NMRium draft persistence tests
 │   │   ├── test_fragments_api.py    # Tests regarding to fragments, logbook and EP/BVA tests
 │   │   ├── test_health.py           # Health endpoint tests
 │   │   ├── test_logbook_api.py      # Logbook testing
@@ -89,6 +92,7 @@ Molecular Merge and Match
 │   │   ├── test_tags_api.py
 │   │   └── test_warnings.py         # Tests on how SMILES are converted to atom count and DBE
 │   ├── Dockerfile                   # Container image for the backend
+│   ├── .dockerignore                # Keeps venv, caches and local databases out of the image
 │   ├── main_electron.py             # Build entry point for Python sidecar executable
 │   ├── pyproject.toml               # Ruff linter configuration
 │   ├── README.md                    # Backend readme
@@ -211,8 +215,6 @@ Molecular Merge and Match
 │   │   ├── App.tsx                  # Root component
 │   │   ├── index.css                # General style file
 │   │   ├── main.tsx                 # React entry point
-│   │   ├── nmrglueGUI.css
-│   │   ├── nmrglueGUI.tsx
 │   │   ├── panelStyles.css
 │   │   └── vite-env.d.ts            # TypeScript declarations for Vite-specific features
 │   ├── tests/
@@ -244,10 +246,12 @@ Molecular Merge and Match
 │   │       ├── stereoDetection.test.ts
 │   │       └── svgMergePointLocator.test.ts
 │   ├── Dockerfile                   # Multi-stage image: Node build → nginx serve
+│   ├── .dockerignore                # Keeps node_modules, dist and coverage out of the image
 │   ├── eslint.config.js             # ESLint v9 flat config (TypeScript + React rules)
 │   ├── index.html                   # html which is used during the built
+│   ├── NMRium.html                  # Standalone NMRium window (F2)
+│   ├── NMRiumF8.html                # F8 exercise authoring: NMRium draft then Ketcher
 │   ├── nginx.conf                   # nginx: SPA fallback + /api/ reverse-proxy to backend
-│   ├── nmrglueGUI.html
 │   ├── package.json
 │   ├── package-lock.json
 │   ├── README.md                     # Frontend README
@@ -255,15 +259,14 @@ Molecular Merge and Match
 │   ├── tsconfig.node.json
 │   └── vite.config.ts               # Build config + dev proxy + Node polyfills for Ketcher
 |
-├── build.bat
-├── build_mac.sh
-├── build.sh
+├── build.bat                        # Windows build (backend freeze, frontend build, Electron packaging)
+├── build.sh                         # macOS/Linux build (detects the OS)
 ├── docker-compose.yml               # One-command full-stack startup
 ├── .gitattributes
 ├── .gitignore
 ├── LICENSE                          # MIT License
-├── local_dev.bat
-├── local_dev.sh
+├── local_dev.bat                    # Windows: start backend and frontend for development
+├── local_dev.sh                     # macOS/Linux: start backend and frontend for development
 ├── main.js                          # Main entry point of Electron
 ├── package.json                     # Specifies Electron build configuration
 ├── preload.js                       # Preload script
@@ -328,6 +331,14 @@ The frontend runs at **http://localhost:5173**. The Vite dev server proxies all 
 
 Open http://localhost:5173 — the connectivity indicator in the header should show the backend as reachable.
 
+#### Shortcut: `local_dev.sh` / `local_dev.bat`
+
+These scripts create the venv and install dependencies when missing, then start both servers. On Linux they open two terminal tabs; on macOS the backend runs in the background and the frontend in the foreground (Ctrl+C stops both). Port 8000 is freed first if a stale process holds it.
+
+#### Building the desktop app
+
+`bash build.sh` (macOS/Linux, detects the OS) or `build.bat` (Windows). See [packaging.md](packaging.md) for the manual steps.
+
 ## Running Tests & Linters
 
 ### Frontend
@@ -367,7 +378,7 @@ python -m pytest           # Pytest (runs from backend/ so app imports resolve c
 | Double bond configuration choice | Implemented | After merge, detects new stereogenic double bonds via a graph-level CIP-priority comparison (sphere-by-sphere expansion with multi-bond phantom atoms and ring-closure handling) and prompts the user to choose between the two possible geometric configurations (Option 1 / Option 2). Handles conjugated dienes by reusing shared slashes between adjacent stereo bonds. |
 | Send to fragments (unsolution) | Implemented | Send the working solution back to the fragment list, with option to keep or clear the solution |
 | Exercise/bundle/spectra API | Implemented | Create exercises, parse ACS NMR text, persist spectra files, store peaks |
-| Exercise creation (teacher) | Implemented | Frontend form supports single and bulk CSV exercise creation; bulk import maps `{N}_<label>.svg` files to additional spectra automatically |
+| Exercise creation (teacher) | Implemented | Frontend supports single and bulk CSV creation plus an F8 NMRium draft workflow that stores 1D peaks, multiplets with rounded integrals, carbon counts, peak-to-multiplet links, Bruker source metadata, a validated Ketcher structure (SMILES, InChI, and molfile), and page-three exercise assignment metadata (set, iterated name number, CAS lookup through PubChem, six tags, and spaced-repetition priority); the summary displays solvent per spectrum, a compact ppm/integral/multiplicity/coupling list, the InChI molecular formula, and an RDKit-rendered structure |
 | ZIP exercise import | Implemented | Bulk import via `.zip` containing a CSV manifest plus spectra folders; export is not implemented |
 | Additional spectra popup | Implemented | "Additional Spectra" button opens a modal with one tab per spectrum (IR, MS, …); supports Fit and Scroll (150% default zoom) view modes |
 | Atom count and DBE warning (fragments) | Implemented | From all linked fragments the SMILES are send to the backend when an extra fragment is linked or a fragment is no longer linked, where the atoms are counted and compared the the atoms in the molecule formula, H's are ignored. The DBE is calculated and compared with the student entered DBE. If there are too many H's of DBEs then the warning appears |

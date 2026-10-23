@@ -1,11 +1,16 @@
-const { app, BrowserWindow, nativeImage, protocol, net, ipcMain, globalShortcut, dialog } = require('electron');
+const { app, BrowserWindow, nativeImage, protocol, net, ipcMain, dialog } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 const fs = require('fs');
 const nodeNet = require('net');
 
 let backendProcess = null;
-let backendPort = 8000;
+let backendPort = null;
+let backendReady = false;
+let backendExited = false;
+let backendStderrLines = [];
+let quitCleanupDone = false;
+const BACKEND_EXIT_TIMEOUT_MS = 5000;
 let mainWindow = null;
 let activeExerciseId = null;
 let mainWindowCloseAuthorized = false;
@@ -157,11 +162,41 @@ function startBackend() {
             throw new Error("Spawn failed to create process.");
         }
 
-        backendProcess.stdout.on('data', (data) => console.log(`Py: ${data}`));
-        backendProcess.stderr.on('data', (data) => console.error(`PyErr: ${data}`));
+        const markReadyIfStarted = (text) => {
+            if (text.includes('Application startup complete')) backendReady = true;
+        };
+        backendProcess.stdout.on('data', (data) => {
+            console.log(`Py: ${data}`);
+            markReadyIfStarted(String(data));
+        });
+        backendProcess.stderr.on('data', (data) => {
+            console.error(`PyErr: ${data}`);
+            const text = String(data);
+            markReadyIfStarted(text);
+            backendStderrLines.push(...text.split(/\r?\n/).filter(Boolean));
+            backendStderrLines = backendStderrLines.slice(-20);
+        });
 
         backendProcess.on('error', (err) => {
             console.error("Failed to start backend process:", err);
+            backendExited = true;
+            if (!quitCleanupDone) {
+                dialog.showErrorBox('Backend failed to start', String(err && err.message || err));
+                app.quit();
+            }
+        });
+
+        backendProcess.on('exit', (code, signal) => {
+            backendExited = true;
+            console.log(`Backend exited (code=${code}, signal=${signal})`);
+            if (!backendReady && !quitCleanupDone && code !== 0) {
+                const lastLines = backendStderrLines.join('\n') || '(no error output)';
+                dialog.showErrorBox(
+                    'Backend failed to start',
+                    `The backend exited before it was ready (code ${code ?? signal}).\n\n${lastLines}`
+                );
+                app.quit();
+            }
         });
 
     } catch (err) {
@@ -218,17 +253,17 @@ function setupApiProxy() {
 
 function createWindow() {
     let iconAsset;
-    // Linux doesn't scale the .png or .icns very well, unless using nativeImage to smooth rescale.
+    // Linux doesn't scale the .png or .icns very well, unless using nativeImage or selecting a dedicated size.
     if (process.platform === 'linux') {
-        const rawIcon = nativeImage.createFromPath(path.join(__dirname, 'build-assets', 'icon.png'));
-        iconAsset = rawIcon.resize({ width: 64, height: 64, quality: 'good' });
+        // const rawIcon = nativeImage.createFromPath(path.join(__dirname, 'build-assets', 'icons', 'icon.png'));
+        iconAsset = path.join(__dirname, 'build-assets', 'icons', '64x64.png');
     }
     // Windows shows the context icon somewhat smaller somehow, the cropped version looks best
     else if (process.platform === 'win32') {
-        iconAsset = path.join(__dirname, 'build-assets', 'icon_crop.png');
+        iconAsset = path.join(__dirname, 'build-assets', 'win', 'icon_crop.ico');
     }
     else {
-        iconAsset = path.join(__dirname, 'build-assets', 'icon_mac.png');
+        iconAsset = path.join(__dirname, 'build-assets', 'mac', 'icon_mac.icns');
     }
 
     const win = new BrowserWindow({
@@ -342,7 +377,10 @@ app.whenReady().then(async () => {
     try {
         backendPort = await getFreePort();
     } catch (err) {
-        console.warn("Could not find free port, falling back to 8000:", err);
+        console.error("Could not find a free port:", err);
+        dialog.showErrorBox('Cannot start backend', `No free network port could be found.\n\n${err && err.message || err}`);
+        app.quit();
+        return;
     }
     setupApiProxy();
     setupUserData();
@@ -354,17 +392,33 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('will-quit', () => {
-    globalShortcut.unregisterAll();
-  if (backendProcess) {
-    console.log("Killing backend process...");
+app.on('before-quit', (event) => {
+    if (quitCleanupDone) return;
+    quitCleanupDone = true;
+    if (!backendProcess || backendExited) return;
+
+    event.preventDefault();
+    console.log("Terminating backend process...");
+    let finished = false;
+    const finish = () => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        app.quit();
+    };
+    const timer = setTimeout(() => {
+        console.warn("Backend did not exit within timeout, quitting anyway.");
+        finish();
+    }, BACKEND_EXIT_TIMEOUT_MS);
+    backendProcess.once('exit', finish);
+
     if (process.platform === 'win32') {
-      const { exec } = require('child_process');
-      exec(`taskkill /pid ${backendProcess.pid} /T /F`);
+        execFile('taskkill', ['/pid', String(backendProcess.pid), '/T', '/F'], (err) => {
+            if (err) console.warn("taskkill failed:", err.message);
+        });
     } else {
-      backendProcess.kill('SIGTERM');
+        backendProcess.kill('SIGTERM');
     }
-  }
 });
 
 process.on('SIGINT', () => {

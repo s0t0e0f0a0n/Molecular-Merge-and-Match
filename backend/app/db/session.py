@@ -791,6 +791,40 @@ def _migrate_add_missing_columns() -> None:
             conn.execute(text("ALTER TABLE logbook_states ADD COLUMN archived DATETIME"))
             conn.commit()
 
+        # Archived rows share an exercise_id with the active one, so drop the UNIQUE constraint.
+        has_unique_exercise_id = any(
+            index[2] and [col[2] for col in conn.execute(text(f"PRAGMA index_info('{index[1]}')"))] == ["exercise_id"]
+            for index in list(conn.execute(text("PRAGMA index_list(logbook_states)")))
+        )
+        if has_unique_exercise_id:
+            conn.execute(text("ALTER TABLE logbook_states RENAME TO logbook_states_legacy"))
+            conn.execute(text("DROP INDEX IF EXISTS ix_logbook_states_exercise_id"))
+            conn.execute(text(
+                """
+                CREATE TABLE logbook_states (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    exercise_id VARCHAR(50) NOT NULL,
+                    entries_json TEXT NOT NULL,
+                    cursor INTEGER NOT NULL,
+                    links_json TEXT NOT NULL,
+                    restarts TEXT NOT NULL DEFAULT '[]',
+                    archived DATETIME,
+                    updated_at DATETIME NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+                )
+                """
+            ))
+            conn.execute(text(
+                """
+                INSERT INTO logbook_states
+                    (id, exercise_id, entries_json, cursor, links_json, restarts, archived, updated_at)
+                SELECT id, exercise_id, entries_json, cursor, links_json, restarts, archived, updated_at
+                FROM logbook_states_legacy
+                """
+            ))
+            conn.execute(text("DROP TABLE logbook_states_legacy"))
+            conn.execute(text("CREATE INDEX ix_logbook_states_exercise_id ON logbook_states (exercise_id)"))
+            conn.commit()
+
         # Update C13 peaks model for older database versions
         result_c13_peaks = conn.execute(text("PRAGMA table_info(exercise_c13_peaks)"))
         existing_c13_peaks = {row[1] for row in result_c13_peaks}
@@ -828,6 +862,7 @@ def _purge_soft_deleted_fragments() -> None:
 
 def _reopen_overdue_exercises_in_db(db: Session) -> None:
     """In SR mode, make selected exercises whose due_time has passed reviewable."""
+    from app.api.reset import reset_exercise_data
     from app.core.statistics_keys import statistics_exercise_id_keys
 
     settings_row = db.query(UserSettings).filter(UserSettings.name == "User").first()
@@ -843,11 +878,21 @@ def _reopen_overdue_exercises_in_db(db: Session) -> None:
         .all()
     )
     for exercise in overdue:
-        exercise.completed = False
         statistics_rows = db.query(Statistics).filter(
             Statistics.exercise_id.in_(statistics_exercise_id_keys(exercise.id))
         ).all()
+        # Only a completed exercise is being reopened; one already reopened keeps its work.
+        newly_reopened = bool(exercise.completed) or any(
+            row.completed_at is not None for row in statistics_rows
+        )
+        exercise.completed = False
+        if newly_reopened:
+            reset_exercise_data(db, exercise.id, "workspace")
         for row in statistics_rows:
+            if newly_reopened:
+                # A review is timed from zero, not added to the previous attempt.
+                row.timer_total = 0
+                row.started_at = None
             if row.completed_at is not None:
                 baseline_exists = (
                     db.query(StatisticsReviewEvent.id)

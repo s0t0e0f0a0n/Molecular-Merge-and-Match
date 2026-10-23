@@ -103,7 +103,10 @@ def _logbook_event_counts(db, exercise_id: int | str) -> tuple[int, int, int]:
     elif key.startswith("exercise-"):
         keys.append(key[len("exercise-"):])
 
-    row = db.query(LogbookState).filter(LogbookState.exercise_id.in_(keys)).first()
+    row = db.query(LogbookState).filter(
+        LogbookState.exercise_id.in_(keys),
+        LogbookState.archived.is_(None),
+    ).first()
     if row is None:
         return 0, 0, 0
 
@@ -144,7 +147,10 @@ def _find_or_create_logbook_state(db, exercise_id: int | str) -> LogbookState:
     for storage_key in keys:
         row = (
             db.query(LogbookState)
-            .filter(LogbookState.exercise_id == storage_key)
+            .filter(
+                LogbookState.exercise_id == storage_key,
+                LogbookState.archived.is_(None),
+            )
             .first()
         )
         if row is not None:
