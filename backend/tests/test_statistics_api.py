@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 
 from app.api.spacedrep import calculate_spaced_repetition_interval
 from app.api.statistics import (
@@ -11,6 +11,8 @@ from app.api.statistics import (
     mark_exercise_paused,
     mark_exercise_resumed,
 )
+from app.db import session as db_session
+from app.db.base import Base
 from app.db.models import (
     Exercise,
     LogbookState,
@@ -240,6 +242,89 @@ def test_review_event_status_column_migration_preserves_existing_values():
         assert "SR_status" not in columns
     finally:
         db.close()
+
+
+def test_statistics_type_migration_preserves_model_columns(tmp_path, monkeypatch):
+    migration_engine = create_engine(f"sqlite:///{tmp_path / 'migration.db'}")
+    try:
+        Base.metadata.create_all(bind=migration_engine)
+        with migration_engine.begin() as connection:
+            connection.execute(text("DROP TABLE statistics"))
+            connection.execute(
+                text(
+                    """
+                    CREATE TABLE statistics (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        exercise_id VARCHAR(50) NOT NULL,
+                        incorrect_count INTEGER NOT NULL DEFAULT 0,
+                        cheats_used INTEGER NOT NULL DEFAULT 0,
+                        cheats_off DATETIME,
+                        difficulty VARCHAR(10) NOT NULL DEFAULT 'O0',
+                        confidence INTEGER NOT NULL DEFAULT 0,
+                        merges_done INTEGER DEFAULT 0,
+                        matches_done INTEGER DEFAULT 0,
+                        fragments_drawn INTEGER DEFAULT 0,
+                        dbe_set INTEGER NOT NULL DEFAULT 0,
+                        start_counting DATETIME,
+                        stop_counting DATETIME,
+                        timer_total INTEGER NOT NULL DEFAULT 0,
+                        started_at DATETIME,
+                        completed_at DATETIME,
+                        paused_at DATETIME,
+                        pause_total INTEGER NOT NULL DEFAULT 0,
+                        due_time DATETIME
+                    )
+                    """
+                )
+            )
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO statistics (
+                        exercise_id, incorrect_count, cheats_used, cheats_off,
+                        difficulty, confidence, merges_done, matches_done,
+                        fragments_drawn, dbe_set, start_counting, stop_counting,
+                        timer_total, started_at, completed_at, paused_at,
+                        pause_total, due_time
+                    ) VALUES (
+                        'legacy-1', 4, 1010, '2026-10-01 09:00:00',
+                        'E2', 3, 2, 7, 9, 1, '2026-09-30 08:00:00',
+                        '2026-10-01 08:30:00', 130, '2026-09-30 08:00:00',
+                        '2026-10-01 08:30:00', '2026-10-01 08:15:00', 5,
+                        '2026-10-02 08:00:00'
+                    )
+                    """
+                )
+            )
+
+        monkeypatch.setattr(db_session, "engine", migration_engine)
+        db_session._migrate_add_missing_columns()
+
+        with migration_engine.connect() as connection:
+            migrated_columns = {
+                row[1]
+                for row in connection.execute(text("PRAGMA table_info(statistics)"))
+            }
+            assert set(Statistics.__table__.columns.keys()) <= migrated_columns
+
+            migrated = connection.execute(
+                text("SELECT * FROM statistics WHERE exercise_id = 'legacy-1'")
+            ).mappings().one()
+            assert migrated["cheats_used"] == "1010"
+            assert migrated["cheats_off"] == "2026-10-01 09:00:00"
+            assert migrated["paused_at"] == "2026-10-01 08:15:00"
+            assert migrated["pause_total"] == 5
+            assert migrated["SR_status"] == "new"
+            assert migrated["incorrect_count"] == 4
+            assert migrated["difficulty"] == "E2"
+            assert migrated["confidence"] == 3
+            assert migrated["merges_done"] == 2
+            assert migrated["matches_done"] == 7
+            assert migrated["fragments_drawn"] == 9
+            assert migrated["dbe_set"] == 1
+            assert migrated["mastery_index"] == pytest.approx(0.0)
+    finally:
+        migration_engine.dispose()
 
 
 def test_reopening_overdue_review_preserves_previous_completion_for_interval():

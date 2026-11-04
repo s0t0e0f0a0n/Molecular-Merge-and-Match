@@ -129,10 +129,62 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
 
   const [allHistories, setAllHistories] = useState<Record<string, ExerciseHistory>>({});
   const [isJumping, setIsJumping] = useState(false);
+  const [saveErrorExerciseKey, setSaveErrorExerciseKey] = useState<string | null>(null);
+  const [resetVersion, setResetVersion] = useState(0);
   const handlersRef = useRef<HistoryHandlers | null>(null);
   const applyingHistoryRef = useRef(false);
 
   const loadedRef = useRef<Set<string>>(new Set());
+  const dirtyRef = useRef<Set<string>>(new Set());
+  const saveTimersRef = useRef<Map<string, number>>(new Map());
+  const latestHistoriesRef = useRef(allHistories);
+  latestHistoriesRef.current = allHistories;
+
+  useEffect(() => {
+    const handleExerciseReset = (event: Event) => {
+      const detail = (event as CustomEvent<{ exerciseIds?: number[] }>).detail;
+      if (!Array.isArray(detail?.exerciseIds)) return;
+
+      const keys = detail.exerciseIds.flatMap((id) => [String(id), `exercise-${id}`]);
+      for (const key of keys) {
+        loadedRef.current.delete(key);
+        dirtyRef.current.delete(key);
+        const timer = saveTimersRef.current.get(key);
+        if (timer !== undefined) {
+          window.clearTimeout(timer);
+          saveTimersRef.current.delete(key);
+        }
+      }
+      const selectedKey = selectedExerciseIdRef.current === null
+        ? null
+        : `exercise-${selectedExerciseIdRef.current}`;
+      if (selectedKey && keys.includes(selectedKey)) {
+        setResetVersion((version) => version + 1);
+      }
+      setSaveErrorExerciseKey((current) => current && keys.includes(current) ? null : current);
+      setAllHistories((previous) => {
+        const next = { ...previous };
+        let changed = false;
+        for (const key of keys) {
+          if (Object.hasOwn(next, key)) {
+            delete next[key];
+            changed = true;
+          }
+        }
+        return changed ? next : previous;
+      });
+    };
+
+    window.addEventListener('exercise-reset', handleExerciseReset);
+    return () => window.removeEventListener('exercise-reset', handleExerciseReset);
+  }, []);
+
+  useEffect(() => () => {
+    for (const timer of saveTimersRef.current.values()) {
+      window.clearTimeout(timer);
+    }
+    saveTimersRef.current.clear();
+  }, []);
 
   // Load the logbook for the current exercise (once).
   useEffect(() => {
@@ -160,36 +212,47 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
       loadedRef.current.add(exerciseKey);
 
       // The entries that were typed during loading should be kept
-      setAllHistories((prev) => {
-        if (prev[exerciseKey] !== undefined) return prev;
-        return { ...prev, [exerciseKey]: next };
-      });
+      setAllHistories((prev) => prev[exerciseKey] !== undefined
+        ? { ...prev }
+        : { ...prev, [exerciseKey]: next });
     }).catch((err) => console.error('logbook load failed', err));
     return () => { cancelled = true; };
-  }, [exerciseKey]);
+  }, [exerciseKey, resetVersion]);
 
-  // Save very time the logbook changes
+  // Persist only histories changed by an explicit logbook operation.
   useEffect(() => {
-    const state = allHistories[exerciseKey];
-    if (!state || !loadedRef.current.has(exerciseKey)) return;
-    
-    // Saves should not be fired during undo/redo steps
     if (isJumping) return;
-    
-    const t = window.setTimeout(() => {
-      saveLogbook(exerciseKey, {
-        entries_json: JSON.stringify(state.entries),
-        cursor: state.cursor,
-        links_json: JSON.stringify(state.links),
-      }).then(async (savedState) => {
-        const exerciseId = Number(exerciseKey.replace(/^exercise-/, ''));
-        if (savedState.timer_checkpointed && exerciseId === selectedExerciseIdRef.current) {
-          setSelectedExerciseStatistics(await fetchExerciseStatistics(exerciseId));
-        }
-      }).catch((err) => console.error('logbook save failed', err));
-    }, SAVE_DEBOUNCE_MS);
-    return () => window.clearTimeout(t);
-  }, [allHistories, exerciseKey, isJumping, selectedExerciseId, setSelectedExerciseStatistics]);
+
+    for (const key of dirtyRef.current) {
+      if (!loadedRef.current.has(key) || !latestHistoriesRef.current[key] || saveTimersRef.current.has(key)) {
+        continue;
+      }
+      const timer = window.setTimeout(() => {
+        saveTimersRef.current.delete(key);
+        if (!dirtyRef.current.delete(key)) return;
+        const state = latestHistoriesRef.current[key];
+        if (!state) return;
+
+        saveLogbook(key, {
+          entries_json: JSON.stringify(state.entries),
+          cursor: state.cursor,
+          links_json: JSON.stringify(state.links),
+        }).then((savedState) => {
+          setSaveErrorExerciseKey((current) => current === key ? null : current);
+          const exerciseId = Number(key.replace(/^exercise-/, ''));
+          if (savedState.timer_checkpointed && exerciseId === selectedExerciseIdRef.current) {
+            fetchExerciseStatistics(exerciseId)
+              .then(setSelectedExerciseStatistics)
+              .catch((err) => console.error('logbook statistics refresh failed', err));
+          }
+        }, (err) => {
+          console.error('logbook save failed', err);
+          setSaveErrorExerciseKey(key);
+        });
+      }, SAVE_DEBOUNCE_MS);
+      saveTimersRef.current.set(key, timer);
+    }
+  }, [allHistories, isJumping, setSelectedExerciseStatistics]);
 
   const current = allHistories[exerciseKey] ?? emptyHistory;
 
@@ -201,6 +264,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
   (entry: EntryInput) => {
     if (applyingHistoryRef.current) return;
 
+    dirtyRef.current.add(exerciseKey);
     setAllHistories((prev) => {
         const prior = prev[exerciseKey] ?? emptyHistory;
         const truncated = prior.entries.slice(0, prior.cursor);
@@ -221,6 +285,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
 
   const setLinks = useCallback(
     (links: Link[]) => {
+      dirtyRef.current.add(exerciseKey);
       setAllHistories((prev) => {
         const prior = prev[exerciseKey] ?? emptyHistory;
         return { ...prev, [exerciseKey]: { ...prior, links } };
@@ -258,6 +323,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
 
           // Restore the links as well
           if (entry.removedLinks && entry.removedLinks.length > 0) {
+            dirtyRef.current.add(exerciseKey);
             setAllHistories((prev) => {
               const prior = prev[exerciseKey] ?? emptyHistory;
 
@@ -302,6 +368,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
       case 'merge-fragments': {
         await h.deleteFragment(entry.createdFragmentId);
 
+        dirtyRef.current.add(exerciseKey);
         setAllHistories((prev) => {
           const prior = prev[exerciseKey] ?? emptyHistory;
           return {
@@ -316,6 +383,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         return entry;
       }
       case 'link':
+        dirtyRef.current.add(exerciseKey);
         setAllHistories((prev) => {
           const prior = prev[exerciseKey] ?? emptyHistory;
           const links = prior.links.filter(
@@ -325,6 +393,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         });
         return entry;
       case 'unlink':
+        dirtyRef.current.add(exerciseKey);
         setAllHistories((prev) => {
           const prior = prev[exerciseKey] ?? emptyHistory;
           if (prior.links.some((l) => l.fragmentId === entry.fragmentId && l.peakId === entry.peakId)) {
@@ -335,6 +404,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         });
         return entry;
       case 'clear-links':
+        dirtyRef.current.add(exerciseKey);
         setAllHistories((prev) => {
           const prior = prev[exerciseKey] ?? emptyHistory;
           return { ...prev, [exerciseKey]: { ...prior, links: entry.before } };
@@ -360,6 +430,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
 
           const fragmentId = String(entry.fragmentId);
 
+          dirtyRef.current.add(exerciseKey);
           setAllHistories((prev) => {
             const prior = prev[exerciseKey] ?? emptyHistory;
 
@@ -393,6 +464,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
       case 'merge-fragments': {
         await h.restoreFragment(entry.createdFragmentId);
 
+        dirtyRef.current.add(exerciseKey);
         setAllHistories((prev) => {
           const prior = prev[exerciseKey] ?? emptyHistory;
           return {
@@ -407,6 +479,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         return entry;
       }
       case 'link':
+        dirtyRef.current.add(exerciseKey);
         setAllHistories((prev) => {
           const prior = prev[exerciseKey] ?? emptyHistory;
           if (prior.links.some((l) => l.fragmentId === entry.fragmentId && l.peakId === entry.peakId)) {
@@ -417,6 +490,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         });
         return entry;
       case 'unlink':
+        dirtyRef.current.add(exerciseKey);
         setAllHistories((prev) => {
           const prior = prev[exerciseKey] ?? emptyHistory;
           const links = prior.links.filter(
@@ -426,6 +500,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         });
         return entry;
       case 'clear-links':
+        dirtyRef.current.add(exerciseKey);
         setAllHistories((prev) => {
           const prior = prev[exerciseKey] ?? emptyHistory;
           return { ...prev, [exerciseKey]: { ...prior, links: [] } };
@@ -439,6 +514,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
     if (state.cursor === 0) return;
     const entry = state.entries[state.cursor - 1];
     const updated = await applyReverse(entry);
+    dirtyRef.current.add(exerciseKey);
     setAllHistories((prev) => {
       const prior = prev[exerciseKey] ?? emptyHistory;
       const entries = [...prior.entries];
@@ -452,6 +528,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
     if (state.cursor >= state.entries.length) return;
     const entry = state.entries[state.cursor];
     const updated = await applyForward(entry);
+    dirtyRef.current.add(exerciseKey);
     setAllHistories((prev) => {
       const prior = prev[exerciseKey] ?? emptyHistory;
       const entries = [...prior.entries];
@@ -488,6 +565,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         }
 
         // Update the cursor in the logbook's state.
+        dirtyRef.current.add(exerciseKey);
         setAllHistories((prev) => {
           const prior = prev[exerciseKey] ?? emptyHistory;
           return { ...prev, [exerciseKey]: { ...prior, cursor } };
@@ -545,7 +623,16 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
     [current, isJumping, record, setLinks, undo, redo, jumpTo, clearHistory, registerHandlers],
   );
 
-  return <HistoryContext.Provider value={value}>{children}</HistoryContext.Provider>;
+  return (
+    <HistoryContext.Provider value={value}>
+      {saveErrorExerciseKey === exerciseKey ? (
+        <div className="logbook-save-error" role="alert">
+          Logbook save failed. Your recent changes may not be saved.
+        </div>
+      ) : null}
+      {children}
+    </HistoryContext.Provider>
+  );
 }
 
 export function useHistory(): HistoryContextValue {

@@ -634,7 +634,12 @@ def _migrate_add_missing_columns() -> None:
         if "mastery_index" not in existing_statistics:
             conn.execute(text("ALTER TABLE statistics ADD COLUMN mastery_index FLOAT DEFAULT 0"))
             conn.commit()
-        elif next(row[2] for row in statistics_columns if row[1] == "cheats_used").upper() != "VARCHAR(15)":
+        cheats_used_column = next(
+            row
+            for row in conn.execute(text("PRAGMA table_info(statistics)"))
+            if row[1] == "cheats_used"
+        )
+        if cheats_used_column[2].upper() != "VARCHAR(15)":
             conn.execute(text("ALTER TABLE statistics RENAME TO statistics_legacy"))
             conn.execute(text(
                 """
@@ -643,11 +648,12 @@ def _migrate_add_missing_columns() -> None:
                     exercise_id VARCHAR(50) NOT NULL,
                     incorrect_count INTEGER NOT NULL DEFAULT 0,
                     cheats_used VARCHAR(15) NOT NULL DEFAULT '000000000000',
+                    cheats_off DATETIME,
                     difficulty VARCHAR(10) NOT NULL DEFAULT 'O0',
                     confidence INTEGER NOT NULL DEFAULT 0,
-                    merges_done INTEGER NOT NULL DEFAULT 0,
-                    matches_done INTEGER NOT NULL DEFAULT 0,
-                    fragments_drawn INTEGER NOT NULL DEFAULT 0,
+                    merges_done INTEGER DEFAULT 0,
+                    matches_done INTEGER DEFAULT 0,
+                    fragments_drawn INTEGER DEFAULT 0,
                     dbe_set INTEGER NOT NULL DEFAULT 0,
                     start_counting DATETIME,
                     stop_counting DATETIME,
@@ -655,18 +661,57 @@ def _migrate_add_missing_columns() -> None:
                     started_at DATETIME,
                     completed_at DATETIME,
                     mastery_index FLOAT DEFAULT 0,
+                    paused_at DATETIME,
+                    pause_total INTEGER NOT NULL DEFAULT 0,
+                    SR_status VARCHAR(20) NOT NULL DEFAULT 'new',
                     due_time DATETIME
                 )
                 """
             ))
+            legacy_statistics_columns = {
+                row[1]
+                for row in conn.execute(text("PRAGMA table_info(statistics_legacy)"))
+            }
+            statistics_copy_expressions = {
+                "cheats_used": "CAST(cheats_used AS TEXT)",
+                "dbe_set": "CASE WHEN dbe_set IS NULL THEN 0 ELSE 1 END",
+            }
+            statistics_copy_columns = [
+                column
+                for column in (
+                    "id",
+                    "exercise_id",
+                    "incorrect_count",
+                    "cheats_used",
+                    "cheats_off",
+                    "difficulty",
+                    "confidence",
+                    "merges_done",
+                    "matches_done",
+                    "fragments_drawn",
+                    "dbe_set",
+                    "start_counting",
+                    "stop_counting",
+                    "timer_total",
+                    "started_at",
+                    "completed_at",
+                    "mastery_index",
+                    "paused_at",
+                    "pause_total",
+                    "SR_status",
+                    "due_time",
+                )
+                if column in legacy_statistics_columns
+            ]
+            statistics_copy_select = [
+                statistics_copy_expressions.get(column, column)
+                for column in statistics_copy_columns
+            ]
             conn.execute(text(
-                """
+                f"""
                 INSERT INTO statistics
-                    (id, exercise_id, incorrect_count, cheats_used, difficulty, confidence, merges_done, matches_done, fragments_drawn, dbe_set, start_counting,
-                     stop_counting, timer_total, started_at, completed_at, mastery_index, due_time)
-                SELECT id, exercise_id, incorrect_count, CAST(cheats_used AS TEXT), difficulty, confidence, merges_done, matches_done, fragments_drawn,
-                       CASE WHEN dbe_set IS NULL THEN 0 ELSE 1 END, start_counting,
-                       stop_counting, timer_total, started_at, completed_at, mastery_index, due_time
+                    ({", ".join(statistics_copy_columns)})
+                SELECT {", ".join(statistics_copy_select)}
                 FROM statistics_legacy
                 """
             ))

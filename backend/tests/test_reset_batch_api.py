@@ -125,6 +125,22 @@ def test_reset_batch_escalation_levels(client, level):
         assert counts["statistics"] == 0
 
 
+def test_logbook_reset_batch_hides_archived_entries_from_get(client):
+    exercise_id = _seed_exercise()
+    response = client.post(
+        "/api/v1/exercises/reset-batch",
+        json={"exercise_ids": [exercise_id], "level": "logbook"},
+    )
+    assert response.status_code == 204
+
+    fetched = client.get(
+        "/api/v1/logbook/",
+        params={"exercise_id": f"exercise-{exercise_id}"},
+    )
+    assert fetched.status_code == 200
+    assert fetched.json() == {"entries_json": "[]", "cursor": 0, "links_json": "[]", "restarts": "[]"}
+
+
 def test_reset_batch_completion_clears_exercise_completion_without_deleting_statistics(client):
     exercise_id = _seed_exercise()
     response = client.post(

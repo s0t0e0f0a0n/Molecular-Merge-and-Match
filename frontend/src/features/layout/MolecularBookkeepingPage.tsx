@@ -596,22 +596,13 @@ useEffect(() => {
     void loadSolventPreferences();
   }, [loadSolventPreferences]);
     
-    useEffect(() => {
-      const handleExerciseReset = (event: Event) => {
-        const detail = (event as CustomEvent<{ level?: string }>).detail;
-        if (detail.level === 'exercise') void loadSolventPreferences();
-      };
-      window.addEventListener('exercise-reset', handleExerciseReset);
-      return () => window.removeEventListener('exercise-reset', handleExerciseReset);
-    }, [loadSolventPreferences]);
-
   useEffect(() => {
     const handleExerciseReset = (event: Event) => {
       const detail = (event as CustomEvent<{ exerciseIds?: number[]; level?: string }>).detail;
+      if (detail.level === 'exercise') void loadSolventPreferences();
       if (!selectedExerciseId || !detail.exerciseIds?.includes(selectedExerciseId) || !detail.level) return;
 
       void (async () => {
-        await history.clearHistory();
         if (detail.level !== 'logbook') await refetchFragments();
         if (detail.level !== 'logbook' && detail.level !== 'workspace') await refetchSolution();
         if (detail.level === 'completion' || detail.level === 'progression') {
@@ -632,7 +623,7 @@ useEffect(() => {
 
     window.addEventListener('exercise-reset', handleExerciseReset);
     return () => window.removeEventListener('exercise-reset', handleExerciseReset);
-  }, [clearSelectedExercise, exerciseSummaries, history, refetchFragments, refetchSolution, selectExerciseById, selectedExerciseId]);
+  }, [clearSelectedExercise, exerciseSummaries, loadSolventPreferences, refetchFragments, refetchSolution, selectExerciseById, selectedExerciseId]);
 
   const handleExercisesMutated = useCallback(async () => {
     await Promise.all([

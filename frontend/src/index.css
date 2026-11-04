@@ -43,6 +43,22 @@
 *::after {
   box-sizing: border-box;
 }
+
+.logbook-save-error {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  z-index: 11000;
+  max-width: calc(100vw - 24px);
+  transform: translateX(-50%);
+  border: 1px solid #b91c1c;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #7f1d1d;
+  padding: 10px 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
 /* also testing dark and light mode */
 :root {
   --font-ui: 'Ubuntu Sans', system-ui, sans-serif;

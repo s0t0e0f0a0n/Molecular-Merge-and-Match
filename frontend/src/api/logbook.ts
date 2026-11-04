@@ -43,7 +43,6 @@ export async function saveLogbook(
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      keepalive: true,
     },
   );
   if (!response.ok) {
