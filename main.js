@@ -329,7 +329,7 @@ async function flushActiveExerciseTimerBeforeClose(win) {
         try {
             const response = await net.fetch(
                 `http://127.0.0.1:${backendPort}/api/v1/statistics/stop?exercise_id=${encodeURIComponent(String(exerciseId))}`,
-                { method: 'POST', signal: controller.signal },
+                { method: 'POST', headers: { 'X-Requested-With': 'MMM' }, signal: controller.signal },
             );
             if (!response.ok) {
                 throw new Error(`Timer save failed (${response.status})`);

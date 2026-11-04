@@ -459,31 +459,45 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
   const [zoom, setZoom] = useState(1.2) // Multiplier for 'scroll' mode
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const [svgContent, setSvgContent] = useState<string>('')
+  const [svgError, setSvgError] = useState<Error | null>(null)
 
   useEffect(() => {
-  if (!src) {
+    const controller = new AbortController();
     setSvgContent('');
-    return;
-  }
+    setSvgError(null);
 
-  fetch(src)
-    .then((res) => res.text())
-    .then((text) => {
-      const processed = forceSvgFontFamily(
-        applySvgDisplaySettings(text, type, showSolventText, showExchangeText, showIntegralCurves),
-        {},
-      )
-        .replace(/<title[\s\S]*?<\/title>/gi, '')
-        .replace(/<desc[\s\S]*?<\/desc>/gi, '')
-        .replace(/<metadata[\s\S]*?<\/metadata>/gi, '')
-        .replace(/\s+title="[^"]*"/gi, '')
-        .replace(/\s+data-name="[^"]*"/gi, '')
-        .replace(/width="[^"]*"/, 'width="100%"')
-        .replace(/height="[^"]*"/, 'height="100%"')
-      setSvgContent(processed)
-    })
-    .catch((err) => console.error('Failed to load SVG', err))
-}, [src, type, showSolventText, showExchangeText, showIntegralCurves])
+    if (!src) {
+      return () => controller.abort();
+    }
+
+    fetch(src, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to load spectrum (${res.status})`);
+        return res.text();
+      })
+      .then((text) => {
+        if (controller.signal.aborted) return;
+        const processed = forceSvgFontFamily(
+          applySvgDisplaySettings(text, type, showSolventText, showExchangeText, showIntegralCurves),
+          {},
+        )
+          .replace(/<title[\s\S]*?<\/title>/gi, '')
+          .replace(/<desc[\s\S]*?<\/desc>/gi, '')
+          .replace(/<metadata[\s\S]*?<\/metadata>/gi, '')
+          .replace(/\s+title="[^"]*"/gi, '')
+          .replace(/\s+data-name="[^"]*"/gi, '')
+          .replace(/width="[^"]*"/, 'width="100%"')
+          .replace(/height="[^"]*"/, 'height="100%"')
+        setSvgContent(processed)
+      })
+      .catch((err) => {
+        if (controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) return;
+        setSvgError(err instanceof Error ? err : new Error(String(err)));
+        console.error('Failed to load SVG', err);
+      });
+
+    return () => controller.abort();
+  }, [src, type, showSolventText, showExchangeText, showIntegralCurves])
 
   const highlightWidthPPM = useMemo(() => {
     if (type === 'H') return 0.21; // was 0.18 ppm
@@ -624,6 +638,7 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
           borderBottomRightRadius: 12,
         }}
       >
+        {svgError && <div role="alert">Failed to load spectrum.</div>}
         <SpectrumCanvas
           viewMode={viewMode}
           zoom={zoom}

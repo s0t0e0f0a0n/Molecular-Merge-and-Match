@@ -1,11 +1,10 @@
 ## Molecular Merge & Match - Changelog
 
-Changes and additions since release version 1.0.0 are grouped by:
-1. Style/layout
-2. Features
-3. Smaller functionality updates
-3. Bugfixes
-4. Other
+Recent release entries are grouped by:
+1. Added
+2. Changed
+3. Fixed
+4. Security
 
 ### Versions in this document:  
 [v1.6.0](#v160)  
@@ -16,43 +15,40 @@ Changes and additions since release version 1.0.0 are grouped by:
 [v1.1.2](#feature-and-file-changes-in-version-112)  
 
 ## v1.6.0
-Reset logbooks now invalidate and reload cached histories, preventing stale entries from returning after a reset. Switching exercises or loading history no longer triggers an unnecessary save.
-Large logbook saves no longer use keepalive, avoiding Chromium's 64 KiB limit; failed saves now show a warning.
-Legacy database migration now preserves statistics columns and their data when converting `cheats_used` to text, preventing missing-column errors after an upgrade.
-Desktop builds now use restricted data-file permissions and exclude local databases and uploads; uploaded and rendered spectrum SVGs are sanitized.
-API requests are hardened against cross-site requests with trusted-host validation and a required custom header on non-GET API requests. Web deployments can configure trusted hosts with `ALLOWED_HOSTS`.
-Exercise uploads now limit SVG text to 5 MiB and base64 spectra to 10 MiB, and reject PNG/JPEG files whose signatures do not match their extensions.
+### Changed
+- Resetting a logbook now invalidates and reloads cached history, preventing stale entries from returning. Switching exercises or loading history no longer triggers an unnecessary save.
+- Large logbook saves no longer use `keepalive`, avoiding Chromium's 64 KiB request-body limit.
+
+### Fixed
+- Switching exercises no longer lets late fragment, working-solution, or spectrum responses overwrite the current exercise.
+- Legacy database migrations now preserve statistics columns and their data when converting `cheats_used` to text.
+- Failed logbook saves now display a warning.
+- Closing the app no longer shows a false "timer could not be saved" warning; the timer save on close now sends the required request header.
+
+### Security
+- Updated Ketcher to 3.16.2 (pinned) and DOMPurify to 3.4.17, resolving all known runtime dependency vulnerabilities. CI now audits runtime npm and Python dependencies.
+- Desktop builds now apply restricted permissions to data files and exclude local databases and uploads.
+- Uploaded and rendered spectrum SVGs are sanitized.
+- API requests are protected against cross-site requests through trusted-host validation and a required custom header on non-GET requests. Web deployments can configure trusted hosts with `ALLOWED_HOSTS`.
+- Exercise uploads limit SVG text to 5 MiB and base64-encoded spectra to 10 MiB. PNG and JPEG files whose signatures do not match their extensions are rejected.
 
 ## v1.5.0
-Changes since version 1.4.0
+### Added
+- Logbook states now record when an exercise is opened and closed, improving statistics for exercises worked on over multiple days.
+- DBE values are recorded in the logbook and statistics, and DBE statistics are shown in the statistics panel.
+- New settings and statistics have been added.
+- Spaced repetition has been implemented.
 
-Logbook states now store when the exercise was openend and closed. That way the statistics panel shows more accurately when an exercise was worked on over multiple days.
+### Changed
+- Tags now use a “show” option instead of “hide.”
+- Settings, Statistics, and Info panels have been updated.
+- Solvents are displayed in two centered columns, grouped by whether they are in use.
 
-DBE setting is logged in logbook and statistics. DBE statistics are included in the statistics panel. 
-
-Solvent and tag counting is restored.
-
-Solvents are displayed in two columns, seperated by if they are used or not and also centralized.
-
-Resetting workspace too harsh is fixed
-
-Logbook graph is fixed
-
-Tags included in statistics is fixed
-
-Changed tags from "hide" option, to "show" option.
-
-Exercisemenu now correctly handles deleting visually, the tags list is expanded equally and the annoying dynamic scrollbar and div change behaviour is fixed.
-
-Cheat tag behaviour is corrected.
-
-Settings, Statistics and Infopanel have been updated.
-
-New settings added.
-
-New statistics added.
-
-Space repetition implemented.
+### Fixed
+- Solvent and tag counts have been restored.
+- Workspace reset behavior, the logbook graph, and tag statistics have been fixed.
+- The exercise menu now displays deletions correctly, lays out the tag list evenly, and avoids disruptive scrollbar and layout changes.
+- Cheat-tag behavior has been corrected.
 
 ## v1.4.0
 Changes since version 1.3.0

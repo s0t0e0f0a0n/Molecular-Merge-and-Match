@@ -1,6 +1,6 @@
 {
   "name": "molecular-merge-and-match",
-  "version": "1.5.8",
+  "version": "1.5.10",
   "description": "Molecular Bookkeeping for Structural Analysis",
   "main": "main.js",
   "devDependencies": {
@@ -79,10 +79,7 @@
     "linux": {
       "target": [
         "flatpak",
-        "AppImage",
-        "deb",
-        "rpm",
-        "pacman"
+        "AppImage"
       ],
       "executableName": "molecularmergeandmatch",
       "artifactName": "${name}-Setup-${version}-${arch}.${ext}",
