@@ -30,7 +30,40 @@ export default defineConfig(() => ({
       },
     },
     optimizeDeps: {
-      include: ['ketcher-react', 'ketcher-standalone', 'raphael'],
+      include: [
+        'ketcher-react',
+        'ketcher-standalone',
+        'raphael',
+        'classnames',
+        'lodash/debounce.js',
+        'lodash/throttle.js',
+        'lodash/set.js',
+        'lodash/merge.js',
+        'lodash/mergeWith.js',
+        'lodash/has.js',
+        'lodash/cloneDeep.js',
+        'lodash/isEqual.js',
+        'lodash/map.js',
+        'lodash.escaperegexp',
+        'lodash.debounce',
+        '@emotion/react',
+        '@emotion/styled',
+        '@hookform/resolvers',
+        'dlv',
+        'eventemitter3',
+        'file-saver',
+        'immer',
+        'mf-parser',
+        'ml-tree-similarity',
+        'numeral',
+        'papaparse',
+        'react-dropzone',
+        'react-hook-form',
+        'react-icons',
+        'react-rnd',
+        'yup',
+      ],
+      exclude: ['nmrium'],
       esbuildOptions: {
         define: { global: 'globalThis' },
         plugins: [
@@ -42,6 +75,8 @@ export default defineConfig(() => ({
       rollupOptions: {
         input: {
           main: 'index.html',
+          NMRium: 'NMRium.html',
+          NMRiumF8: 'NMRiumF8.html',
         },
       },
       commonjsOptions: {
@@ -67,6 +102,10 @@ export default defineConfig(() => ({
         changeOrigin: true,
         },
         '/references': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        },
+        '/nmrium-temp': {
         target: 'http://localhost:8000',
         changeOrigin: true,
         },

@@ -15,7 +15,14 @@ Recent release entries are grouped by:
 [v1.1.2](#feature-and-file-changes-in-version-112)  
 
 ## v1.6.0
+### Added
+- NMRium integration, replacing the NMRGlue test bench. Press F2 (Command+F2 on macOS) to open the NMRium spectrum viewer in its own window.
+- Press F8 (Command+F8 on macOS) to open the NMRium exercise-creation workflow. Load a Bruker dataset, pick and process the spectra, and the workflow stores the 1D peaks, multiplets and integrals as a draft that is saved to the database and restored the next time you open it.
+- Spectra can be exported as SVG, previewed with an adjustable ppm range and integral position, and stored temporarily in the backend (`NMRiumtemp`) for use in the new exercise.
+- The workflow continues with a Ketcher structure step and a summary page, which looks up the CAS number through PubChem and renders the structure with RDKit.
+
 ### Changed
+- The NMRGlue test bench (nmrglue and matplotlib preview) has been removed; NMRium replaces it.
 - Resetting a logbook now invalidates and reloads cached history, preventing stale entries from returning. Switching exercises or loading history no longer triggers an unnecessary save.
 - Large logbook saves no longer use `keepalive`, avoiding Chromium's 64 KiB request-body limit.
 

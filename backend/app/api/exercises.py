@@ -33,8 +33,8 @@ from app.core.solvent_tokens import (
     extract_solvent_ids,
     resolve_solvent_tokens,
 )
-from app.core.svg_sanitize import sanitize_svg
 from app.core.statistics_keys import canonical_statistics_exercise_id, statistics_exercise_id_keys
+from app.core.svg_sanitize import sanitize_svg
 from app.core.tag_tokens import (
     apply_tag_count_delta as apply_tag_count_delta,
 )

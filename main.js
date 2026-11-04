@@ -12,6 +12,7 @@ let backendStderrLines = [];
 let quitCleanupDone = false;
 const BACKEND_EXIT_TIMEOUT_MS = 5000;
 let mainWindow = null;
+const nmriumWindows = { nmrium: null, nmriumF8: null };
 let activeExerciseId = null;
 let mainWindowCloseAuthorized = false;
 let mainWindowCloseInProgress = false;
@@ -294,6 +295,8 @@ function createWindow() {
         if (mainWindow === win) mainWindow = null;
     });
 
+    win.webContents.on('before-input-event', handleNmriumShortcut);
+
     win.once('ready-to-show', () => {
         win.maximize();
         win.show();
@@ -312,6 +315,44 @@ function createWindow() {
     const indexPath = path.join(__dirname, 'frontend', 'dist', 'index.html');
     console.log("Loading from:", indexPath);
     win.loadFile(indexPath);
+}
+
+function openNmriumWindow(key, title, htmlFile) {
+    const existing = nmriumWindows[key];
+    if (existing && !existing.isDestroyed()) {
+        existing.show();
+        existing.focus();
+        return;
+    }
+
+    const win = new BrowserWindow({
+        width: 1500,
+        height: 950,
+        title,
+        icon: path.join(__dirname, 'build-assets', 'icons', '64x64.png'),
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true
+        }
+    });
+    nmriumWindows[key] = win;
+    win.on('closed', () => {
+        if (nmriumWindows[key] === win) nmriumWindows[key] = null;
+    });
+    win.loadFile(path.join(__dirname, 'frontend', 'dist', htmlFile));
+}
+
+function handleNmriumShortcut(event, input) {
+    if (input.type !== 'keyDown') return;
+    if (input.key === 'F2') {
+        event.preventDefault();
+        openNmriumWindow('nmrium', 'NMRium', 'NMRium.html');
+    } else if (input.key === 'F8') {
+        event.preventDefault();
+        openNmriumWindow('nmriumF8', 'NMRium (F8)', 'NMRiumF8.html');
+    }
 }
 
 async function flushActiveExerciseTimerBeforeClose(win) {

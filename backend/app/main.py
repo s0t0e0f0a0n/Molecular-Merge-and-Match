@@ -9,6 +9,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from app.api.nmrium_svg_exports import SVG_TEMP_ROOT
 from app.api.router import api_router
 from app.core.config import settings
 from app.db.session import init_db
@@ -60,9 +61,11 @@ def create_app() -> FastAPI:
     Path("data/uploads").mkdir(parents=True, exist_ok=True)
     Path("data/examples").mkdir(parents=True, exist_ok=True)
     Path("data/references").mkdir(parents=True, exist_ok=True)
+    SVG_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
     app.mount("/uploads", StaticFiles(directory="data/uploads"), name="uploads")
     app.mount("/examples", StaticFiles(directory="data/examples"), name="examples")
     app.mount("/references", StaticFiles(directory="data/references"), name="references")
+    app.mount("/nmrium-temp", StaticFiles(directory=str(SVG_TEMP_ROOT)), name="nmrium-temp")
 
     return app
 

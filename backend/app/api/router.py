@@ -1,10 +1,12 @@
 from fastapi import APIRouter
 
+from app.api.exercise_creation import router as exercise_creation_router
 from app.api.exercises import router as exercises_router
 from app.api.fragments import router as fragments_router
 from app.api.health import router as health_router
 from app.api.info import router as info_router
 from app.api.logbook import router as logbook_router
+from app.api.nmrium_svg_exports import router as nmrium_svg_exports_router
 from app.api.predefined_fragments import router as predefined_fragments_router
 from app.api.reset import router as reset_router
 from app.api.settings import router as settings_router
@@ -30,3 +32,5 @@ api_router.include_router(settings_router)
 api_router.include_router(spacedrep_router)
 api_router.include_router(solvents_router)
 api_router.include_router(tags_router)
+api_router.include_router(exercise_creation_router)
+api_router.include_router(nmrium_svg_exports_router)
