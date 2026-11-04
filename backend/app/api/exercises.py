@@ -336,6 +336,7 @@ class ExerciseSummaryOut(BaseModel):
     matches_done: int | None = None
     dbe_set: int = 0
     has_saved_progress: bool = False
+    has_statistics: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -812,6 +813,7 @@ def _to_summary_response(
         matches_done=statistics.matches_done if statistics is not None else None,
         dbe_set=statistics.dbe_set if statistics is not None else 0,
         has_saved_progress=has_saved_progress,
+        has_statistics=statistics is not None,
     )
 
 

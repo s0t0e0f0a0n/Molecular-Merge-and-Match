@@ -860,14 +860,18 @@ def _purge_soft_deleted_fragments() -> None:
         db.close()
 
 
-def _reopen_overdue_exercises_in_db(db: Session) -> None:
-    """In SR mode, make selected exercises whose due_time has passed reviewable."""
+def _reopen_overdue_exercises_in_db(db: Session, require_sr_mode: bool = True) -> list[int]:
+    """Make selected exercises whose due_time has passed reviewable.
+
+    Normally this only runs in SR mode; a manual quick reset can skip that check.
+    Returns the ids of the overdue exercises.
+    """
     from app.api.reset import reset_exercise_data
     from app.core.statistics_keys import statistics_exercise_id_keys
 
     settings_row = db.query(UserSettings).filter(UserSettings.name == "User").first()
-    if settings_row is None or not settings_row.SR_mode:
-        return
+    if require_sr_mode and (settings_row is None or not settings_row.SR_mode):
+        return []
     overdue = (
         db.query(Exercise)
         .filter(
@@ -914,6 +918,7 @@ def _reopen_overdue_exercises_in_db(db: Session) -> None:
                         )
                     )
             row.completed_at = None
+    return [exercise.id for exercise in overdue]
 
 
 def _reopen_overdue_exercises_for_sr() -> None:

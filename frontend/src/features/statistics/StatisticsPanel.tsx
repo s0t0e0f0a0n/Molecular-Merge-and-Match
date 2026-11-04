@@ -1,17 +1,27 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { TagsIcon, TimeDistributionIcon, ResetIcon } from '../../components/PanelIcons';
 import {
+  fetchStatisticsBehaviorEvents,
   fetchStatisticsReviewHistory,
   type ExerciseSummary,
   type StatisticsReviewDay,
+  type StatisticsBehaviorEvent,
 } from '../../api/exercises';
 import { fetchLogbookHistory, type ApiLogbookState } from '../../api/logbook';
-import { resetExercises, type ResetLevel } from '../../api/reset';
+import { RadarChart } from './RadarChart';
+import {
+  generateGlobalProfile,
+  generateStudyStyleProfile,
+  MIN_STYLE_SESSIONS,
+  REVERSAL_ENTRY_KINDS,
+  selectSessions,
+  type ExerciseSession,
+} from './metaCognitive';
+import { resetDueExercises, resetExercises, type ResetLevel } from '../../api/reset';
 import { fetchTags, type Tag } from '../../api/tags';
 import '../../panelStyles.css';
 
-type StatisticsTabId = '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8';
+type StatisticsTabId = 'overview' | 'progression' | 'behaviour' | 'time' | 'levels' | 'mastery' | 'spaced' | 'reset';
 
 type StatisticsPanelProps = {
   isOpen: boolean;
@@ -22,30 +32,16 @@ type StatisticsPanelProps = {
   deleteProgression?: boolean;
   showCheatTags?: boolean;
 };
-// tab 1 contains progression overview and graph.
-// tab 2 contains timing tables
-// tab 3 contains timing graphs
-// tab 4 contains advanced statistics 
-// tab 5 conatins the reset functions
-// tab 6 contains temporary statistics
+// Tab order: overview, progression, behaviour, time, levels, mastery, spaced, reset
 const TABS: Array<{ id: StatisticsTabId; label: React.ReactNode }> = [
-  { id: '1', label: <>
-      <TagsIcon />&nbsp;<span>Progression</span></> },
-  { id: '2', label: <>
-      <TagsIcon />&nbsp;<span>Exercise overview</span></> },
-  { id: '3', label: <>
-
-      <TimeDistributionIcon />&nbsp;<span>Time distribution</span></> },
-  { id: '4', label: <>
-      <TagsIcon />&nbsp;<span>Advanced</span></> },
-  { id: '5', label: <>
-
-      <ResetIcon />&nbsp;<span>Reset</span></> },
-  { id: '7', label: <>
-      <TagsIcon />&nbsp;<span>Mastery List</span></> },
-  { id: '8', label: <>
-      <TimeDistributionIcon />&nbsp;<span>Level analysis</span></> },
-  { id: '6', label: 'Temp' },
+  { id: 'overview', label: 'Exercise overview' },
+  { id: 'progression', label: 'Progression' },
+  { id: 'behaviour', label: 'Study behaviour' },
+  { id: 'time', label: 'Time distribution' },
+  { id: 'levels', label: 'Level analysis' },
+  { id: 'mastery', label: 'Mastery List' },
+  { id: 'spaced', label: 'Spaced repetition' },
+  { id: 'reset', label: 'Reset' },
 ];
 
 const CONTRIBUTION_STATUSES = [
@@ -283,9 +279,12 @@ type LogbookDistributionBucket = {
   link: number;
   mergeFragments: number;
   dbe: number;
+  rest: number;
+  pause: number;
 };
 
 const LOGBOOK_BIN_COUNT = 20;
+const LOGBOOK_REST_THRESHOLD_MS = 30_000;
 
 function parseLogbookTimestamp(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -329,12 +328,15 @@ function exerciseLogbooks(
 function buildLogbookDistribution(
   exerciseSummaries: ExerciseSummary[],
   logbooks: Record<string, ApiLogbookState[]>,
+  onRest?: (exercise: ExerciseSummary, durationMs: number) => void,
 ): LogbookDistributionBucket[] {
   const buckets = Array.from({ length: LOGBOOK_BIN_COUNT }, () => ({
     createFragment: 0,
     link: 0,
     mergeFragments: 0,
     dbe: 0,
+    rest: 0,
+    pause: 0,
   }));
   const eventKinds = new Set(['create-fragment', 'link', 'merge-fragments', 'set-dbe']);
 
@@ -360,30 +362,59 @@ function buildLogbookDistribution(
       const activeDuration = restarts.reduce((sum, interval) => sum + interval.stop - interval.start, 0);
       if (isArchived && !(restarts.length > 0 && activeDuration > 0)) return;
       const duration = hasCurrentRange ? completedAt!.getTime() - startedAt!.getTime() : 0;
-      entries.forEach((entry) => {
-        if (!eventKinds.has(entry.kind ?? '')) return;
-        const timestamp = parseLogbookTimestamp(entry.ts);
-        if (timestamp === null) return;
-        let normalizedPosition: number | null = null;
+      // Elapsed active time (ms) at a timestamp, or null when outside the attempt.
+      const elapsedAt = (timestamp: number): number | null => {
         if (restarts.length > 0 && activeDuration > 0) {
           let elapsedBeforeInterval = 0;
           for (const interval of restarts) {
             if (timestamp >= interval.start && timestamp <= interval.stop) {
-              normalizedPosition = (elapsedBeforeInterval + timestamp - interval.start) / activeDuration;
-              break;
+              return elapsedBeforeInterval + timestamp - interval.start;
             }
             elapsedBeforeInterval += interval.stop - interval.start;
           }
-        } else if (timestamp >= startedAt!.getTime() && timestamp <= completedAt!.getTime()) {
-          normalizedPosition = (timestamp - startedAt!.getTime()) / duration;
+          return null;
         }
-        if (normalizedPosition === null) return;
-        const bucket = buckets[Math.min(LOGBOOK_BIN_COUNT - 1, Math.floor(normalizedPosition * LOGBOOK_BIN_COUNT))];
-        if (entry.kind === 'create-fragment') bucket.createFragment += 1;
-        if (entry.kind === 'link') bucket.link += 1;
-        if (entry.kind === 'merge-fragments') bucket.mergeFragments += 1;
-        if (entry.kind === 'set-dbe') bucket.dbe += 1;
+        if (timestamp >= startedAt!.getTime() && timestamp <= completedAt!.getTime()) return timestamp - startedAt!.getTime();
+        return null;
+      };
+      const totalDuration = restarts.length > 0 && activeDuration > 0 ? activeDuration : duration;
+      const addToBucket = (elapsed: number, kind: string) => {
+        const bucket = buckets[Math.min(LOGBOOK_BIN_COUNT - 1, Math.floor((elapsed / totalDuration) * LOGBOOK_BIN_COUNT))];
+        if (kind === 'create-fragment') bucket.createFragment += 1;
+        if (kind === 'link') bucket.link += 1;
+        if (kind === 'merge-fragments') bucket.mergeFragments += 1;
+        if (kind === 'set-dbe') bucket.dbe += 1;
+        if (kind === 'rest') bucket.rest += 1;
+        if (kind === 'pause') bucket.pause += 1;
+      };
+
+      const activity: number[] = [];
+      entries.forEach((entry) => {
+        const timestamp = parseLogbookTimestamp(entry.ts);
+        if (timestamp === null) return;
+        const elapsed = elapsedAt(timestamp);
+        if (elapsed === null) return;
+        activity.push(elapsed);
+        if (eventKinds.has(entry.kind ?? '')) addToBucket(elapsed, entry.kind ?? '');
       });
+
+      // Every stop of the timer except the final one (completion) is a pause.
+      if (restarts.length > 1) {
+        let elapsedBeforeInterval = 0;
+        restarts.slice(0, -1).forEach((interval) => {
+          elapsedBeforeInterval += interval.stop - interval.start;
+          addToBucket(Math.min(elapsedBeforeInterval, totalDuration - 1), 'pause');
+        });
+      }
+
+      // Each gap over 30 s between consecutive logbook entries is one rest, placed at the gap's midpoint.
+      activity.sort((left, right) => left - right);
+      for (let index = 1; index < activity.length; index += 1) {
+        if (activity[index] - activity[index - 1] > LOGBOOK_REST_THRESHOLD_MS) {
+          addToBucket((activity[index] + activity[index - 1]) / 2, 'rest');
+          onRest?.(exercise, activity[index] - activity[index - 1]);
+        }
+      }
     });
   });
 
@@ -417,7 +448,7 @@ function LogbookDistributionGraph({ exerciseSummaries }: { exerciseSummaries: Ex
   const buckets = buildLogbookDistribution(exerciseSummaries, logbooks);
   const maximumCount = Math.max(
     1,
-    ...buckets.map((bucket) => bucket.createFragment + bucket.link + bucket.mergeFragments + bucket.dbe),
+    ...buckets.map((bucket) => bucket.createFragment + bucket.link + bucket.mergeFragments + bucket.dbe + bucket.rest + bucket.pause),
   );
   const ticks = timelineTicks(maximumCount);
 
@@ -430,6 +461,8 @@ function LogbookDistributionGraph({ exerciseSummaries }: { exerciseSummaries: Ex
           <span className="statistics-timeline-legend-item"><span className="statistics-logbook-swatch is-link" aria-hidden="true" />Link</span>
           <span className="statistics-timeline-legend-item"><span className="statistics-logbook-swatch is-merge" aria-hidden="true" />Merge fragments</span>
           <span className="statistics-timeline-legend-item"><span className="statistics-logbook-swatch is-dbe" aria-hidden="true" />Set DBE</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-logbook-swatch is-rest" aria-hidden="true" />Rests (&gt;30 s)</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-logbook-swatch is-pause" aria-hidden="true" />Pause</span>
         </div>
       </div>
       <div className="statistics-timeline-chart statistics-time-of-day-chart">
@@ -450,7 +483,7 @@ function LogbookDistributionGraph({ exerciseSummaries }: { exerciseSummaries: Ex
             </div>
             <div className="statistics-time-of-day-distribution statistics-spaced-bins" style={{ '--timeline-days': buckets.length } as React.CSSProperties}>
               {buckets.map((bucket, index) => {
-                const total = bucket.createFragment + bucket.link + bucket.mergeFragments + bucket.dbe;
+                const total = bucket.createFragment + bucket.link + bucket.mergeFragments + bucket.dbe + bucket.rest + bucket.pause;
                 return (
                   <div key={index} className="statistics-time-of-day-bin" title={`${index * 5}-${(index + 1) * 5}%: ${total} event${total === 1 ? '' : 's'}`}>
                     <div className="statistics-timeline-bar" aria-label={`${index * 5}-${(index + 1) * 5}%: ${total} events`}>
@@ -458,6 +491,8 @@ function LogbookDistributionGraph({ exerciseSummaries }: { exerciseSummaries: Ex
                       <span className="statistics-timeline-segment statistics-logbook-link" style={{ height: `${(bucket.link / maximumCount) * 100}%` }} />
                       <span className="statistics-timeline-segment statistics-logbook-merge" style={{ height: `${(bucket.mergeFragments / maximumCount) * 100}%` }} />
                       <span className="statistics-timeline-segment statistics-logbook-dbe" style={{ height: `${(bucket.dbe / maximumCount) * 100}%` }} />
+                      <span className="statistics-timeline-segment statistics-logbook-rest" style={{ height: `${(bucket.rest / maximumCount) * 100}%` }} />
+                      <span className="statistics-timeline-segment statistics-logbook-pause" style={{ height: `${(bucket.pause / maximumCount) * 100}%` }} />
                     </div>
                     <span className="statistics-time-distribution-label">{index % 5 === 0 ? `${index * 5}%` : ''}</span>
                   </div>
@@ -626,7 +661,7 @@ function formatReviewCount(count: number): string {
 
 function SRReviewHistoryGraph() {
   const [history, setHistory] = useState<StatisticsReviewDay[]>([]);
-  const [rangeDays, setRangeDays] = useState(365);
+  const [rangeDays, setRangeDays] = useState(30);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -661,17 +696,18 @@ function SRReviewHistoryGraph() {
   const maximumCumulativeTotal = Math.max(1, ...days.map((day) => day.cumulativeTotal));
   const dailyTicks = timelineTicks(maximumDailyCount);
   const totalTicks = timelineTicks(maximumCumulativeTotal);
+  // Extend the total line to the plot edges so it spans the full graph width.
+  const totalPoints = [
+    ...(days.length > 0 ? [{ x: 0, total: days[0].cumulativeTotal }] : []),
+    ...days.map((day, index) => ({ x: index + 0.5, total: day.cumulativeTotal })),
+    ...(days.length > 0 ? [{ x: days.length, total: days[days.length - 1].cumulativeTotal }] : []),
+  ].map((point) => ({ x: point.x, y: 100 - (point.total / maximumCumulativeTotal) * 100 }));
   const totalAreaPath = [
     `M 0 100`,
-    ...days.map((day, index) => {
-      const y = 100 - (day.cumulativeTotal / maximumCumulativeTotal) * 100;
-      return `L ${index + 0.5} ${y}`;
-    }),
+    ...totalPoints.map((point) => `L ${point.x} ${point.y}`),
     `L ${days.length} 100 Z`,
   ].join(' ');
-  const totalLinePoints = days
-    .map((day, index) => `${index + 0.5},${100 - (day.cumulativeTotal / maximumCumulativeTotal) * 100}`)
-    .join(' ');
+  const totalLinePoints = totalPoints.map((point) => `${point.x},${point.y}`).join(' ');
   const labelStep = Math.max(1, Math.ceil(rangeDays / 5));
   const dateLabels = days.filter(
     (day, index) => index % labelStep === 0 || index === days.length - 1,
@@ -712,9 +748,6 @@ function SRReviewHistoryGraph() {
       {error ? <p className="statistics-sr-review-error" role="alert">{error}</p> : null}
       {!loading && !error ? (
         <>
-          {days.every((day) => day.total === 0) ? (
-            <p className="statistics-sr-review-message">No review activity in this period.</p>
-          ) : null}
           <div className="statistics-sr-review-chart">
             <div className="statistics-sr-review-axis-title">Reviews per day</div>
             <div className="statistics-sr-review-axis" aria-label="Reviews per day">
@@ -800,7 +833,7 @@ function SRReviewHistoryGraph() {
                 </span>
               ))}
             </div>
-            <div className="statistics-sr-review-axis-caption">Days ago</div>
+            <div className="statistics-sr-review-axis-caption">days ago</div>
             <div className="statistics-sr-review-right-axis-title">Cumulative reviews</div>
           </div>
         </>
@@ -809,9 +842,24 @@ function SRReviewHistoryGraph() {
   );
 }
 
+const TIME_BIN_SECONDS = 30;
+const TIME_BIN_MAX = 120;
+const TIME_BIN_MIN = 20;
+
+function timeBinLabel(bin: number): string {
+  if (bin === TIME_BIN_MAX) return '60+';
+  return bin % 2 === 0 ? String(bin / 2) : '';
+}
+
+function timeBinTitle(bin: number): string {
+  if (bin === TIME_BIN_MAX) return '60+ minutes';
+  const minutes = bin / 2;
+  return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+}
+
 function exerciseTimeMinute(exercise: ExerciseSummary): number {
-  const roundedMinute = Math.round(Math.max(0, exercise.timer_total ?? 0) / 60);
-  return Math.min(60, Math.max(1, roundedMinute));
+  const roundedHalfMinute = Math.round(Math.max(0, exercise.timer_total ?? 0) / TIME_BIN_SECONDS);
+  return Math.min(TIME_BIN_MAX, Math.max(1, roundedHalfMinute));
 }
 
 function exerciseDifficulty(exercise: ExerciseSummary): 'easy' | 'medium' | 'difficult' | null {
@@ -825,8 +873,8 @@ function exerciseDifficulty(exercise: ExerciseSummary): 'easy' | 'medium' | 'dif
 function buildTimeDistribution(exerciseSummaries: ExerciseSummary[]): TimeDistributionBucket[] {
   const completedExercises = exerciseSummaries.filter((exercise) => exercise.completed_at != null);
   const maximumMinute = Math.min(
-    60,
-    Math.max(1, ...completedExercises.map(exerciseTimeMinute)),
+    TIME_BIN_MAX,
+    Math.max(TIME_BIN_MIN, ...completedExercises.map(exerciseTimeMinute)),
   );
   const buckets = Array.from({ length: maximumMinute }, (_, index) => ({
     minute: index + 1,
@@ -884,14 +932,14 @@ function TimeDistributionGraph({ exerciseSummaries }: { exerciseSummaries: Exerc
                   <div
                     key={bucket.minute}
                     className="statistics-time-distribution-day"
-                    title={`${bucket.minute === 60 ? '60+' : bucket.minute} minute${bucket.minute === 1 ? '' : 's'}: ${total} exercise${total === 1 ? '' : 's'}`}
+                    title={`${timeBinTitle(bucket.minute)}: ${total} exercise${total === 1 ? '' : 's'}`}
                   >
-                    <div className="statistics-timeline-bar" aria-label={`${bucket.minute === 60 ? '60+' : bucket.minute} minutes: ${total} exercises`}>
+                    <div className="statistics-timeline-bar" aria-label={`${timeBinTitle(bucket.minute)}: ${total} exercises`}>
                       <span className="statistics-timeline-segment is-green" style={{ height: `${(bucket.easy / maximumCount) * 100}%` }} />
                       <span className="statistics-timeline-segment is-blue" style={{ height: `${(bucket.medium / maximumCount) * 100}%` }} />
                       <span className="statistics-timeline-segment is-red" style={{ height: `${(bucket.difficult / maximumCount) * 100}%` }} />
                     </div>
-                    <span className="statistics-time-distribution-label">{bucket.minute === 60 ? '60+' : bucket.minute}</span>
+                    <span className="statistics-time-distribution-label">{timeBinLabel(bucket.minute)}</span>
                   </div>
                 );
               })}
@@ -901,6 +949,254 @@ function TimeDistributionGraph({ exerciseSummaries }: { exerciseSummaries: Exerc
       </div>
       <div className="statistics-time-of-day-axis-title">time spent (min)</div>
     </section>
+  );
+}
+
+type RestDurationBucket = { bin: number; easy: number; medium: number; difficult: number };
+
+// Same 30 s rounding and 10-60 minute range as the exercise time graph.
+function buildRestDurationDistribution(
+  exerciseSummaries: ExerciseSummary[],
+  logbooks: Record<string, ApiLogbookState[]>,
+): RestDurationBucket[] {
+  const rests: Array<{ bin: number; difficulty: 'easy' | 'medium' | 'difficult' }> = [];
+  buildLogbookDistribution(exerciseSummaries, logbooks, (exercise, durationMs) => {
+    const difficulty = exerciseDifficulty(exercise);
+    if (!difficulty) return;
+    rests.push({ bin: Math.min(TIME_BIN_MAX, Math.max(1, Math.round(durationMs / (TIME_BIN_SECONDS * 1000)))), difficulty });
+  });
+  const binCount = Math.max(TIME_BIN_MIN, ...rests.map((rest) => rest.bin));
+  const buckets = Array.from({ length: binCount }, (_, index) => ({ bin: index + 1, easy: 0, medium: 0, difficult: 0 }));
+  rests.forEach((rest) => {
+    buckets[rest.bin - 1][rest.difficulty] += 1;
+  });
+  return buckets;
+}
+
+function RestDurationGraph({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
+  const [logbooks, setLogbooks] = useState<Record<string, ApiLogbookState[]>>({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let isCurrent = true;
+    setIsLoading(true);
+    fetchLogbookHistory()
+      .then((data) => {
+        if (isCurrent) setLogbooks(data);
+      })
+      .catch(() => {
+        if (isCurrent) setLogbooks({});
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoading(false);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [exerciseSummaries]);
+
+  if (isLoading) return <p>Loading logbook statistics...</p>;
+
+  const buckets = buildRestDurationDistribution(exerciseSummaries, logbooks);
+  const maximumCount = Math.max(1, ...buckets.map((bucket) => bucket.easy + bucket.medium + bucket.difficult));
+  const ticks = timelineTicks(maximumCount);
+
+  return (
+    <section className="statistics-timeline-section" aria-label="Rest duration distribution">
+      <div className="statistics-timeline-heading">
+        <h3>Rests duration</h3>
+        <div className="statistics-timeline-legend" aria-label="Difficulty legend">
+          <span className="statistics-timeline-legend-item"><span className="statistics-contribution-swatch statistics-contribution-status is-green" aria-hidden="true" />Easy</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-contribution-swatch statistics-contribution-status is-blue" aria-hidden="true" />Medium</span>
+          <span className="statistics-timeline-legend-item"><span className="statistics-contribution-swatch statistics-contribution-status is-red" aria-hidden="true" />Difficult</span>
+        </div>
+      </div>
+      <div className="statistics-timeline-chart statistics-time-distribution-chart">
+        <div className="statistics-timeline-axis-title">Number of rests</div>
+        <div className="statistics-timeline-axis" aria-label="Number of rests">
+          {ticks.map((tick) => (
+            <span key={tick} className="statistics-timeline-axis-label" style={{ bottom: `${(tick / maximumCount) * 100}%` }}>
+              {tick}
+            </span>
+          ))}
+        </div>
+        <div className="statistics-timeline-viewport">
+          <div className="statistics-timeline-plot">
+            <div className="statistics-timeline-guides" aria-hidden="true">
+              {ticks.map((tick) => (
+                <span key={tick} style={{ bottom: `${(tick / maximumCount) * 100}%` }} />
+              ))}
+            </div>
+            <div className="statistics-time-distribution" style={{ '--timeline-days': buckets.length } as React.CSSProperties}>
+              {buckets.map((bucket) => {
+                const total = bucket.easy + bucket.medium + bucket.difficult;
+                return (
+                  <div
+                    key={bucket.bin}
+                    className="statistics-time-distribution-day"
+                    title={`${timeBinTitle(bucket.bin)}: ${total} rest${total === 1 ? '' : 's'}`}
+                  >
+                    <div className="statistics-timeline-bar" aria-label={`${timeBinTitle(bucket.bin)}: ${total} rests`}>
+                      <span className="statistics-timeline-segment is-green" style={{ height: `${(bucket.easy / maximumCount) * 100}%` }} />
+                      <span className="statistics-timeline-segment is-blue" style={{ height: `${(bucket.medium / maximumCount) * 100}%` }} />
+                      <span className="statistics-timeline-segment is-red" style={{ height: `${(bucket.difficult / maximumCount) * 100}%` }} />
+                    </div>
+                    <span className="statistics-time-distribution-label">{timeBinLabel(bucket.bin)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="statistics-time-of-day-axis-title">rest duration (min)</div>
+    </section>
+  );
+}
+
+const DIFFICULTY_NUMBER = { easy: 1, medium: 2, difficult: 3 } as const;
+
+function buildExerciseSessions(
+  exerciseSummaries: ExerciseSummary[],
+  logbooks: Record<string, ApiLogbookState[]>,
+  behaviorEvents: StatisticsBehaviorEvent[],
+): ExerciseSession[] {
+  const sessions: ExerciseSession[] = [];
+  exerciseSummaries.forEach((exercise) => {
+    const startedAt = parseExerciseDate(exercise.started_at);
+    const completedAt = parseExerciseDate(exercise.completed_at);
+    const difficulty = exerciseDifficulty(exercise);
+    if (!startedAt || !completedAt || !difficulty || !exercise.has_statistics) return;
+    const logbook = exerciseLogbooks(logbooks, exercise).find((candidate) => !candidate.archived);
+    if (!logbook) return;
+
+    const entryTimes: number[] = [];
+    const reversalTimes: number[] = [];
+    try {
+      const parsed = JSON.parse(logbook.entries_json) as unknown;
+      if (Array.isArray(parsed)) {
+        parsed.forEach((entry) => {
+          const timestamp = parseLogbookTimestamp((entry as { ts?: unknown } | null)?.ts);
+          if (timestamp === null || timestamp < startedAt.getTime() || timestamp > completedAt.getTime()) return;
+          entryTimes.push(timestamp);
+          if (REVERSAL_ENTRY_KINDS.includes((entry as { kind?: string }).kind ?? '')) reversalTimes.push(timestamp);
+        });
+      }
+    } catch {
+      return;
+    }
+    if (entryTimes.length === 0) return;
+    const restartIntervals = parseLogbookRestarts(logbook.restarts);
+    const restartMs = restartIntervals.reduce((sum, interval) => sum + interval.stop - interval.start, 0);
+    const activeMs = restartMs > 0 ? restartMs : completedAt.getTime() - startedAt.getTime();
+
+    const keys = new Set([String(exercise.id), `exercise-${exercise.id}`]);
+    const attemptEvents = behaviorEvents.filter((event) => {
+      if (!keys.has(event.exercise_id)) return false;
+      const occurredAt = parseExerciseDate(event.occurred_at)?.getTime();
+      return occurredAt !== undefined && occurredAt >= startedAt.getTime() && occurredAt <= completedAt.getTime();
+    });
+    const timesFor = (eventType: StatisticsBehaviorEvent['event_type']) => attemptEvents
+      .filter((event) => event.event_type === eventType)
+      .map((event) => parseExerciseDate(event.occurred_at)!.getTime());
+
+    sessions.push({
+      incorrectCount: exercise.incorrect_count ?? 0,
+      confidence: exercise.confidence ?? 0,
+      difficulty: DIFFICULTY_NUMBER[difficulty],
+      cheatsUsed: exerciseUsedCheats(exercise),
+      entryTimes,
+      incorrectTimes: timesFor('incorrect-validation'),
+      cheatActivationTimes: timesFor('cheat-activation'),
+      exitTimes: timesFor('exercise-closed'),
+      reversalTimes,
+      activeMs,
+      completedAt: completedAt.getTime(),
+    });
+  });
+  return sessions;
+}
+
+const LAST_SESSIONS_WINDOW = 20;
+
+function BehaviourProfiles({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
+  const [data, setData] = useState<{ logbooks: Record<string, ApiLogbookState[]>; events: StatisticsBehaviorEvent[] } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [lastOnly, setLastOnly] = useState(false);
+
+  useEffect(() => {
+    let isCurrent = true;
+    setData(null);
+    setLoadError(null);
+    Promise.all([fetchLogbookHistory(), fetchStatisticsBehaviorEvents()])
+      .then(([logbooks, events]) => {
+        if (isCurrent) setData({ logbooks, events });
+      })
+      .catch((error: unknown) => {
+        if (isCurrent) {
+          setLoadError(error instanceof Error ? error.message : 'Unable to load study behaviour data.');
+        }
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [exerciseSummaries]);
+
+  if (loadError) return <p role="alert">{loadError}</p>;
+  if (!data) return <p>Loading study behaviour...</p>;
+
+  const allSessions = buildExerciseSessions(exerciseSummaries, data.logbooks, data.events);
+  const sessions = selectSessions(allSessions, lastOnly ? LAST_SESSIONS_WINDOW : null);
+  const profile = generateGlobalProfile(sessions);
+  const style = generateStudyStyleProfile(sessions);
+  const countLabel = `${sessions.length} completed exercise${sessions.length === 1 ? '' : 's'} with logbook data`;
+
+  return (
+    <>
+      <div className="statistics-radar-row">
+        <section className="statistics-timeline-section statistics-radar-section" aria-label="Metacognitive profile">
+          <div className="statistics-timeline-heading">
+            <h3>Metacognitive profile</h3>
+            <span className="statistics-timeline-legend-item">{countLabel}</span>
+          </div>
+          <RadarChart
+            ariaLabel="Metacognitive profile radar chart"
+            axes={[
+              { label: 'Concept mastery', value: profile.conceptMastery, description: 'Accuracy (1 / (incorrect validations + 1)) weighted by difficulty. High is good.' },
+              { label: 'Calibration', value: profile.calibration, description: 'How closely your confidence rating matches your actual accuracy. High is good.' },
+              { label: 'Deliberation', value: profile.deliberation, description: 'Gaps over 20 s between logbook entries, relative to the number of entries: time spent thinking.' },
+              { label: 'Resilience', value: profile.resilience, description: 'How you react after an incorrect validation: no cheat right away, no giving up, little backtracking.' },
+              { label: 'Autonomy', value: profile.autonomous, description: 'Solving without cheats. 1 at no cheat use, 0 when 30% or more of exercises used cheats.' },
+            ]}
+          />
+        </section>
+        <div className="statistics-radar-toggle" role="group" aria-label="Exercises included in the profiles">
+          <button type="button" className={lastOnly ? '' : 'is-active'} aria-pressed={!lastOnly} onClick={() => setLastOnly(false)}>All exercises</button>
+          <button type="button" className={lastOnly ? 'is-active' : ''} aria-pressed={lastOnly} onClick={() => setLastOnly(true)}>Last {LAST_SESSIONS_WINDOW}</button>
+        </div>
+        <section className="statistics-timeline-section statistics-radar-section" aria-label="Study style profile">
+          <div className="statistics-timeline-heading">
+            <h3>Study style profile</h3>
+            <span className="statistics-timeline-legend-item">
+              {sessions.length < MIN_STYLE_SESSIONS ? `Needs at least ${MIN_STYLE_SESSIONS} exercises` : 'Low everywhere is best'}
+            </span>
+          </div>
+          <RadarChart
+            ariaLabel="Study style radar chart"
+            startAngle={(-2 * Math.PI) / 3}
+            floor={0.1}
+            axes={[
+              { label: 'Phantom', value: sessions.length < MIN_STYLE_SESSIONS ? 0 : style.phantom, description: 'Accurate and quick, but with cheats. Leans on aids.' },
+              { label: 'Dunning-Kruger', value: sessions.length < MIN_STYLE_SESSIONS ? 0 : style.dunningKruger, description: 'Confident on difficult exercises, yet inaccurate. Overestimates own skill.' },
+              { label: 'Hidden genius', value: sessions.length < MIN_STYLE_SESSIONS ? 0 : style.hiddenGenius, description: 'Accurate and decisive, yet low confidence. Underestimates own skill.' },
+              { label: 'Speed demon', value: sessions.length < MIN_STYLE_SESSIONS ? 0 : style.speedDemon, description: 'Finishes in under 5 minutes with many mistakes. Rushes.' },
+              { label: 'Perfectionist', value: sessions.length < MIN_STYLE_SESSIONS ? 0 : style.perfectionist, description: 'Accurate without cheats, but takes over 20 minutes.' },
+              { label: 'Stubborn', value: sessions.length < MIN_STYLE_SESSIONS ? 0 : style.stubborn, description: 'Many mistakes, no cheats, and either a long time or a lot of undoing. Struggles without help.' },
+            ]}
+          />
+        </section>
+      </div>
+    </>
   );
 }
 
@@ -1130,9 +1426,9 @@ function perfectStreak(exerciseSummaries: ExerciseSummary[]): number {
   return streak;
 }
 
-function TempTab({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
+function PerfectStreak({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
   return (
-    <section className="statistics-summary" aria-label="Temporary statistics">
+    <section className="statistics-summary" aria-label="Perfect streak">
       <div className="statistics-summary-item">
         <h3>Perfect streak</h3>
         <p>{perfectStreak(exerciseSummaries)} exercises</p>
@@ -1279,7 +1575,9 @@ function ProgressionTab({ exerciseSummaries, showCheatTags }: { exerciseSummarie
 
 type ResetRowId = 'current' | 'set' | 'tag' | 'age' | 'difficulty' | 'all';
 
-function ResetTab({ exerciseSummaries, selectedExerciseId, enableDelete, deleteProgression, showCheatTags }: { exerciseSummaries: ExerciseSummary[]; selectedExerciseId: number | null; enableDelete: boolean; deleteProgression: boolean; showCheatTags: boolean }) {
+function ResetTab({ exerciseSummaries: allExerciseSummaries, selectedExerciseId, enableDelete, deleteProgression, showCheatTags }: { exerciseSummaries: ExerciseSummary[]; selectedExerciseId: number | null; enableDelete: boolean; deleteProgression: boolean; showCheatTags: boolean }) {
+  // Only exercises with a statistics row can be reset (seeded examples/references have none), except for full deletion.
+  const exerciseSummaries = allExerciseSummaries.filter((exercise) => exercise.has_statistics === true);
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedSet, setSelectedSet] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
@@ -1287,10 +1585,11 @@ function ResetTab({ exerciseSummaries, selectedExerciseId, enableDelete, deleteP
   const [maximumAge, setMaximumAge] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('');
   const [resetLevels, setResetLevels] = useState<Record<ResetRowId, ResetLevel | ''>>({ current: '', set: '', tag: '', age: '', difficulty: '', all: '' });
-  const [pendingReset, setPendingReset] = useState<{ exerciseIds: number[]; level: ResetLevel } | null>(null);
+  const [pendingReset, setPendingReset] = useState<{ exerciseIds: number[]; level: ResetLevel; dueOnly?: boolean } | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
-  const exerciseSets = Array.from(new Set(exerciseSummaries.map((exercise) => exercise.exercise_set?.trim()).filter((set): set is string => Boolean(set)))).sort((left, right) => left.localeCompare(right));
+  const setSource = enableDelete ? allExerciseSummaries : exerciseSummaries;
+  const exerciseSets = Array.from(new Set(setSource.map((exercise) => exercise.exercise_set?.trim()).filter((set): set is string => Boolean(set) && (enableDelete || set!.toLowerCase() !== 'references')))).sort((left, right) => left.localeCompare(right));
 
   useEffect(() => {
     setResetLevels((levels) => ({
@@ -1312,7 +1611,9 @@ function ResetTab({ exerciseSummaries, selectedExerciseId, enableDelete, deleteP
     fetchTags().then(setTags).catch(() => setTags([]));
   }, []);
 
-  const idsForDateRange = (minimum: number, maximum: number): number[] => exerciseSummaries
+  const listFor = (rowId: ResetRowId) => (resetLevels[rowId] === 'exercise' ? allExerciseSummaries : exerciseSummaries);
+
+  const idsForDateRange = (minimum: number, maximum: number): number[] => listFor('age')
     .filter((exercise) => {
       const dateValue = exercise.completed_at ?? exercise.started_at;
       if (!dateValue) return false;
@@ -1328,14 +1629,35 @@ function ResetTab({ exerciseSummaries, selectedExerciseId, enableDelete, deleteP
     setPendingReset({ exerciseIds, level });
   };
 
+  const requestQuickReset = (exerciseIds: number[] | 'due') => {
+    if (exerciseIds !== 'due' && exerciseIds.length === 0) return;
+    setResetError(null);
+    setPendingReset(exerciseIds === 'due' ? { exerciseIds: [], level: 'completion', dueOnly: true } : { exerciseIds, level: 'completion' });
+  };
+
+  const hasCompletion = (exercise: ExerciseSummary) => {
+    const completedAt = exercise.completed_at?.trim();
+    return Boolean(completedAt && completedAt !== '0');
+  };
+  const completedWithHelpIds = exerciseSummaries.filter((exercise) => hasCompletion(exercise) && exerciseUsedCheats(exercise)).map((exercise) => exercise.id);
+  // An exercise flagged completed without a completion time (the seeded Sucrose example) is not incomplete.
+  // Mirrors the backend: overdue selected exercises that are still marked completed get reopened.
+  const hasDueExercises = exerciseSummaries.some((exercise) => {
+    const due = parseExerciseDate(exercise.due_time);
+    return (exercise.in_SR ?? 0) > 0 && due !== null && due.getTime() < Date.now() && (exercise.completed === true || hasCompletion(exercise));
+  });
+  const incompleteIds = exerciseSummaries.filter((exercise) => !hasCompletion(exercise) && exercise.completed !== true).map((exercise) => exercise.id);
+
   const proceedWithReset = async () => {
     if (!pendingReset || resetting || (pendingReset.level === 'exercise' && !enableDelete) || (pendingReset.level === 'progression' && !deleteProgression)) return;
     setResetting(true);
     setResetError(null);
     try {
-      await resetExercises(pendingReset.exerciseIds, pendingReset.level);
+      const exerciseIds = pendingReset.dueOnly
+        ? await resetDueExercises()
+        : (await resetExercises(pendingReset.exerciseIds, pendingReset.level), pendingReset.exerciseIds);
       setPendingReset(null);
-      window.dispatchEvent(new CustomEvent('exercise-reset', { detail: pendingReset }));
+      window.dispatchEvent(new CustomEvent('exercise-reset', { detail: { ...pendingReset, exerciseIds } }));
       window.dispatchEvent(new Event('exercise-statistics-updated'));
     } catch (error) {
       setResetError(error instanceof Error ? error.message : 'Reset failed.');
@@ -1363,12 +1685,20 @@ function ResetTab({ exerciseSummaries, selectedExerciseId, enableDelete, deleteP
     <section className="statistics-reset-tab" aria-label="Reset options">
       <div className="statistics-reset-heading"><h3>Reset data</h3><p>Choose the scope for each reset action.</p></div>
       <div className="statistics-reset-list">
-        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset current exercise</span>{scopeSelect('current', 'Reset level for current exercise')}{resetButton('current', selectedExerciseId === null ? [] : [selectedExerciseId])}</div>
-        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises from the <select className="statistics-reset-select" value={selectedSet} onChange={(event) => setSelectedSet(event.target.value)} aria-label="Exercise set"><option value="" disabled>Select exercise set</option>{exerciseSets.map((set) => <option key={set} value={set}>{set}</option>)}</select> exercise set</span>{scopeSelect('set', 'Reset level for exercise set')}{resetButton('set', exerciseSummaries.filter((exercise) => exercise.exercise_set?.trim() === selectedSet).map((exercise) => exercise.id))}</div>
-        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises with the <select className="statistics-reset-select" value={selectedTag} onChange={(event) => setSelectedTag(event.target.value)} aria-label="Tag"><option value="" disabled>Select tag</option>{tags.filter((tag) => showCheatTags || !tag.is_cheat).map((tag) => <option key={tag.id} value={tag.tag_name}>{tag.tag_name}</option>)}</select> tag</span>{scopeSelect('tag', 'Reset level for tag')}{resetButton('tag', exerciseSummaries.filter((exercise) => exercise.tags.includes(selectedTag)).map((exercise) => exercise.id))}</div>
+        <div className="statistics-quick-reset-row">
+          <span className="statistics-reset-inline-content">Quick reset</span>
+          <div className="statistics-quick-reset-buttons">
+            <button type="button" className="statistics-reset-button" disabled={completedWithHelpIds.length === 0} onClick={() => requestQuickReset(completedWithHelpIds)}>All completed exercises with help enabled</button>
+            <button type="button" className="statistics-reset-button" disabled={incompleteIds.length === 0} onClick={() => requestQuickReset(incompleteIds)}>All currently incomplete exercises</button>
+            <button type="button" className="statistics-reset-button" disabled={!hasDueExercises} onClick={() => requestQuickReset('due')}>All exercises due for review</button>
+          </div>
+        </div>
+        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset current exercise</span>{scopeSelect('current', 'Reset level for current exercise')}{resetButton('current', selectedExerciseId === null || !listFor('current').some((exercise) => exercise.id === selectedExerciseId) ? [] : [selectedExerciseId])}</div>
+        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises from the <select className="statistics-reset-select" value={selectedSet} onChange={(event) => setSelectedSet(event.target.value)} aria-label="Exercise set"><option value="" disabled>Select exercise set</option>{exerciseSets.map((set) => <option key={set} value={set}>{set}</option>)}</select> exercise set</span>{scopeSelect('set', 'Reset level for exercise set')}{resetButton('set', listFor('set').filter((exercise) => exercise.exercise_set?.trim() === selectedSet).map((exercise) => exercise.id))}</div>
+        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises with the <select className="statistics-reset-select" value={selectedTag} onChange={(event) => setSelectedTag(event.target.value)} aria-label="Tag"><option value="" disabled>Select tag</option>{tags.filter((tag) => showCheatTags || !tag.is_cheat).map((tag) => <option key={tag.id} value={tag.tag_name}>{tag.tag_name}</option>)}</select> tag</span>{scopeSelect('tag', 'Reset level for tag')}{resetButton('tag', listFor('tag').filter((exercise) => exercise.tags.includes(selectedTag)).map((exercise) => exercise.id))}</div>
         <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises between <input className="statistics-reset-number" type="number" min="0" aria-label="Youngest age in days" value={minimumAge} onChange={(event) => setMinimumAge(event.target.value)} /> and <input className="statistics-reset-number" type="number" min="0" aria-label="Oldest age in days" value={maximumAge} onChange={(event) => setMaximumAge(event.target.value)} /> days old</span>{scopeSelect('age', 'Reset level for age range')}{resetButton('age', idsForDateRange(Number(minimumAge) || 0, Number(maximumAge) || Number.POSITIVE_INFINITY))}</div>
-        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises with <select className="statistics-reset-select" value={selectedDifficulty} onChange={(event) => setSelectedDifficulty(event.target.value)} aria-label="Difficulty"><option value="" disabled>Select difficulty</option><option value="E">Easy</option><option value="M">Medium</option><option value="D">Hard</option></select> difficulty</span>{scopeSelect('difficulty', 'Reset level for difficulty')}{resetButton('difficulty', exerciseSummaries.filter((exercise) => exercise.difficulty?.startsWith(selectedDifficulty)).map((exercise) => exercise.id))}</div>
-        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset all exercises</span>{scopeSelect('all', 'Reset level for all exercises')}{resetButton('all', exerciseSummaries.map((exercise) => exercise.id))}</div>
+        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset exercises with <select className="statistics-reset-select" value={selectedDifficulty} onChange={(event) => setSelectedDifficulty(event.target.value)} aria-label="Difficulty"><option value="" disabled>Select difficulty</option><option value="E">Easy</option><option value="M">Medium</option><option value="D">Hard</option></select> difficulty</span>{scopeSelect('difficulty', 'Reset level for difficulty')}{resetButton('difficulty', listFor('difficulty').filter((exercise) => exercise.difficulty?.startsWith(selectedDifficulty)).map((exercise) => exercise.id))}</div>
+        <div className="statistics-reset-row"><span className="statistics-reset-inline-content">Reset all exercises</span>{scopeSelect('all', 'Reset level for all exercises')}{resetButton('all', listFor('all').map((exercise) => exercise.id))}</div>
       </div>
       {pendingReset ? <div className="statistics-reset-confirmation-backdrop" role="presentation"><div className="statistics-reset-confirmation" role="dialog" aria-modal="true" aria-labelledby="statistics-reset-confirmation-title"><div className="statistics-reset-confirmation-icon" aria-hidden="true">!</div><h3 id="statistics-reset-confirmation-title">Reset data?</h3><p>This action cannot be undone.</p><p className="statistics-reset-confirmation-detail">For the selected exercises, <b>all {pendingReset.level} data</b> will be permanently deleted.</p>{resetError ? <p className="statistics-reset-confirmation-error" role="alert">{resetError}</p> : null}<div className="statistics-reset-confirmation-actions"><button type="button" className="statistics-reset-cancel" disabled={resetting} onClick={() => setPendingReset(null)}>Cancel</button><button type="button" className="statistics-reset-proceed" disabled={resetting} onClick={() => void proceedWithReset()}>{resetting ? 'Resetting...' : 'Proceed'}</button></div></div></div> : null}
     </section>
@@ -1380,11 +1710,59 @@ function exerciseLevel(exercise: ExerciseSummary): string {
   return tags.find((tag) => /^level [0-5]$/i.test(tag.trim()))?.trim() ?? '';
 }
 
+type MasterySortKey = 'name' | 'level' | 'cheats' | 'incorrect' | 'confidence' | 'difficulty' | 'successes' | 'time' | 'mastery' | 'due';
+
+const MASTERY_COLUMNS: Array<{ key: MasterySortKey; label: string }> = [
+  { key: 'name', label: 'Name' },
+  { key: 'level', label: 'Level' },
+  { key: 'cheats', label: 'Cheats' },
+  { key: 'incorrect', label: 'Incorrect' },
+  { key: 'confidence', label: 'Confidence' },
+  { key: 'difficulty', label: 'Difficulty' },
+  { key: 'successes', label: 'Successes' },
+  { key: 'time', label: 'Time spent' },
+  { key: 'mastery', label: 'Mastery Index' },
+  { key: 'due', label: 'Due date' },
+];
+
+const MASTERY_FLEX_COLUMNS: MasterySortKey[] = ['name'];
+
+const DIFFICULTY_ORDER: Record<string, number> = { E: 0, M: 1, D: 2 };
+
+function masterySortValue(exercise: ExerciseSummary, key: MasterySortKey): string | number | null {
+  const match = /^([EMD])(\d+)$/.exec(exercise.difficulty?.trim() ?? '');
+  switch (key) {
+    case 'name': return `${exercise.exercise_set ?? 'Unassigned'} / ${exercise.name ?? `Exercise ${exercise.id}`}`;
+    case 'level': return exerciseLevel(exercise) || null;
+    case 'cheats': return exerciseUsedCheats(exercise) ? 1 : 0;
+    case 'incorrect': return exercise.incorrect_count ?? 0;
+    case 'confidence': return exercise.confidence ?? null;
+    case 'difficulty': return match ? DIFFICULTY_ORDER[match[1]] : null;
+    case 'successes': return match ? Number(match[2]) : null;
+    case 'time': return exercise.timer_total ?? 0;
+    case 'mastery': return exercise.mastery_index ?? 0;
+    case 'due': return parseExerciseDate(exercise.due_time)?.getTime() ?? null;
+  }
+}
+
 function MasteryListTab({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
+  const [sort, setSort] = useState<{ key: MasterySortKey; direction: 'asc' | 'desc' }>({ key: 'mastery', direction: 'desc' });
+  const factor = sort.direction === 'asc' ? 1 : -1;
   // Only exercises with a statistics row have a difficulty value.
   const rows = exerciseSummaries
     .filter((exercise) => exercise.difficulty != null)
-    .sort((left, right) => (right.mastery_index ?? 0) - (left.mastery_index ?? 0));
+    .sort((left, right) => {
+      const leftValue = masterySortValue(left, sort.key);
+      const rightValue = masterySortValue(right, sort.key);
+      // Empty values always go last regardless of direction.
+      if (leftValue === null || rightValue === null) {
+        return leftValue === rightValue ? 0 : leftValue === null ? 1 : -1;
+      }
+      const result = typeof leftValue === 'string' && typeof rightValue === 'string'
+        ? leftValue.localeCompare(rightValue)
+        : Number(leftValue) - Number(rightValue);
+      return result * factor;
+    });
   const difficultyNames: Record<string, string> = { E: 'Easy', M: 'Medium', D: 'Difficult' };
 
   return (
@@ -1392,16 +1770,27 @@ function MasteryListTab({ exerciseSummaries }: { exerciseSummaries: ExerciseSumm
       <table className="statistics-mastery-table">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Level</th>
-            <th>Cheats</th>
-            <th>Incorrect</th>
-            <th>Confidence</th>
-            <th>Difficulty</th>
-            <th>Successes</th>
-            <th>Time spent</th>
-            <th>Mastery Index</th>
-            <th>Due date</th>
+            {MASTERY_COLUMNS.map((column) => (
+              <th
+                key={column.key}
+                className={MASTERY_FLEX_COLUMNS.includes(column.key) ? 'is-flex' : 'is-compact'}
+                aria-sort={sort.key === column.key ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
+                <button
+                  type="button"
+                  className="statistics-mastery-sort"
+                  onClick={() => setSort((current) => ({
+                    key: column.key,
+                    direction: current.key === column.key && current.direction === 'asc' ? 'desc' : 'asc',
+                  }))}
+                >
+                  {column.label}
+                  <span className="statistics-mastery-sort-arrow" aria-hidden="true">
+                    {sort.key === column.key ? (sort.direction === 'asc' ? '▲' : '▼') : ''}
+                  </span>
+                </button>
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -1410,16 +1799,16 @@ function MasteryListTab({ exerciseSummaries }: { exerciseSummaries: ExerciseSumm
             const due = parseExerciseDate(exercise.due_time);
             return (
               <tr key={exercise.id}>
-                <td>{`${exercise.exercise_set ?? 'Unassigned'} / ${exercise.name ?? `Exercise ${exercise.id}`}`}</td>
-                <td>{exerciseLevel(exercise)}</td>
-                <td>{exerciseUsedCheats(exercise) ? 'yes' : 'no'}</td>
-                <td>{exercise.incorrect_count ?? 0}</td>
-                <td>{exercise.confidence ?? ''}</td>
-                <td>{match ? difficultyNames[match[1]] : '--'}</td>
-                <td>{match ? match[2] : '--'}</td>
-                <td>{formatDuration(exercise.timer_total)}</td>
-                <td>{(exercise.mastery_index ?? 0).toFixed(3)}</td>
-                <td>{due ? due.toLocaleDateString() : ''}</td>
+                <td className="is-flex">{`${exercise.exercise_set ?? 'Unassigned'} / ${exercise.name ?? `Exercise ${exercise.id}`}`}</td>
+                <td className="is-compact">{exerciseLevel(exercise)}</td>
+                <td className="is-compact">{exerciseUsedCheats(exercise) ? 'yes' : 'no'}</td>
+                <td className="is-compact">{exercise.incorrect_count ?? 0}</td>
+                <td className="is-compact">{exercise.confidence ?? ''}</td>
+                <td className="is-compact">{match ? difficultyNames[match[1]] : '--'}</td>
+                <td className="is-compact">{match ? match[2] : '--'}</td>
+                <td className="is-compact">{formatDuration(exercise.timer_total)}</td>
+                <td className="is-compact">{(exercise.mastery_index ?? 0).toFixed(3)}</td>
+                <td className="is-compact">{due ? due.toLocaleDateString() : ''}</td>
               </tr>
             );
           })}
@@ -1474,6 +1863,7 @@ function ContributionGrid({ exerciseSummaries }: { exerciseSummaries: ExerciseSu
           <RankedExerciseList title="Slowest solved exercises" exercises={slowestExercises} includeTime />
           <div className="statistics-ranking-list-column">
             <RankedExerciseList title="Most incorrect answers" exercises={mostIncorrectExercises} includeIncorrectCount />
+            <PerfectStreak exerciseSummaries={exerciseSummaries} />
             <StatisticsSummary exerciseSummaries={exerciseSummaries} />
           </div>
         </div>
@@ -1512,10 +1902,9 @@ function buildLevelPoints(exerciseSummaries: ExerciseSummary[]): LevelPoint[][] 
 
 function LevelAnalysisGraph({ exerciseSummaries }: { exerciseSummaries: ExerciseSummary[] }) {
   const levels = buildLevelPoints(exerciseSummaries);
-  const visibleLevels = levels
-    .map((points, level) => ({ points, level }))
-    .filter(({ points }) => points.length >= LEVEL_MIN_POINTS);
-  const allSeconds = visibleLevels.flatMap(({ points }) => points.map((point) => point.seconds));
+  const allLevels = levels.map((points, level) => ({ points, level }));
+  const analyzedLevels = allLevels.filter(({ points }) => points.length >= LEVEL_MIN_POINTS);
+  const allSeconds = analyzedLevels.flatMap(({ points }) => points.map((point) => point.seconds));
   const maximum = timeScaleMaximum(Math.max(0, ...allSeconds));
   const ticks = [0, maximum / 4, maximum / 2, (maximum * 3) / 4, maximum];
   const position = (seconds: number) => `${Math.min(100, Math.max(0, (seconds / maximum) * 100))}%`;
@@ -1532,11 +1921,10 @@ function LevelAnalysisGraph({ exerciseSummaries }: { exerciseSummaries: Exercise
           <span className="statistics-timeline-legend-item"><span className="statistics-level-mad-legend" aria-hidden="true" />Mean absolute deviation</span>
         </div>
       </div>
-      {visibleLevels.length === 0 ? (
-        <p>{`A level row appears once it has at least ${LEVEL_MIN_POINTS} timed exercises.`}</p>
-      ) : (
+      {(
         <div className="statistics-level-chart">
-          {visibleLevels.map(({ points, level }) => {
+          {allLevels.map(({ points, level }) => {
+            const hasAnalysis = points.length >= LEVEL_MIN_POINTS;
             const mean = points.reduce((sum, point) => sum + point.seconds, 0) / points.length;
             const mad = points.reduce((sum, point) => sum + Math.abs(point.seconds - mean), 0) / points.length;
             const left = Math.max(0, mean - mad);
@@ -1548,6 +1936,7 @@ function LevelAnalysisGraph({ exerciseSummaries }: { exerciseSummaries: Exercise
                   <span>n={points.length}</span>
                 </div>
                 <div className="statistics-level-track">
+                  {hasAnalysis ? (<>
                   <div
                     className="statistics-level-mad"
                     style={{ left: position(left), width: `${((right - left) / maximum) * 100}%` }}
@@ -1564,6 +1953,9 @@ function LevelAnalysisGraph({ exerciseSummaries }: { exerciseSummaries: Exercise
                       title={`${point.name}: ${formatDuration(Math.round(point.seconds))}`}
                     />
                   ))}
+                  </>) : (
+                    <span className="statistics-level-placeholder">{`Analysis of this level appears when at least ${LEVEL_MIN_POINTS} exercises of this level have been completed`}</span>
+                  )}
                 </div>
               </div>
             );
@@ -1584,7 +1976,7 @@ function LevelAnalysisGraph({ exerciseSummaries }: { exerciseSummaries: Exercise
 }
 
 export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedExerciseId, enableDelete = false, deleteProgression = false, showCheatTags = false }: StatisticsPanelProps) {
-  const [activeTab, setActiveTab] = useState<StatisticsTabId>('1');
+  const [activeTab, setActiveTab] = useState<StatisticsTabId>('overview');
 
   if (!isOpen) {
     return null;
@@ -1620,7 +2012,7 @@ export function StatisticsPanel({ isOpen, onClose, exerciseSummaries, selectedEx
 
         <div className="settings-panel-content">
           <div className="settings-tab-content" id={`statisticstab-${activeTab}`}>
-            {activeTab === '1' ? <ProgressionTab exerciseSummaries={exerciseSummaries} showCheatTags={showCheatTags} /> : activeTab === '2' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === '3' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><TimeDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><TimeOfDayDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === '4' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><DueDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><SRReviewHistoryGraph /></div></div> : activeTab === '5' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} enableDelete={enableDelete} deleteProgression={deleteProgression} showCheatTags={showCheatTags} /> : activeTab === '6' ? <TempTab exerciseSummaries={exerciseSummaries} /> : activeTab === '7' ? <MasteryListTab exerciseSummaries={exerciseSummaries} /> : activeTab === '8' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LevelAnalysisGraph exerciseSummaries={exerciseSummaries} /></div></div> : null}
+            {activeTab === 'progression' ? <ProgressionTab exerciseSummaries={exerciseSummaries} showCheatTags={showCheatTags} /> : activeTab === 'overview' ? <ContributionGrid exerciseSummaries={exerciseSummaries} /> : activeTab === 'time' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LogbookDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><TimeDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><RestDurationGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === 'spaced' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><DueDistributionGraph exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><SRReviewHistoryGraph /></div></div> : activeTab === 'reset' ? <ResetTab exerciseSummaries={exerciseSummaries} selectedExerciseId={selectedExerciseId} enableDelete={enableDelete} deleteProgression={deleteProgression} showCheatTags={showCheatTags} /> : activeTab === 'behaviour' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><BehaviourProfiles exerciseSummaries={exerciseSummaries} /></div><div className="statistics-graph-box"><TimeOfDayDistributionGraph exerciseSummaries={exerciseSummaries} /></div></div> : activeTab === 'mastery' ? <MasteryListTab exerciseSummaries={exerciseSummaries} /> : activeTab === 'levels' ? <div className="statistics-progression-tab"><div className="statistics-graph-box"><LevelAnalysisGraph exerciseSummaries={exerciseSummaries} /></div></div> : null}
           </div>
         </div>
       </div>

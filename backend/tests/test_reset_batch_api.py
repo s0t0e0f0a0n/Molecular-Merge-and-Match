@@ -152,3 +152,85 @@ def test_reset_batch_remove_deletes_exercise_and_dependents(client):
     )
     assert response.status_code == 204
     assert _counts(exercise_id) == {key: 0 for key in _counts(exercise_id)}
+
+
+def test_reset_due_reopens_overdue_exercises_without_changing_due_time(client):
+    due_exercise_id = _seed_exercise()
+    future_exercise_id = _seed_exercise()
+    overdue = datetime(2020, 1, 1)
+    future = datetime(2999, 1, 1)
+    db = SessionLocal()
+    try:
+        for exercise_id, due_time in ((due_exercise_id, overdue), (future_exercise_id, future)):
+            exercise = db.query(Exercise).filter(Exercise.id == exercise_id).one()
+            exercise.in_SR = 1
+            exercise.due_time = due_time
+            exercise.completed = True
+            statistics = db.query(Statistics).filter(Statistics.exercise_id == str(exercise_id)).one()
+            statistics.completed_at = datetime(2019, 12, 1)
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.post("/api/v1/exercises/reset-due")
+    assert response.status_code == 200
+    assert response.json() == {"exercise_ids": [due_exercise_id]}
+
+    db = SessionLocal()
+    try:
+        due = db.query(Exercise).filter(Exercise.id == due_exercise_id).one()
+        assert due.completed is False
+        assert due.due_time == overdue
+        assert db.query(Statistics).filter(Statistics.exercise_id == str(due_exercise_id)).one().completed_at is None
+        assert db.query(Fragment).filter(Fragment.exercise_id == f"exercise-{due_exercise_id}").count() == 0
+        future_exercise = db.query(Exercise).filter(Exercise.id == future_exercise_id).one()
+        assert future_exercise.completed is True
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize("level", ["logbook", "workspace", "completion", "progression"])
+def test_reset_batch_skips_exercises_without_statistics(client, level):
+    exercise_id = _seed_exercise()
+    db = SessionLocal()
+    try:
+        db.query(Statistics).filter(Statistics.exercise_id == str(exercise_id)).delete()
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.post(
+        "/api/v1/exercises/reset-batch",
+        json={"exercise_ids": [exercise_id], "level": level},
+    )
+    assert response.status_code == 204
+
+    db = SessionLocal()
+    try:
+        exercise = db.query(Exercise).filter(Exercise.id == exercise_id).one()
+        assert exercise.completed is True
+        assert db.query(Fragment).filter(Fragment.exercise_id == f"exercise-{exercise_id}").count() == 1
+    finally:
+        db.close()
+
+
+def test_reset_batch_exercise_level_deletes_exercise_without_statistics(client):
+    exercise_id = _seed_exercise()
+    db = SessionLocal()
+    try:
+        db.query(Statistics).filter(Statistics.exercise_id == str(exercise_id)).delete()
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.post(
+        "/api/v1/exercises/reset-batch",
+        json={"exercise_ids": [exercise_id], "level": "exercise"},
+    )
+    assert response.status_code == 204
+
+    db = SessionLocal()
+    try:
+        assert db.query(Exercise).filter(Exercise.id == exercise_id).count() == 0
+    finally:
+        db.close()

@@ -1,6 +1,12 @@
 from datetime import datetime, timedelta
 
-from app.db.models import Exercise, Statistics, StatisticsReviewEvent, UserSettings
+from app.db.models import (
+    Exercise,
+    Statistics,
+    StatisticsBehaviorEvent,
+    StatisticsReviewEvent,
+    UserSettings,
+)
 from app.db.session import SessionLocal
 
 
@@ -54,6 +60,36 @@ def test_new_display_settings_can_be_saved_and_fetched(client):
     assert fetched.json()["show_integral_curves"] is False
     assert fetched.json()["enable_delete"] is True
     assert fetched.json()["SR_mode"] is True
+
+
+def test_enabling_cheats_records_activation_for_active_exercise(client):
+    db = SessionLocal()
+    try:
+        settings = db.query(UserSettings).filter_by(name="User").first()
+        if settings is None:
+            settings = UserSettings(name="User")
+            db.add(settings)
+        settings.cheats = "000000000000"
+        db.add(Statistics(
+            exercise_id="42",
+            started_at=datetime.now() - timedelta(minutes=2),
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.put(
+        "/api/v1/settings/",
+        json={"cheats": "100000000000", "exercise_id": 42},
+    )
+
+    assert response.status_code == 200
+    with SessionLocal() as db:
+        event = db.query(StatisticsBehaviorEvent).filter_by(
+            exercise_id="42",
+            event_type="cheat-activation",
+        ).one()
+        assert event.occurred_at is not None
 
 
 def test_enabling_sr_mode_reopens_only_overdue_selected_exercises(client):

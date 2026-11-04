@@ -6,6 +6,7 @@ from typing import Literal
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
+from app.core.statistics_keys import statistics_exercise_id_keys
 from app.core.usage_counts import recount_exercise_usage
 from app.db.models import (
     Exercise,
@@ -15,7 +16,7 @@ from app.db.models import (
     StatisticsReviewEvent,
     WorkingSolution,
 )
-from app.db.session import get_db
+from app.db.session import _reopen_overdue_exercises_in_db, get_db
 
 router = APIRouter(prefix="/exercises", tags=["exercises"])
 
@@ -27,6 +28,11 @@ class ResetExercisesRequest(BaseModel):
 
 def reset_exercise_data(db, exercise_id: int, level: str) -> None:
     keys = (str(exercise_id), f"exercise-{exercise_id}")
+    # Seeded examples and references have no statistics row; only full deletion applies to them.
+    if level != "exercise" and db.query(Statistics.id).filter(
+        Statistics.exercise_id.in_(statistics_exercise_id_keys(exercise_id))
+    ).first() is None:
+        return
     if level in {"logbook", "workspace", "completion"}:
         # Keep the logbook data, but mark it as archived; the next write starts a new row.
         db.query(LogbookState).filter(
@@ -71,6 +77,19 @@ def reset_exercises(body: ResetExercisesRequest) -> None:
             db.flush()
             recount_exercise_usage(db)
         db.commit()
+
+
+class ResetDueExercisesResponse(BaseModel):
+    exercise_ids: list[int]
+
+
+@router.post("/reset-due", response_model=ResetDueExercisesResponse)
+def reset_due_exercises() -> ResetDueExercisesResponse:
+    # Same reopening as enabling spaced repetition; due dates are left untouched.
+    with get_db() as db:
+        exercise_ids = _reopen_overdue_exercises_in_db(db, require_sr_mode=False)
+        db.commit()
+    return ResetDueExercisesResponse(exercise_ids=exercise_ids)
 
 
 @router.post("/reset", status_code=204, response_model=None)

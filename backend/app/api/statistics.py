@@ -18,6 +18,7 @@ from app.db.models import (
     Exercise,
     LogbookState,
     Statistics,
+    StatisticsBehaviorEvent,
     StatisticsReviewEvent,
     UserSettings,
 )
@@ -309,13 +310,23 @@ def mark_exercise_selected(exercise_id: int | str) -> None:
 
 def mark_exercise_closed(exercise_id: int | str) -> None:
     with get_db() as db:
+        # Closing a seeded, already-completed exercise must not create its statistics row.
+        if _exercise_is_completed(db, exercise_id) and _find_statistics_row(db, str(exercise_id)) is None:
+            return
         row, _ = _ensure_statistics_row(db, exercise_id)
         if row is None:
             return
 
+        closed_at = datetime.now()
         row.pause_total += 1
+        if row.started_at is not None and row.completed_at is None:
+            db.add(StatisticsBehaviorEvent(
+                exercise_id=str(row.exercise_id),
+                occurred_at=closed_at,
+                event_type="exercise-closed",
+            ))
         if row.start_counting is not None and row.stop_counting is None:
-            _finalize_timer(db, row, datetime.now(), count_short_elapsed=True)
+            _finalize_timer(db, row, closed_at, count_short_elapsed=True)
 
         db.commit()
         db.refresh(row)
@@ -499,6 +510,9 @@ def get_statistics(exercise_id: str = Query(...)) -> StatisticsOut:
         if _is_reference_exercise(db, exercise_id):
             return StatisticsOut(exercise_id=str(exercise_id))
         row = _find_statistics_row(db, exercise_id)
+        if row is None and _exercise_is_completed(db, exercise_id):
+            # Viewing a seeded, already-completed exercise must not create a statistics row.
+            return StatisticsOut(exercise_id=str(exercise_id))
         if row is None:
             # If no statistics row exists yet, create one to maintain previous behavior
             # where selecting an exercise resulted in an available statistics row.
@@ -536,6 +550,46 @@ def get_statistics_review_history() -> list[StatisticsReviewDayOut]:
             setattr(day, status, count)
         day.total += count
     return list(counts_by_day.values())
+
+
+class StatisticsBehaviorEventOut(BaseModel):
+    exercise_id: str
+    occurred_at: datetime
+    event_type: Literal["incorrect-validation", "cheat-activation", "exercise-closed"]
+
+
+@router.get("/behavior-events", response_model=list[StatisticsBehaviorEventOut])
+def get_statistics_behavior_events() -> list[StatisticsBehaviorEventOut]:
+    with get_db() as db:
+        incorrect_rows = (
+            db.query(StatisticsReviewEvent)
+            .filter(
+                StatisticsReviewEvent.is_correct.is_(False),
+                StatisticsReviewEvent.is_baseline.is_(False),
+            )
+            .order_by(StatisticsReviewEvent.reviewed_at)
+            .all()
+        )
+        behavior_rows = db.query(StatisticsBehaviorEvent).order_by(
+            StatisticsBehaviorEvent.occurred_at
+        ).all()
+        events = [
+            StatisticsBehaviorEventOut(
+                exercise_id=row.exercise_id,
+                occurred_at=row.reviewed_at,
+                event_type="incorrect-validation",
+            )
+            for row in incorrect_rows
+        ]
+        events.extend(
+            StatisticsBehaviorEventOut(
+                exercise_id=row.exercise_id,
+                occurred_at=row.occurred_at,
+                event_type=row.event_type,
+            )
+            for row in behavior_rows
+        )
+        return sorted(events, key=lambda event: event.occurred_at)
 
 
 @router.post("/difficulty", response_model=StatisticsOut)

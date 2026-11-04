@@ -22,6 +22,7 @@ export type ExerciseSummary = {
   matches_done?: number | null;
   dbe_set?: number | null;
   has_saved_progress?: boolean | null;
+  has_statistics?: boolean;
 };
 
 export type ApiH1Peak = {
@@ -304,6 +305,20 @@ export async function fetchStatisticsReviewHistory(): Promise<StatisticsReviewDa
     throw new Error(`Failed to load spaced-repetition review history (${response.status})`);
   }
   return (await response.json()) as StatisticsReviewDay[];
+}
+
+export type StatisticsBehaviorEvent = {
+  exercise_id: string;
+  occurred_at: string;
+  event_type: 'incorrect-validation' | 'cheat-activation' | 'exercise-closed';
+};
+
+export async function fetchStatisticsBehaviorEvents(): Promise<StatisticsBehaviorEvent[]> {
+  const response = await fetch('/api/v1/statistics/behavior-events');
+  if (!response.ok) {
+    throw new Error(`Failed to load statistics behavior events (${response.status})`);
+  }
+  return (await response.json()) as StatisticsBehaviorEvent[];
 }
 
 export async function rateExerciseDifficulty(

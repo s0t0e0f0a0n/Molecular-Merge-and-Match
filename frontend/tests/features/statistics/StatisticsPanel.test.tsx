@@ -2,11 +2,12 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StatisticsPanel } from '../../../src/features/statistics/StatisticsPanel';
-import { resetExercises } from '../../../src/api/reset';
+import { resetDueExercises, resetExercises } from '../../../src/api/reset';
 import { fetchLogbookHistory } from '../../../src/api/logbook';
 
 vi.mock('../../../src/api/reset', () => ({
   resetExercises: vi.fn().mockResolvedValue(undefined),
+  resetDueExercises: vi.fn().mockResolvedValue([4]),
 }));
 
 vi.mock('../../../src/api/logbook', () => ({
@@ -34,7 +35,7 @@ function renderResetPanel() {
     <StatisticsPanel
       isOpen
       onClose={() => undefined}
-      exerciseSummaries={summaries}
+      exerciseSummaries={summaries.map((exercise) => ({ ...exercise, has_statistics: true }))}
       selectedExerciseId={2}
       enableDelete
       deleteProgression
@@ -88,7 +89,7 @@ describe('Statistics reset controls', () => {
       <StatisticsPanel
         isOpen
         onClose={() => undefined}
-        exerciseSummaries={summaries}
+        exerciseSummaries={summaries.map((exercise) => ({ ...exercise, has_statistics: true }))}
         selectedExerciseId={2}
         enableDelete={false}
       />,
@@ -102,7 +103,7 @@ describe('Statistics reset controls', () => {
       <StatisticsPanel
         isOpen
         onClose={() => undefined}
-        exerciseSummaries={summaries}
+        exerciseSummaries={summaries.map((exercise) => ({ ...exercise, has_statistics: true }))}
         selectedExerciseId={2}
         enableDelete
       />,
@@ -129,6 +130,80 @@ describe('Statistics reset controls', () => {
       }
     }
   }, 30000);
+
+  it('quick reset buttons reset the matching exercises to completion level', async () => {
+    const user = userEvent.setup();
+    render(
+      <StatisticsPanel
+        isOpen
+        onClose={() => undefined}
+        exerciseSummaries={[
+          ...summaries.slice(0, 2).map((exercise) => ({ ...exercise, has_statistics: true, cheats_used: exercise.id === 1 ? '1' : '0' })),
+          { id: 6, name: 'Six', exercise_set: 'set-a', tags: [], has_statistics: true, started_at: '2026-09-10T00:00:00', completed_at: null },
+          { id: 7, name: 'Seeded', exercise_set: 'References', tags: [], completed_at: null },
+          { id: 8, name: 'Sucrose', exercise_set: 'Examples', tags: [], has_statistics: true, completed: true, completed_at: null },
+        ]}
+        selectedExerciseId={2}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(screen.queryByRole('option', { name: 'References' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'All completed exercises with help enabled' }));
+    await user.click(screen.getByRole('button', { name: 'Proceed' }));
+    await waitFor(() => expect(resetExercises).toHaveBeenCalledWith([1], 'completion'));
+
+    await user.click(screen.getByRole('button', { name: 'All currently incomplete exercises' }));
+    await user.click(screen.getByRole('button', { name: 'Proceed' }));
+    await waitFor(() => expect(resetExercises).toHaveBeenCalledWith([6], 'completion'));
+
+    expect(screen.getByRole('button', { name: 'All exercises due for review' })).toBeDisabled();
+  });
+
+  it('enables the due-for-review quick reset when an overdue exercise exists', async () => {
+    const user = userEvent.setup();
+    render(
+      <StatisticsPanel
+        isOpen
+        onClose={() => undefined}
+        exerciseSummaries={[
+          { id: 4, name: 'Four', exercise_set: 'set-c', tags: [], has_statistics: true, in_SR: 1, completed: true, completed_at: '2026-08-01T01:00:00', due_time: '2026-08-02T00:00:00' },
+        ]}
+        selectedExerciseId={4}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    await user.click(screen.getByRole('button', { name: 'All exercises due for review' }));
+    await user.click(screen.getByRole('button', { name: 'Proceed' }));
+    await waitFor(() => expect(resetDueExercises).toHaveBeenCalledTimes(1));
+  });
+
+  it('lets seeded exercises without statistics be deleted when deletion is enabled', async () => {
+    const user = userEvent.setup();
+    render(
+      <StatisticsPanel
+        isOpen
+        onClose={() => undefined}
+        exerciseSummaries={[
+          { id: 6, name: 'Six', exercise_set: 'set-a', tags: [], has_statistics: true, completed_at: null },
+          { id: 7, name: 'Ref', exercise_set: 'References', tags: [], completed_at: null },
+        ]}
+        selectedExerciseId={7}
+        enableDelete
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    await user.selectOptions(screen.getByLabelText('Exercise set'), 'References');
+
+    await user.selectOptions(screen.getByLabelText('Reset level for exercise set'), 'workspace');
+    await user.click(screen.getAllByRole('button', { name: 'Reset!' })[1]);
+    expect(screen.queryByRole('button', { name: 'Proceed' })).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Reset level for exercise set'), 'exercise');
+    await user.click(screen.getAllByRole('button', { name: 'Reset!' })[1]);
+    await user.click(screen.getByRole('button', { name: 'Proceed' }));
+    await waitFor(() => expect(resetExercises).toHaveBeenCalledWith([7], 'exercise'));
+  });
 
   it('keeps all Reset! buttons inactive until their own level is selected', async () => {
     const user = userEvent.setup();
@@ -166,6 +241,7 @@ describe('Statistics tag progression', () => {
       />,
     );
 
+    await userEvent.setup().click(screen.getByRole('button', { name: /Progression/ }));
     await waitFor(() => expect(screen.getByText('hidden-tag')).toBeInTheDocument());
     const progressionRow = screen.getByText('hidden-tag').closest('.statistics-progression-row');
 
@@ -281,7 +357,7 @@ describe('Advanced logbook distribution', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: /Advanced/ }));
+    await user.click(screen.getByRole('button', { name: /Time distribution/ }));
 
     expect(await screen.findByTitle('25-30%: 2 events')).toBeInTheDocument();
     expect(screen.getByTitle('75-80%: 1 event')).toBeInTheDocument();
@@ -293,7 +369,6 @@ describe('Advanced logbook distribution', () => {
 
 describe('Temporary statistics', () => {
   it('counts perfect completed exercises until the first exercise with mistakes', async () => {
-    const user = userEvent.setup();
     render(
       <StatisticsPanel
         isOpen
@@ -309,7 +384,6 @@ describe('Temporary statistics', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Temp' }));
 
     expect(screen.getByRole('heading', { name: 'Perfect streak' })).toBeInTheDocument();
     expect(screen.getByText('2 exercises')).toBeInTheDocument();

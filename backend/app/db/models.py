@@ -351,6 +351,15 @@ class StatisticsReviewEvent(Base):
     is_baseline: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
+class StatisticsBehaviorEvent(Base):
+    __tablename__ = "statistics_behavior_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    exercise_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(30), nullable=False)
+
+
 class UserSettings(Base):
     __tablename__ = "user_settings"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

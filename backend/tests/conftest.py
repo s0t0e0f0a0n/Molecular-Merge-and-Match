@@ -13,6 +13,7 @@ from app.db.models import (
     PredefinedFragment,
     SolventsUsed,
     Statistics,
+    StatisticsBehaviorEvent,
     StatisticsReviewEvent,
     WorkingSolution,
 )
@@ -35,6 +36,7 @@ def _ensure_tables_and_clean():
         db.query(Fragment).delete()
         db.query(WorkingSolution).delete()
         db.query(LogbookState).delete()
+        db.query(StatisticsBehaviorEvent).delete()
         db.query(StatisticsReviewEvent).delete()
         db.query(PredefinedFragment).delete()
         db.query(Statistics).delete()

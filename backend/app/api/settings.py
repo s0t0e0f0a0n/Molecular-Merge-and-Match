@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from app.core.statistics_keys import statistics_exercise_id_keys
-from app.db.models import Statistics, UserSettings
+from app.db.models import Statistics, StatisticsBehaviorEvent, UserSettings
 from app.db.session import _reopen_overdue_exercises_in_db, get_db
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -79,6 +79,28 @@ def _record_cheats_disabled(
         {Statistics.cheats_off: datetime.now()},
         synchronize_session=False,
     )
+
+
+def _record_cheats_enabled(
+    db,
+    previous_cheats: str,
+    next_cheats: str,
+    exercise_id: int | None,
+) -> None:
+    if exercise_id is None or previous_cheats.startswith("1") or not next_cheats.startswith("1"):
+        return
+    has_active_statistics = db.query(Statistics.id).filter(
+        Statistics.exercise_id.in_(statistics_exercise_id_keys(exercise_id)),
+        Statistics.started_at.isnot(None),
+        Statistics.completed_at.is_(None),
+    ).first()
+    if has_active_statistics is None:
+        return
+    db.add(StatisticsBehaviorEvent(
+        exercise_id=str(exercise_id),
+        occurred_at=datetime.now(),
+        event_type="cheat-activation",
+    ))
 
 
 class UserSettingsResponse(BaseModel):
@@ -215,6 +237,7 @@ def update_settings(payload: UpdateUserSettingsRequest) -> UserSettingsResponse:
             previous_cheats = _normalize_cheats(settings.cheats)
             settings.cheats = _normalize_cheats(payload.cheats)
             _record_cheats_disabled(db, previous_cheats, settings.cheats, payload.exercise_id)
+            _record_cheats_enabled(db, previous_cheats, settings.cheats, payload.exercise_id)
         if payload.show_CAS is not None:
             settings.show_CAS_input = bool(payload.show_CAS)
         if payload.show_timer is not None:
@@ -275,6 +298,12 @@ def apply_preset(
         if user_settings.SR_mode and not was_sr_mode_enabled:
             _reopen_overdue_exercises_in_db(db)
         _record_cheats_disabled(
+            db,
+            previous_cheats,
+            _normalize_cheats(user_settings.cheats),
+            exercise_id,
+        )
+        _record_cheats_enabled(
             db,
             previous_cheats,
             _normalize_cheats(user_settings.cheats),

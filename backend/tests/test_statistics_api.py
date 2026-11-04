@@ -15,6 +15,7 @@ from app.db.models import (
     Exercise,
     LogbookState,
     Statistics,
+    StatisticsBehaviorEvent,
     StatisticsReviewEvent,
     UserSettings,
 )
@@ -629,3 +630,84 @@ def test_reference_exercise_does_not_create_statistics_row(client):
         assert db.query(Statistics).filter(Statistics.exercise_id == str(exercise_id)).first() is None
     finally:
         db.close()
+
+
+def test_viewing_seeded_completed_exercise_does_not_create_statistics_row(client):
+    db = SessionLocal()
+    try:
+        exercise = Exercise(
+            name="Seeded completed",
+            h1_svg_path="/uploads/h1.svg",
+            h1_axis_start=10,
+            h1_axis_end=0,
+            c13_svg_path="/uploads/c13.svg",
+            c13_axis_start=200,
+            c13_axis_end=0,
+            h1_nmr_text="h1",
+            c13_nmr_text="c13",
+            exercise_set="Examples",
+            completed=True,
+        )
+        db.add(exercise)
+        db.commit()
+        exercise_id = exercise.id
+    finally:
+        db.close()
+
+    assert client.get("/api/v1/statistics/", params={"exercise_id": exercise_id}).status_code == 200
+    assert client.post("/api/v1/statistics/stop", params={"exercise_id": exercise_id}).status_code == 200
+
+    db = SessionLocal()
+    try:
+        assert db.query(Statistics).filter(Statistics.exercise_id == str(exercise_id)).count() == 0
+    finally:
+        db.close()
+
+
+def test_stopping_active_exercise_records_behavior_event(client):
+    started_at = datetime.now() - timedelta(minutes=2)
+    db = SessionLocal()
+    try:
+        db.add(Statistics(
+            exercise_id="812",
+            started_at=started_at,
+            start_counting=started_at,
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.post("/api/v1/statistics/stop", params={"exercise_id": 812})
+
+    assert response.status_code == 200
+    with SessionLocal() as db:
+        event = db.query(StatisticsBehaviorEvent).filter_by(
+            exercise_id="812",
+            event_type="exercise-closed",
+        ).one()
+        assert event.occurred_at >= started_at
+
+
+def test_behavior_events_endpoint_includes_failed_validation_events(client):
+    reviewed_at = datetime.now()
+    db = SessionLocal()
+    try:
+        db.add(StatisticsReviewEvent(
+            exercise_id="813",
+            reviewed_at=reviewed_at,
+            status_at_review="new",
+            is_correct=False,
+            is_baseline=False,
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get("/api/v1/statistics/behavior-events")
+
+    assert response.status_code == 200
+    assert response.json() == [{
+        "exercise_id": "813",
+        "occurred_at": reviewed_at.isoformat(),
+        "event_type": "incorrect-validation",
+    }]
