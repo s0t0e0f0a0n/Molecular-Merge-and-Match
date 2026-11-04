@@ -21,6 +21,10 @@ The SQLite database (`data/app.db`) and uploaded files (`data/uploads/`) are cre
 
 Swagger docs: http://localhost:8000/docs
 
+## Host validation
+
+The API accepts requests only for hosts listed in `ALLOWED_HOSTS`, a comma-separated environment variable. It defaults to `127.0.0.1,localhost,backend` for desktop and local development. For a web deployment, set `ALLOWED_HOSTS` to the public domain (for example, `app.example.com`); Docker Compose passes this variable through to the backend.
+
 ## Uploaded files
 
 Spectrum SVGs and additional spectra are stored under `data/uploads/` and served at `/uploads/` as static files. The API returns URL paths (e.g. `/uploads/exercises/h1/abc.svg`), never filesystem paths.

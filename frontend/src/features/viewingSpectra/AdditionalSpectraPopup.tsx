@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import DOMPurify from 'dompurify'
 import type { ApiAdditionalSpectrum } from '../../api/exercises'
 import { forceSvgFontFamily, isSvgPath } from './svgFontOverride'
 
@@ -294,7 +295,11 @@ export function AdditionalSpectraPopup({ spectra }: Props) {
                       padding: 7,
                       boxSizing: 'border-box',
                     }}
-                    dangerouslySetInnerHTML={{ __html: activeSvgContent }}
+                    dangerouslySetInnerHTML={{
+                      __html: DOMPurify.sanitize(activeSvgContent, {
+                        USE_PROFILES: { svg: true, svgFilters: true },
+                      }),
+                    }}
                   />
                 ) : (
                   <div

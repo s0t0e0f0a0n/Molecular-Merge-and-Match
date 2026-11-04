@@ -46,8 +46,10 @@ describe('SpectrumViewer title — italic solvent rerender', () => {
       <SpectrumViewer {...commonProps({ src: '/spectrum.svg', showIntegralCurves: false })} />,
     );
 
-    await waitFor(() => expect(container.querySelector('#integral')).toBeNull());
-    expect(container.querySelector('#spectrum')).not.toBeNull();
+    await waitFor(() => {
+      expect(container.querySelector('#integral')).toBeNull();
+      expect(container.querySelector('#spectrum')).not.toBeNull();
+    });
 
     rerender(
       <SpectrumViewer {...commonProps({ src: '/spectrum.svg', showIntegralCurves: true })} />,

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import DOMPurify from 'dompurify'
 import { formatChemistryText } from '../../utils/formatChemistryText'
 import { useHighlighting, type MergedHighlightBox, type PeakBox } from '../../hooks/useHighlighting'
 import { forceSvgFontFamily } from './svgFontOverride'
@@ -310,7 +311,11 @@ function SpectrumCanvas({
     >
       <div
         style={{ width: '100%', height: '100%', }}
-        dangerouslySetInnerHTML={{ __html: displaySvg }}
+        dangerouslySetInnerHTML={{
+          __html: DOMPurify.sanitize(displaySvg, {
+            USE_PROFILES: { svg: true, svgFilters: true },
+          }),
+        }}
       />
 
       <div

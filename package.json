@@ -40,7 +40,14 @@
         "from": "backend/data",
         "to": "data",
         "filter": [
-          "**/*"
+          "**/*",
+          "!**/app.db",
+          "!**/test.db",
+          "!**/*.db-journal",
+          "!**/*.db-wal",
+          "!**/*.db-shm",
+          "!uploads",
+          "!uploads/**/*"
         ]
       }
     ],

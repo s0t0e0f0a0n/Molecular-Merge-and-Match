@@ -48,4 +48,7 @@ def _ensure_tables_and_clean():
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(app)
+    return TestClient(
+        app,
+        headers={"X-Requested-With": "MMM", "Host": "localhost"},
+    )

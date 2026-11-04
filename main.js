@@ -71,7 +71,7 @@ function setupUserData() {
         try {
             const copyFolderSync = (src, dest) => {
                 if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-                try { fs.chmodSync(dest, 511); } catch (e) {} // Ensure dir is writable //SvdV : Was 0o755, Safe for Flatpak/macOS sandboxes
+                try { fs.chmodSync(dest, 0o700); } catch (e) {}
                 
                 for (const file of fs.readdirSync(src)) {
                     const srcPath = path.join(src, file);
@@ -80,7 +80,7 @@ function setupUserData() {
                         copyFolderSync(srcPath, destPath);
                     } else {
                         fs.copyFileSync(srcPath, destPath);
-                        try { fs.chmodSync(destPath, 438); } catch (e) {} //Was 0o666
+                        try { fs.chmodSync(destPath, 0o600); } catch (e) {}
                     }
                 }
             };
@@ -111,7 +111,7 @@ function setupUserData() {
                 } catch (e) {
                     console.warn(`Failed to copy seed file ${file}:`, e.message);
                 }
-                try { fs.chmodSync(destPath, 438); } catch (e) { }
+                try { fs.chmodSync(destPath, 0o600); } catch (e) { }
             }
         }
     }
@@ -132,7 +132,7 @@ function startBackend() {
                 if (process.env.SNAP || process.env.FLATPAK_ID) {
                     console.log("Running inside Snap/Flatpak sandbox, skipping chmod (read-only filesystem).");
                 } else {
-                    fs.chmodSync(backendPath, 511); // Safe decimal 511 for Flatpak/macOS
+                    fs.chmodSync(backendPath, 0o755);
                     console.log("Successfully set 755 execution permissions on backend binary.");
                 }
             }

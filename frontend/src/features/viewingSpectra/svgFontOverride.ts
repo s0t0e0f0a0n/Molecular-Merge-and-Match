@@ -12,8 +12,8 @@ export function forceSvgFontFamily(
 ): string {
   const { forceFill = true } = options;
 
-  // Uses escaped double quotes for the inner fallback string to ensure cross-browser parsing
-  const fontStack = 'var(--font-spectrum, Aptos, "Ubuntu Sans", system-ui, sans-serif)';
+  // Keep the inner font-family quote distinct from the SVG attribute delimiter.
+  const fontStack = `var(--font-spectrum, Aptos, 'Ubuntu Sans', system-ui, sans-serif)`;
 
   let processed = svgText;
 

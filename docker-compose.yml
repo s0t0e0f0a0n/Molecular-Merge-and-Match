@@ -6,6 +6,8 @@ services:
   backend:
     build:
       context: ./backend
+    environment:
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-127.0.0.1,localhost,backend}
     ports:
       - "8000:8000"
     volumes:

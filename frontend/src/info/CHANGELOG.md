@@ -8,11 +8,20 @@ Changes and additions since release version 1.0.0 are grouped by:
 4. Other
 
 ### Versions in this document:  
+[v1.6.0](#v160)  
 [v1.5.0](#v150)  
 [v1.4.0](#v140)  
 [v1.3.0](#v130)  
 [v1.2.1](#version-121)  
 [v1.1.2](#feature-and-file-changes-in-version-112)  
+
+## v1.6.0
+Reset logbooks now invalidate and reload cached histories, preventing stale entries from returning after a reset. Switching exercises or loading history no longer triggers an unnecessary save.
+Large logbook saves no longer use keepalive, avoiding Chromium's 64 KiB limit; failed saves now show a warning.
+Legacy database migration now preserves statistics columns and their data when converting `cheats_used` to text, preventing missing-column errors after an upgrade.
+Desktop builds now use restricted data-file permissions and exclude local databases and uploads; uploaded and rendered spectrum SVGs are sanitized.
+API requests are hardened against cross-site requests with trusted-host validation and a required custom header on non-GET API requests. Web deployments can configure trusted hosts with `ALLOWED_HOSTS`.
+Exercise uploads now limit SVG text to 5 MiB and base64 spectra to 10 MiB, and reject PNG/JPEG files whose signatures do not match their extensions.
 
 ## v1.5.0
 Changes since version 1.4.0

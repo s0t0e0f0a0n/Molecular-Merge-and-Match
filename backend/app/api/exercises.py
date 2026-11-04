@@ -33,6 +33,7 @@ from app.core.solvent_tokens import (
     extract_solvent_ids,
     resolve_solvent_tokens,
 )
+from app.core.svg_sanitize import sanitize_svg
 from app.core.statistics_keys import canonical_statistics_exercise_id, statistics_exercise_id_keys
 from app.core.tag_tokens import (
     apply_tag_count_delta as apply_tag_count_delta,
@@ -60,12 +61,6 @@ from app.db.models import (
     WorkingSolution,
 )
 from app.db.session import get_db
-
-_SVG_SCRIPT_RE = re.compile(r"<script[\s\S]*?</script\s*>", re.IGNORECASE)
-_SVG_EVENT_ATTR_RE = re.compile(
-    r"""\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)""", re.IGNORECASE
-)
-
 
 _ADDITIONAL_SPECTRUM_PRIORITY_BY_NAME = {
     "ir": 1,
@@ -108,6 +103,9 @@ _ADDITIONAL_SPECTRUM_PRIORITY_BY_NAME = {
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/exercises", tags=["exercises"])
 
+MAX_SVG_TEXT_LENGTH = 5 * 1024 * 1024
+MAX_FILE_BASE64_LENGTH = 10 * 1024 * 1024
+
 def _priority_for_additional_spectrum_filename(filename: str) -> int:
     stem = Path(filename).stem
     if not stem:
@@ -137,7 +135,7 @@ class AxisScale(BaseModel):
 
 class UploadedSvgPayload(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
-    svg_text: str = Field(min_length=1)
+    svg_text: str = Field(min_length=1, max_length=MAX_SVG_TEXT_LENGTH)
 
     @field_validator("filename")
     @classmethod
@@ -149,19 +147,10 @@ class UploadedSvgPayload(BaseModel):
             raise ValueError("File must be an SVG (.svg).")
         return file_name
 
-    @field_validator("svg_text")
-    @classmethod
-    def validate_svg_content(cls, value: str) -> str:
-        value = _SVG_SCRIPT_RE.sub("", value)
-        value = _SVG_EVENT_ATTR_RE.sub("", value)
-        if "<svg" not in value.lower() or "</svg>" not in value.lower():
-            raise ValueError("Provided content is not a valid SVG document.")
-        return value
-
 
 class AdditionalSpectrumPayload(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
-    file_base64: str = Field(min_length=1)
+    file_base64: str = Field(min_length=1, max_length=MAX_FILE_BASE64_LENGTH)
     label: str | None = Field(default=None, max_length=255)
     priority: int | None = Field(default=None, ge=0)
 
@@ -443,6 +432,11 @@ def _write_text_file(content: str, original_filename: str, folder: str) -> str:
     root.mkdir(parents=True, exist_ok=True)
     suffix = Path(original_filename).suffix.lower() or ".txt"
     target_path = root / f"{uuid4().hex}{suffix}"
+    if suffix == ".svg":
+        try:
+            content = sanitize_svg(content)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     target_path.write_text(content, encoding="utf-8")
     return str(target_path)
 
@@ -457,6 +451,21 @@ def _write_base64_file(content_base64: str, original_filename: str, folder: str)
         raise HTTPException(
             status_code=422, detail="Invalid base64 file payload."
         ) from exc
+
+    if suffix == ".png" and not raw.startswith(b"\x89PNG"):
+        raise HTTPException(status_code=400, detail="PNG file has invalid magic bytes.")
+    if suffix in {".jpg", ".jpeg"} and not raw.startswith(b"\xff\xd8\xff"):
+        raise HTTPException(status_code=400, detail="JPEG file has invalid magic bytes.")
+
+    if suffix == ".svg":
+        try:
+            svg_text = raw.decode("utf-8")
+            sanitized_svg = sanitize_svg(svg_text)
+        except UnicodeDecodeError as exc:
+            raise HTTPException(status_code=400, detail="SVG must be UTF-8 encoded.") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raw = sanitized_svg.encode("utf-8")
 
     target_path.write_bytes(raw)
     return str(target_path)

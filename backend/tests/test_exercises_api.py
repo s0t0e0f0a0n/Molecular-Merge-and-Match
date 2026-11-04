@@ -4,8 +4,15 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import text
 
+from app.api.exercises import (
+    MAX_FILE_BASE64_LENGTH,
+    MAX_SVG_TEXT_LENGTH,
+    AdditionalSpectrumPayload,
+    UploadedSvgPayload,
+)
 from app.core.config import settings
 from app.db.models import (
     Exercise,
@@ -54,6 +61,43 @@ def _exercise_payload(
     if solution_cas_number is not None:
         payload["solution_cas_number"] = solution_cas_number
     return payload
+
+
+def test_uploaded_svg_rejects_text_over_size_limit():
+    with pytest.raises(ValidationError):
+        UploadedSvgPayload(
+            filename="large.svg",
+            svg_text="x" * (MAX_SVG_TEXT_LENGTH + 1),
+        )
+
+
+def test_additional_spectrum_rejects_base64_over_size_limit():
+    with pytest.raises(ValidationError):
+        AdditionalSpectrumPayload(
+            filename="large.svg",
+            file_base64="A" * (MAX_FILE_BASE64_LENGTH + 1),
+        )
+
+
+@pytest.mark.parametrize(
+    ("filename", "content"),
+    [
+        ("spectrum.png", b"not a PNG"),
+        ("spectrum.jpg", b"not a JPEG"),
+    ],
+)
+def test_additional_spectrum_rejects_invalid_image_magic_bytes(client, filename, content):
+    payload = _exercise_payload()
+    payload["additional_spectra"] = [
+        {
+            "filename": filename,
+            "file_base64": base64.b64encode(content).decode("ascii"),
+        }
+    ]
+
+    response = client.post("/api/v1/exercises/", json=payload)
+
+    assert response.status_code == 400
 
 
 def test_list_exercises_empty_initially(client):
@@ -430,6 +474,108 @@ def test_create_exercise_stores_additional_spectrum_priority_from_filename(clien
         db.close()
 
 
+def test_create_exercise_sanitizes_uploaded_spectra_and_preserves_paths(client):
+    payload = _exercise_payload()
+    payload["h1_spectrum_svg"]["svg_text"] = (
+        '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)">'
+        '<path d="M0 0 L10 10" stroke="black"/>'
+        '<a href="javascript:alert(1)">unsafe link</a>'
+        "<foreignObject><iframe srcdoc=\"alert(1)\"/></foreignObject>"
+        "</svg>"
+    )
+    payload["additional_spectra"] = [
+        {
+            "filename": "scripted.svg",
+            "file_base64": base64.b64encode(
+                b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script>'
+                b'<path d="M1 1 L2 2"/></svg>'
+            ).decode("ascii"),
+            "label": "Additional",
+        }
+    ]
+
+    response = client.post("/api/v1/exercises/", json=payload)
+    assert response.status_code == 201
+
+    db = SessionLocal()
+    try:
+        exercise = db.query(Exercise).one()
+        h1_svg = _upload_url_to_file_path(exercise.h1_svg_path).read_text(encoding="utf-8")
+        additional = db.query(ExerciseAdditionalSpectrum).one()
+        additional_svg = _upload_url_to_file_path(additional.file_path).read_text(encoding="utf-8")
+
+        assert 'd="M0 0 L10 10"' in h1_svg
+        assert 'stroke="black"' in h1_svg
+        assert "onload" not in h1_svg
+        assert "javascript:" not in h1_svg
+        assert "foreignObject" not in h1_svg
+        assert "<iframe" not in h1_svg
+        assert "<script" not in additional_svg
+        assert 'd="M1 1 L2 2"' in additional_svg
+    finally:
+        db.close()
+
+
+def test_create_exercise_rejects_malformed_svg_with_http_400(client):
+    payload = _exercise_payload()
+    payload["h1_spectrum_svg"]["svg_text"] = (
+        '<svg/onload="alert(1)"><path d="M0 0 L1 1"/></svg>'
+    )
+
+    response = client.post("/api/v1/exercises/", json=payload)
+
+    assert response.status_code == 400
+
+
+def test_import_update_sanitizes_replaced_and_appended_svgs(client):
+    created = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_HASH_CCO),
+    )
+    assert created.status_code == 201
+
+    response = client.post(
+        "/api/v1/exercises/import-update",
+        json={
+            "match": {"inchi_hash": INCHI_HASH_CCO},
+            "replace": {
+                "h1": {
+                    "filename": "replacement.svg",
+                    "svg_text": (
+                        '<svg xmlns="http://www.w3.org/2000/svg">'
+                        '<a href="javascript:alert(1)">link</a>'
+                        '<path d="M0 0 L3 3"/></svg>'
+                    ),
+                }
+            },
+            "append": [
+                {
+                    "filename": "extra.svg",
+                    "file_base64": base64.b64encode(
+                        b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script>'
+                        b'<path d="M4 4 L5 5"/></svg>'
+                    ).decode("ascii"),
+                }
+            ],
+        },
+    )
+    assert response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        exercise = db.query(Exercise).one()
+        replaced_svg = _upload_url_to_file_path(exercise.h1_svg_path).read_text(encoding="utf-8")
+        appended = db.query(ExerciseAdditionalSpectrum).one()
+        appended_svg = _upload_url_to_file_path(appended.file_path).read_text(encoding="utf-8")
+
+        assert "javascript:" not in replaced_svg
+        assert 'd="M0 0 L3 3"' in replaced_svg
+        assert "<script" not in appended_svg
+        assert 'd="M4 4 L5 5"' in appended_svg
+    finally:
+        db.close()
+
+
 def test_import_update_stores_explicit_additional_spectrum_priority(client):
     response = client.post(
         "/api/v1/exercises/",
@@ -445,7 +591,7 @@ def test_import_update_stores_explicit_additional_spectrum_priority(client):
             "append": [
                 {
                     "filename": "custom-spectrum.svg",
-                    "file_base64": base64.b64encode(b"spectrum").decode("ascii"),
+                    "file_base64": base64.b64encode(b"<svg><path d='M0 0 L1 1'/></svg>").decode("ascii"),
                     "label": "IR",
                     "priority": 42,
                 }
@@ -468,7 +614,7 @@ def test_import_update_replaces_additional_spectrum_row_and_file(client):
     payload["additional_spectra"] = [
         {
             "filename": "1_IR.svg",
-            "file_base64": base64.b64encode(b"old spectrum").decode("ascii"),
+            "file_base64": base64.b64encode(b"<svg><path d='M0 0 L1 1'/></svg>").decode("ascii"),
             "label": "IR",
         }
     ]
@@ -497,7 +643,7 @@ def test_import_update_replaces_additional_spectrum_row_and_file(client):
             "replace_additional": {
                 "ir": {
                     "filename": "1_IR.svg",
-                    "file_base64": base64.b64encode(b"new spectrum").decode("ascii"),
+                    "file_base64": base64.b64encode(b"<svg><path d='M2 2 L3 3'/></svg>").decode("ascii"),
                     "label": "IR",
                 }
             },
@@ -512,7 +658,7 @@ def test_import_update_replaces_additional_spectrum_row_and_file(client):
         ).one()
         assert replacement.exercise_id == exercise_id
         assert replacement.file_path != old_path
-        assert _upload_url_to_file_path(replacement.file_path).read_bytes() == b"new spectrum"
+        assert 'd="M2 2 L3 3"' in _upload_url_to_file_path(replacement.file_path).read_text(encoding="utf-8")
         assert not old_file.exists()
     finally:
         db.close()

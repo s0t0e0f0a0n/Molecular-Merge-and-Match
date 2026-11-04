@@ -29,11 +29,19 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
+    allowed_hosts: str = "127.0.0.1,localhost,backend"
 
     @property
     def database_url(self) -> str:
         # SQLAlchemy SQLite URL
         return f"sqlite:///{self.sqlite_path}"
+
+    @property
+    def trusted_hosts(self) -> list[str]:
+        hosts = [host.strip() for host in self.allowed_hosts.split(",") if host.strip()]
+        if not hosts:
+            raise ValueError("ALLOWED_HOSTS must contain at least one host")
+        return hosts
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
