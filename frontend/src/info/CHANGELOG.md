@@ -1,30 +1,33 @@
 ## Molecular Merge & Match - Changelog
 
-Recent release entries are grouped by:
-1. Added
-2. Changed
-3. Fixed
-4. Security
+Releases are listed in reverse chronological order. Each release uses the
+following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 
 ### Versions in this document:  
-[v1.6.0](#v160)  
-[v1.5.0](#v150)  
-[v1.4.0](#v140)  
-[v1.3.0](#v130)  
-[v1.2.1](#version-121)  
-[v1.1.2](#feature-and-file-changes-in-version-112)  
+- [v1.5.10](#v1510)
+- [v1.5.0](#v150)
+- [v1.4.0](#v140)
+- [v1.3.0](#v130)
+- [v1.2.1](#v121)
+- [v1.1.2](#v112)
+- [v1.1.0](#v110)
+- [v1.0.0](#v100)
 
-## v1.6.0
+## v1.5.10
 ### Added
 - NMRium integration, replacing the NMRGlue test bench. Press F2 (Command+F2 on macOS) to open the NMRium spectrum viewer in its own window.
 - Press F8 (Command+F8 on macOS) to open the NMRium exercise-creation workflow. Load a Bruker dataset, pick and process the spectra, and the workflow stores the 1D peaks, multiplets and integrals as a draft that is saved to the database and restored the next time you open it.
 - Spectra can be exported as SVG, previewed with an adjustable ppm range and integral position, and stored temporarily in the backend (`NMRiumtemp`) for use in the new exercise.
 - The workflow continues with a Ketcher structure step and a summary page, which looks up the CAS number through PubChem and renders the structure with RDKit.
+- Study behaviour statistics now include metacognitive and study-style profiles, with a choice between all exercises and the last 20.
+- The statistics reset tools can reset exercises that are due for spaced repetition.
 
 ### Changed
-- The NMRGlue test bench (nmrglue and matplotlib preview) has been removed; NMRium replaces it.
 - Resetting a logbook now invalidates and reloads cached history, preventing stale entries from returning. Switching exercises or loading history no longer triggers an unnecessary save.
 - Large logbook saves no longer use `keepalive`, avoiding Chromium's 64 KiB request-body limit.
+
+### Removed
+- Removed the NMRGlue test bench (nmrglue and matplotlib preview); NMRium replaces it.
 
 ### Fixed
 - Switching exercises no longer lets late fragment, working-solution, or spectrum responses overwrite the current exercise.
@@ -43,8 +46,8 @@ Recent release entries are grouped by:
 ### Added
 - Logbook states now record when an exercise is opened and closed, improving statistics for exercises worked on over multiple days.
 - DBE values are recorded in the logbook and statistics, and DBE statistics are shown in the statistics panel.
-- New settings and statistics have been added.
-- Spaced repetition has been implemented.
+- Statistics now include a time-of-day activity chart, due-date and review-history charts, a Mastery List, and Level analysis.
+- Spaced repetition can be enabled in settings. It queues new and due exercises, advances after a correct solution, and lets users skip and defer an exercise; review intervals use time spent, incorrect attempts, cheat use, confidence, and difficulty.
 
 ### Changed
 - Tags now use a “show” option instead of “hide.”
@@ -58,417 +61,107 @@ Recent release entries are grouped by:
 - Cheat-tag behavior has been corrected.
 
 ## v1.4.0
-Changes since version 1.3.0
+### Added
+- A Statistics panel with fastest/slowest/most incorrect exercise lists; fragment, merge, and link totals and averages; exercise status and progression views; daily time/difficulty charts; and a logbook activity graph.
+- Successful solutions show a blocking prompt for confidence and difficulty ratings.
+- The Statistics panel's reset controls can target the current exercise, a set, a tag, an age range, a difficulty, or all exercises, and reset logbook, workspace, completion, or progression data—or delete selected exercises.
+- An NMRGlue test bench opens with F8 (Command+F8 on macOS). Drop a Bruker <sup>1</sup>H or <sup>13</sup>C dataset folder to preview spectra after zero-filling, windowing, Fourier transformation, and automatic phasing, with pulse-program information.
+- Exercise completion records which cheats were enabled, and upload progress is shown when importing exercises or patches.
+- The “Show only incomplete exercises” toggle narrows the results after the selected exercise-set and tag filters are applied; it combines with those filters using AND, while tags retain their selected AND/OR mode.
 
-## 1. Style/layout additions and changes
-### i. Examples 'references' contain subscript
-The deuterated solvents under exercise set 'references' are processed through formatChemistryText to display subscript in the exercise name.  
-/it{} and /notsub{} can be used but in other parts of the program you will see this as plain text, so only the automatic subscript is useful.
+### Changed
+- Deuterated solvents in the References set now display subscripts in exercise names. Exercise names use natural sorting.
+- Completion indicators now use SVG checkmarks, with distinct symbols for incorrect and halted exercises and a larger checkmark for completed sets.
+- The molecular editor closes when clicking outside it. Molecules rendered in its View mode can be sent to the editor or Working Fragments.
+- Cheats can be toggled with F7 (Command+F7 on macOS) or from the clickable cheat icon.
+- Exercise completion, timer, and checkmark state was adapted to support statistics and partial resets. Previously completed exercises can be partially reset and attempted again; their round checkmark changes back to the earlier checkmark style.
+- Predefined-fragment search keywords and synonyms were expanded without changing the fragment structures.
+- The exercise-menu code was moved into its own file.
 
-### ii. Succesfull validation overlay
-When an exercise is validated to be correct, an overlay is displayed which you cannot ignore. 
-The user is asked to answer the difficult question of HOW difficult the exercise really was. 
-This overlay also hides some visual otherwise annoying flickering when exercises are reloaded because a lot of data is written and retrieved from the database at this point.
-
-### iii. Exercise names sorting
-Exercise names are now listed using natural sorting. So exercises uploaded / created in a strange order, don't seem out of order.
-
-### iv. Green checkmarks update
-The green checkmark has now an SVG style instead of unicode character U2713. 
-In addition also Red crosses for incorrect attempts and Blue stop signs for halted exercises are displayed.
-Completed exersise sets carry the slightly larger U2714 checkmark.
-
-## 2. Feature additions and changes
-### i. Addition of Statistics
-The major contribution to this version is the introduction of a Statistics Panel.  
-This panel shows:
-- Top 10 lists (fastest and slowest to solve, most incorrect).
-- The number of fragments made, merges made and links made in total and averaged.
-- A visual grid of all exercises and their status, with hover over information displaying the title and time it took to complete.
-- Progression per exersize set, selected tags and in total.
-- Progression is displayed as stacked histograms over time.
-- Average time spent per day is displayed in the same graph.
-- Another graph displays the time spent on exercises and in stacked histogram form how difficult exercise were that were finished in that particular time.
-- Logbook graph which displays the merges, matches and fragment creations normalized in time. Allowing users to see at what time during the process of elucidation, each of these actions take place.
-- Reset tab where partial resets can be performed for specific exercise combinations.
-
-As part of gathering statistics, a confidence level is displayed and a difficulty question is asked to the user.  
-The difficulty will not only be used to display the immediatly responses for exercises, but also will be used in an upcoming release featuring a macro-version of spaced repition learning.
-
-### ii. NMRGlue test bench
-By pressing F8 (command+F8 on macOS) a new window opens up using Python's matplotlib and nmrglue to render a preview spectrum, including the pulse program.  
-Users can drag and drop the folder containing any Bruker <sup>1</sup>H or <sup>13</sup>C-NMR dataset.
-The rudimentary viewer already does a lot of things. It zero-fills, applies a window function, Fourier transforms and attempts automatic phasing.
-
-## 3. Functionality updates
-### i. Molecular editor changes
-The molecular editor can now be closed by clicking anywhere outside the editor pop-up.  
-The editor had a “view” option that renders SMILES into an SVG picture of the chemical structure. 
-Now that molecule can be transferred to the editor and/or to the Working Fragments space.
-
-### ii. Cheats enabling/disabling
-Cheats can be quickly enabled/disabled by pressing F7 (command+F7 on macOS).
-The cheats icon is clickable and allows you to disable the cheats. For individual cheats you still must go to the settings menu itself.
-
-### iii. Cheating is stored
-Which cheats a users has turned on when an exercise is completed is now stored in the statistics database.
-
-### iv. Visual upload progression bar
-When uploading exercises or patches, you will see the progression visually.
-
-### v. Checkmark and timer functionality
-Because of the addition of statistics and the future implementation of spaced repetition,
- the database fields used for controll over the visual checkmarks have been changed.
-
-### vi. Restart an old finished exercise
-You can partially reset exercises to re-do them.  
-When an exercise has been succesfully completed before and is partially reset, the green round checkmark symbol is replaced with the previous unicode U2713.
-
-### vii. Exercise filters
-Exercises can now be filtered with "show only incomplete exercises". This ignores the AND / OR selection of other tags.
-
-## 4. Bugfixes
-
-### i. Double warning icon displayed 
-Since last version the wrong warning icon was displayed alongside the correct one when too many atoms where used in the answer of linked fragments. This has been corrected.
-
-### ii. Cleanup of API requests
-The data requested from the database and written to the database was carried out in a less sufficient way before because of incremental implementation of statistics features.  
-Also one on the data fetching process was redundant and was deleted.  
-
-### iii. Fullscreen toggling
-The F11 key and fullscreen toggle button were not mutually usable: meaning when pressing the toggle button to go into fullscreen, F11 couldn´t get you out of it. Now it can.
-
-## 5. Other changes
-### Relocation of code
-Some of the code, like the exercise Menu, now has its own file.
+### Fixed
+- Corrected the duplicate warning icon shown when linked fragments used too many atoms.
+- Removed a redundant data fetch and reduced unnecessary API requests during statistics updates.
+- The F11 key and fullscreen toggle button now work together in both directions.
 
 
 
 
 ## v1.3.0
-Changes since version 1.2.1
-
-## 1. Style/layout additions and changes
-### Minor visibility changes
-Icons in the settings panel are introduced.
-
-## 2. Feature additions and changes
-
-### i. Update patches
-Users can now upload patches through the regular upload (ZIP import) process.  
-Patches are `.json` strcutured, with folders containing `.svg` files, all bundeled in a `.zip`.  
-Patches are meant to update data in the event of mistakes in earlier distributed exercises release.  
-In addition, .svg files can be replaced are added.
-
-## 3. Functionality updates
-### i. Cheat-tags visibility
-The missing option to hide/show additional tags which are considered to be cheats is now working.  
-These cheats can give a major hint regarding the structure of the molecule.
-
-### ii. Deletion of tags
-Tags are never truly deleted, only made invible in the menu. As soon as new exercises are uploaded containing these tags, they reappear.
-
-## 4. Bugfixes
-
---none--
-
-## 5. Other changes
-### i. GitHub
-GitHub is now again used to track changes and more importantly: build the installers. This way, also ARM64 targets can be made.
-
-
-### ii. build targets
-Support for `.flatpak` was extended so flatpaks work on more strict distributions like Arch and Fedora. Flatpaks are build locally.  
-Support for `.pacman` (binary identical to .pkg.tar.zst) was added, can be build from GitHub runners, tested on Artix Linux.  
-Support for `.snap` was added, but its use is discouraged.  
-Windows `.exe` now have the per-user install option: essential for managed system. A portable 'installer' is also available.
-
-
-
-
-
-
-## Version 1.2.1
-Changes since version 1.1.2
-
-## 1. Style/layout additions and changes
-
-### i. Fullscreen button change
-Instead of a button with text, inline svg is used to show minimalstics arrows.
-
-
-### ii. Fonts, spectra, and information
-- Information, like this changelog, has been added in the form of Markdown files. Support for markdown and a few markup plugins has been imported. Whether this will be kept in the future, or turned to standard html markup is not yet certain.  
-- Spectral SVG files are made using MestreNova for NMR spectra and using Microsoft Excel for the IR spectra. This presets certain fonts in both cases, which would have to be manually changed to also include other fonts in the font-family that are deemed suitable for displaying the spectra.
-This proces has been made redundant for all the NMR spectra and IR spectra, by manipulating the SVG files through string replacement of an inline SVG, instead of displaying them directly as an image (which was the case for the additional spectra). The prefered font choice for NMR-spectra is still `Aptos`, which is Microsoft-owned.
-- For IR spectra, the proces has been optimized by making the files using `Ubuntu Sans` as the standard font. In absence of this font, the standard system-ui fonts for Windows and macOS fit perfectly in place of `Ubuntu Sans`, the other way round did not!
-- To harmonize fonts between operating systems, the free to distribute `Ubuntu Sans` has been selected as standard display font and has been embedded in the software. First as a few different static fonts, and in the most recent update variable (.ttf and .woff2) fonts have been embedd.
-Monospace font `Noto Sans Mono` is similarly embedded.
-
-
-### iii. Layout updates
-Minor layout updates include moving the manual CAS validation to the working solution panel, and the addition of a settings button.
-
-
-
-## 2. Feature additions and changes
-
-### i. Settings and cheats panel
-A settings panel is introduced with multiple tabs (settings, solvents, tags, cheats, information and about). Each of these will be explained further separately, besides information and about.  
-Settings are stored as a user profile and presets can be loaded (default, beginner and exam).  
-The beginner preset has more visual aids and cheats already enabled, whereas the more advanced exam preset hides almost everything.
-
-### ii. Settings: display options
-- <sup>1</sup>H and <sup>13</sup>C spectra contain various pieces of text. "Exchanges with D<sub>2</sub>O" and "solvent" are two text strings which can be hideen by manipulation of the inline svg
-- Show or hide the manual (CAS number) validation tool
-- Show or hide the exercise timer
-- Show or hide warning symbols when too many atoms are merged or linked
-- Show or hide the informative text which atoms are missing
-- Enable or disable the use of cheats
-- Select a predefined preset for the settings (and cheats)
-
-
-### iii. Cheats: Coupled <sup>1</sup>H and <sup>13</sup>C spectra display options
-When <sup>13</sup>C-NMR spectra are coupled with <sup>2</sup>H, <sup>19</sup>F, <sup>31</sup>P etc. This information is now stored, and optionally visualized.  
-The .csv file has an additional column of multiplet data for <sup>13</sup>C-NMR. Every multiplet receives a manual 'atom tag'.  
-The atom tag is also listed in peak data `ppm (atom count, atom tag)` for example: `102.3 (1C, 2), 101.5 (1C, 2)`.  
-These two peaks have the same atom tag. The atom count is an integer followed by "C", it is almost always absent and having the "C" distinguises atom count from tag.  
-The new multiplet data and atom tag relation is stored in the database in a similar way as for <sup>1</sup>H data,  
-however peaks and multiplets have seperate tables, since coupled <sup>13</sup>C spectra aren't very common.  
-In standard view settings, users will only see a peaklist without multiplet info.  
-When "cheats" are activated, users can turn on 
-- the multiplicity information for coupled <sup>13</sup>C-NMR specttra in the datatable
-- view the coupling constants in the <sup>13</sup>C-NMR datatable
-- view the coupling constants in the <sup>1</sup>H-NMR datatable
-
-### iv. Cheats: overlays, DBE, atom count, alt nuclei and data source
-More cheat options enable:
-- Helper overlays displaying the most common areas in NMR spectra
-- Always show the correct DBE value, users cannot input their own DBE any longer
-- show the "integration" of the <sup>1</sup>H-NMR signals, as well as those for <sup>13</sup>C-NMR. The latter will nearly always display "1C", unless two different carbon atoms resonate at exactly the same frequency.
-- show the data source of the NMR spectra. This is considered a cheat for now, as one can look up the title description in the raw data folder and possibly find the answer to the exercise.
-- Alternative NMR-active nuclei with data entries are visible as a datatable (see functionalities) 
-
-## 3. Functionality updates
-
-### i. Change in calculation of the DBE and molecular formula
-The stored molecular formula can in rare occasions contain charges or salts.  
-Salts are recommended to be stored as C<sub>2</sub>H<sub>7</sub>N &bullet; HCl as an example for ethylamine hydrochloride.  
-The free base is the interesting part and is expected to be solved, the salt part doesn't have to be drawn.  
-Formerly the dot and spaces are stripped, but this leads to incorrect atom counts and DBE calculation.  
-The new version disregards everything after the &bullet; .  
-In the event Sodium salts are measured, this will be displayed in the spectral title (solvent line) instead OR Sodium and Potassium will be made exempt from the previous ruling. 
-However, the user is still asked to draw the non-salt structure and therefore also refraining from sodium salts in the title is considered good practice.
-
-DBE is now also calculated and stored in the database on exercise creation. The 'true' DBE will be used in cheats.
-All the calculations have been moved to a separate file from which the warnings and exercises make use.
-
-
-### ii. ZIP import handeling and addition of more data fields
-In addition to the standard fields already present, the following columns are added
-- Prefix
-- <sup>13</sup>C coupled NMR data
-- Alternative nuclei data
-- Datasources for both <sup>1</sup>H and <sup>13</sup>C spectra
-
-Instead of giving every exercise the generic label "Exercise" followed by their iterative ID number, the prefix column will contain the name of the exersizes, then followed by their ID number.  
-The other three columns are usefull additions which will be available through cheats and settings.
-In addition, the column `solvent` will now be allowed to be empty. When it is empty, the solvent is extracted from the data text, so to allow different solvents for <sup>1</sup>H and <sup>13</sup>C spectra respectively.
-
-
-### iii. Pause button and timer come from separate file
-The pause button, timer and statistics logic is now placed in its own file instead of the larger MolecularBookkeepingPage.tsx.
-
-
-
-### iv. Solvent and tags are pre-seeded: visibility setting
-A list of solvents and tags, with their preferred display options is pre-seeded into the database.  
-When exercises are loaded, the existings tags and solvents in the .csv file are replaced by tokens matching to the stored solvents and tags.  
-In the Settings, you can select which of the several (2 - 4) display names of each solvent you prefer.  
-In Settings, you can select which tags you want to hide and which you want to completely delete.
-
-
-### v. Alternative nuclei
-The data string for alternative nuclei (like <sup>19</sup>F) is stored in the database, and can through cheats be added to the datatable.  
-In addition, these alt nuclei can now be used to match with fragments. There is no direct spectrum to show peak highlighting, but a match from the datatable can be made.
-
-
-## 4. Bugfixes
-
-### i. Flashing warning symbols
-When switching exercises sometimes the warning symbols would briefly be shown, due to the when the current exercise components are closed and the new ones are loaded.
-The previous fix would interfere with the timer statistics, a more simplistic fix was implemented and preserves the timing functionality.
-
-
-### ii. Overlapping highlighting
-When multiple peaks are matched, or when <sup>13</sup>C J-coupled peaks collapse to a multiplet (activated through cheats), overlapping highlighting creates additive translucency.  
-The additive behaviour is fixed to merge peak highlight boxes before rendering.  
-Highlight is moved to a seperate hook file.
-
-
-
-## 5. Other changes
-
-### i. Listed markdown dependency
-For use in Information, Changelog and About sections. This might be converted to XML/HTML at some point for a little more flexible (inline) styling.
-
-
-
-### ii. Making the local build more universal, and automated
-Several aspects of the build required manual copying files or text edits.  
-Some of these workflow aspects were not essential when a few files where stored differently from the start.  
-Some of these workflow aspect did not succesfully create a local macOS or flatpak installer.  
-Automated shell scripts (.sh in Linux/macOS, .bat in Windows) have been made and generalised to apply in all shells (replacing `source` with `.` for example).
-macOS is currently not entirely verified (by lack of dedicated macOS hardware, wether it be Intel or ARM).
-The different automation files can take certain requirements into consideration, like the targeted architecture, or flags like "noconsole".  
-The latter was essential te remove for locally build macOS, whether it matters using GitHub runners will be tested later.
-
-
-## Feature and file changes in Version 1.1.2
-
-## 1. Style/layout additions and changes
-
-### i. Header toolbar
-Resized the icon and the molecular formula.  
-Changed the title and alt title of the icon to Molecular Merge and Match.  
-Changed the title of the html page to Molecular Merge & Match.  
-Made the exercise selection button wider (so it can accommodate "dimethylsulfoxide-d6" and a checkmark), and changed border color.  
-Added a timer and pause button with hover-over effect (see functionalities).  
-Added a completion checkmark (see functionalities).
-
-
-### ii. Additional spectra resized
-Changed the zoom factor to +/- 20% in scroll mode, including initial zoom.  
-Changed the size of the popup window (harmonised with regular H/C spectra) - approach a little different because the way the two popups come about and show data is different.  
-Total width of the popup changed, aspect ration as DOM style changed to 2.5:1.  
-Further tinkering with the padding of the tabs and the width of the image, to make the two popup (almost) identical. 
-
-
-### iii. Regular H/C spectra zoom and popup adjusted
-Changed the zoom factor to +/- 20% in scroll mode, including initial zoom.  
-Changed the size of the popup window (harmonised with additional spectra) - approach a little different because the way the two popups come about and show data is different.  
-Required different padding for each side, and different when popup is active, using `attribute: isModal ? x : y`
-
-
-### iv. Changed visuals for .svg files
-No code change, but all pictures are remade by me.  
-- H-NMR and C-NMR spectra have increased their linewith from 2.5 to 3.0, expansions from 2.5 to 3.5. Integrals from 3.0 to 4.0.
-- The lines were not as sharp, appeared broken or pixalated, because the svg picture size was decreased in the software, this is more prevalent on low-res displays.
-- The suggested font-family: "Aptos, Calibri, Ubuntu Sans, system-ui, sans-serif" for NMR spectra.
-- TIP for the user: Aptos is a standard Windows 11 font, but seems embedded in office NOT installed on the system. Do this yourself, if you want.
-- IR spectra have been redesigned.
-- IR behaved poorly when Calibri was set as the standard font and when Calibri was absent (like in Linux), Ubuntu Sans took over.
-- IR are now made using Ubuntu Sans. When changing to system-ui (Segoe UI Variable on Windows, SF Pro in mac) they still look good.
-- The suggested font-family: "Ubuntu Sans, system-ui, sans-serif" for IR spectra.
-
-### v. Zip Import additional spectra names
-The hyphen in additional spectra file names, is now retained in the title.
-
-
-## 2. Feature additions and changes
-
-### i. Database changes
-Throughout this version, multiple changes were made that required additional tables or changing the existing database structure.
-
-
-### ii. Zip Import changes
-Users can now upload a .zip file containing multiple folders.  
-Each folder provides the name of the Exercise set and contains its own .csv
-
-
-
-### iii. Statistics backend preparation, including pauzing an exercise
-  
-A future statistics page will contain much information. Most of it is now set up.
-- Start datetime of an exercise.
-- Complete datetime of an exercise.
-- Starting datetime of the current active exercise (5 second delay).
-- Stopping datetime of the current active exercise (open les than 20 seconds is ignored).
-- Duration of exercision is measured and added to already existing time. (even when finished within 20 seconds)
-- Repeated incorrect validation is added to an incorrect count.
-- A completed exercise does not overwrite or append these values.
-- Pauzing an exercise will write to the total spent time.
-
-
-### iv. Checkmark when an exercise is marked as complete
-When an exercises is succesfully completed (CAS or drawing), this is stored in the database and a visual green checkmark appears next to the exercise name.
-
-
-
-### v. More elements included in DBE calculation
-The standard set of C, H, N, F, Cl, Br, I, has been complemented to include:
-- mono-valent atom: deuterium `D, [2]H, [2H]` ([2]H is used by the molecular formula)
-- tri-valent atoms: Phosphorous and Boron `P` and `B`
-- tetra-valent atoms: Silicium and Tin `Si` and `Sn`
-- Note that di-valent atoms `O, S, Se` do not impact the DBE
-
-
-
-## 3. Functionality updates
-
-### i. Manual Import changes
-Users can now enter a _regular_ CAS number and InChI in the Exercise Creation Form. This is then converted to an sha-256 hash.  
-InChI is checked if it contains "InChI=" and if not it is appended to the front.
-
-
-### ii. Alternative CAS numbers.
-For molecules with chiral centers, the different isomers have different CAS numbers.  
-Users draw enantiomers without explicit chirality, bu when manually inserting a CAS number the R-, S-, isomer, or racemate can be filled in.  
-Thes three are now included in the ZipImport, stored in database and included in answer validation.  
-Manual CAS validation now checks any of the three possible CAS numbers (2 optional).  
-Other isomers (diastereo-isomers) can have many more forms, so these type of exercises rarely exists.  
-When they do, it is preferred to have no more than three isomers (for example tartaric acid, RR, SS and the meso SR/RS, beware that racemic and undefined versions of tartaric acid also exist and have a CAS number).
-
-
-### iii. Added more predefined fragments
-The order and identiy of the fragments has been altered. Also tested was the halide ion instead of hydrogen halide, which works.  
-Nitro, azide and hydroxide could not similarly be added as anions, so nitromethane, methyl azide, and water were used as precursors.
-
-
-### iv. Added preloaded fragments
-Example 2 has fragments preloaded when app.db is created.
-
-
-### v. Added predefined references
-New references are spectra of deuterated solvents. Their entries are now created when app.db is created.  
-The .svg files are located in the `references` folder, which had to be treated similar to `examples`, as a static mount.
-
-
-### vi. Added preloaded solutions
-
-The newly created references, and example 1 (sucrose) have their 'answer' preloaded when app.db is created.
-
-### vii. Sorting Additional Spectra
-New and predefined examples' additional spectra will be assigned a predefined priority.  
-The frontend will show the spectra according to this priority.
-
-
-## 4. Bugfixes
-
-### i. Displaying deuterium in molecular formula (title)
-The deuterium has to be stored as `[2]H` in the database, MOL V2000 uses an isoptope line and SMILES uses `[2H]`  
-The molecular formula is adjusted in the frontend by replacing the `[2]H` for `D`
-
-### ii. Using deuterium in calculation error 
-The atoms used currently are compared with the extracted ones from the molecular formula in the database.  
-The formula will now treat deuterium as hydrogen and calculate correctly by replacing the `[2]H` for `H`.  
-This does still show normal hydrogen isotopes in the molecular formula in the solution panel.  
-But since deuterium is a hydrogen isotope and only really used in the references, this detail is not of much importance.
-
-### iii. Exercise window double scrollbar
-When exercises list was expanded or the exercise creation form was opened, a double scrollbar was visible.  
-The outer most one wasn't doing anything. Fixed by increasing height from 80vh to 85vh.
-
-
-## 5. Other changes
-
-### i. Support for Flatpak and Fedora / Red Hat based Linux distributions (.rpm)
-Ran `sudo apt install rpm` on Linux Mint, target `.rpm` was created without issues.  
-Confirmed working on Nobara 43 (with KDE desktop).  
-Flatpak is a sandboxed/container format and required a few tweaks. (confirmed working on Nobara 43 and Linux Mint 22.2)
-
-
-### ii. Other seed files are also stored
-Just as the previous seed files, the preloaded solutions and fragments are created everytime the app.db is deleted, or updated when a new version is installed.  
-Redundant entries are removed from this list, exercises_seed.json has been renamed examples_seed.json
+### Added
+- ZIP patch imports let users apply JSON patches to previously distributed exercises. A ZIP can include patch folders and SVG files to replace or add spectra.
+
+### Changed
+- Settings tabs now have icons.
+- Importing an exercise with a soft-deleted tag now restores the existing tag instead of creating a duplicate.
+- GitHub was reinstated for change tracking and installer builds, enabling ARM64 targets. Flatpak support was extended for stricter distributions such as Arch and Fedora, with builds made locally. Pacman packages (`.pkg.tar.zst`) can be built on GitHub runners and were tested on Artix. Snap support was added but is discouraged. Windows installers now support per-user installation and a portable option.
+- The Example 1 INADEQUATE spectrum SVG was revised with larger text and heavier lines.
+
+### Fixed
+- Cheat-tag visibility now works in the exercise menu; the existing toggle filters cheat tags.
+- Corrected the preloaded sucrose example: Fragment 1 is now annotated as alpha-glucopyranose and Fragment 2 as beta-fructofuranose, matching their structures.
+
+
+
+
+
+
+## v1.2.1
+### Added
+- A Settings panel with Settings, Solvents, Tags, Cheats, Information, Changelog, and About tabs. Settings are saved in a user profile, with Default, Beginner, and Exam presets; Beginner enables more visual aids and cheats, while Exam hides most of them.
+- Display controls for solvent and exchange annotations, manual CAS validation, the timer, warnings, missing-atom text, cheats, and single-exercise creation.
+- Cheat options for NMR helper overlays; correct DBE; <sup>1</sup>H and <sup>13</sup>C atom counts; coupled <sup>13</sup>C multiplets and coupling constants; <sup>1</sup>H coupling constants; alternative-nuclei data; and spectrum data-source labels.
+- ZIP-import CSV fields for exercise-name prefixes, coupled <sup>13</sup>C data, alternative-nuclei data, and <sup>1</sup>H/<sup>13</sup>C data sources. The prefix is combined with the exercise number; an empty `solvent` field now allows the solvent to be extracted separately from each spectrum's data text.
+- Solvents and tags now use pre-seeded database entries and tokens. Settings let users choose preferred solvent names and hide or soft-delete tags; an Undo is available only while the Settings panel remains open.
+- Alternative-nuclei data, such as <sup>19</sup>F, can be shown in a data table and used to match fragments.
+- DBE is calculated and stored when an exercise is created, and the correct value is available to cheats.
+- Markdown content for the Information, Changelog, and About sections.
+
+### Changed
+- The fullscreen control now uses inline arrow icons. The manual CAS validation control moved to the working-solution panel, and a Settings button was added.
+- NMR and IR spectra now use normalized font handling to improve cross-platform rendering. Aptos remains the preferred NMR font; Ubuntu Sans is used for IR spectra and embedded with Noto Sans Mono.
+- Formula parsing now strips trailing charges and ignores salt/adduct components after separators when calculating atom counts and DBE; the non-salt structure remains the target for exercises. Formula and DBE calculations were moved into a shared module.
+- Timer, pause, and statistics logic were separated from the main bookkeeping page.
+- Local build scripts for Linux/macOS and Windows reduce manual setup, support shell differences (for example, using `.` instead of `source`), and account for target architecture and build flags. Linux package targets are AppImage, deb, RPM, and Flatpak; macOS builds were not verified.
+- The preloaded Example exercise and its spectra were updated; its molecular formula changed from `C4H8O2` to `C8H8O2`.
+
+### Fixed
+- Prevented warning symbols from flashing while switching exercises without disrupting timer statistics.
+- Fixed overlapping peak highlights by merging their boxes before rendering.
+
+
+## v1.1.2
+### Added
+- Exercise completion is saved for both CAS and structure answers, with a green checkmark beside completed exercises.
+- Exercise timing and incorrect-attempt tracking record start and completion times, active time, and failed validations. Timing starts five seconds after opening; visits shorter than 20 seconds are ignored unless the exercise is completed or paused.
+- A pause control and paused-screen overlay were added; clicking the overlay resumes the exercise, and pausing saves elapsed time.
+- ZIP imports support up to two alternative CAS numbers for stereoisomers, and answer validation accepts the primary or either alternative CAS number.
+- Additional spectra are displayed in their configured priority order.
+- Pacman packages were added to the Linux release artifacts.
+
+### Changed
+- The exercise selector was widened to accommodate long names and completion checkmarks.
+- The application page title is now “Molecular Merge & Match,” and the interface font changed to Ubuntu Sans.
+
+### Fixed
+- Fixed the double scrollbar shown when expanding the exercise list or opening exercise creation by increasing the layout height from 80vh to 85vh.
+- Packaged builds now include `examples_seed.json`, matching the database seeder so preloaded examples are available.
+
+## v1.1.0
+### Added
+- ZIP imports can contain multiple exercise-set folders, each with its own CSV file.
+- Preloaded deuterated-solvent references, fragments for the ethyl acetate example, and solution structures for sucrose and the solvent references.
+- Expanded the predefined fragment library with iodide, isobutane, nitromethane, and methyl azide.
+
+### Changed
+- Resized the header icon and molecular formula, displayed the current exercise name, and adjusted the regular and additional spectrum popups.
+- DBE calculation now supports deuterium, phosphorus, boron, silicon, and tin.
+- ZIP-import errors now identify the exercise-set folder, making it easier to locate the source of a failed row or file.
+
+### Fixed
+- Deuterium is displayed as D in molecular formulas, and formula comparison treats `[2]H` as hydrogen to avoid validation errors.
+
+## v1.0.0
+### Added
+- Initial desktop release for NMR structure elucidation, with interactive <sup>1</sup>H and <sup>13</sup>C spectra, peak-to-fragment linking and merging, and CAS or structure validation against teacher-defined solutions.
+- Exercise creation and ZIP import, a searchable predefined-fragment library, and per-exercise undo/redo history.
+- Desktop installers for Windows, macOS, and Linux.

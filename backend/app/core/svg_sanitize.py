@@ -1,5 +1,5 @@
 import re
-from xml.etree.ElementTree import Element
+from xml.etree.ElementTree import Element, register_namespace
 
 from defusedxml import ElementTree
 from defusedxml.common import DefusedXmlException
@@ -7,6 +7,11 @@ from defusedxml.common import DefusedXmlException
 SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 XLINK_NAMESPACE = "http://www.w3.org/1999/xlink"
 XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace"
+
+# Without these, serialisation emits `ns0:` prefixes, which the frontend's HTML
+# parser (innerHTML) does not recognise as SVG elements.
+register_namespace("", SVG_NAMESPACE)
+register_namespace("xlink", XLINK_NAMESPACE)
 
 _ALLOWED_ELEMENTS = {
     "a",
