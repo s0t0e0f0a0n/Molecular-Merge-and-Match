@@ -58,7 +58,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24.22.1'
 
       - name: Install RPM and PACMAN dependencies and tools
         if: runner.os == 'Linux'
@@ -71,15 +71,16 @@ jobs:
         shell: bash
         env:
           VITE_BASE_PATH: './'
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
           cd frontend
-          npm install
+          npm ci
           mkdir -p public
           npm run postinstall
           npm run build
 
       - name: Install Root Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Set App Version from Tag
         if: startsWith(github.ref, 'refs/tags/')
