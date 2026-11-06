@@ -568,6 +568,46 @@ it('persists formula and integral curve visibility settings', async () => {
   expect(screen.getAllByTestId('spectrum-mock')[0]).toHaveAttribute('data-show-integral-curves', 'false');
 });
 
+it('updates solvent notation without unmounting the spectrum viewer', async () => {
+  const user = userEvent.setup();
+  const solventPreference = {
+    id: 1,
+    match: 'CDCl3',
+    display: 'Chloroform',
+    smiles: '',
+    names: 'CDCl3,Chloroform-d',
+    options: ['CDCl3', 'Chloroform-d'],
+    preference: 0,
+    count: 1,
+    selected_name: 'CDCl3',
+  };
+  mockFetch.mockImplementation(async (url) => {
+    if (url.includes('/api/v1/solvents/1/preference')) {
+      return {
+        ok: true,
+        json: async () => ({ ...solventPreference, preference: 1, selected_name: 'Chloroform-d' }),
+      } as Response;
+    }
+    if (url.includes('/api/v1/solvents/')) {
+      return { ok: true, json: async () => [solventPreference] } as Response;
+    }
+    return { ok: true, json: async () => [] } as Response;
+  });
+
+  renderPage();
+  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(1));
+  const [spectrumViewer] = await screen.findAllByTestId('spectrum-mock');
+
+  await user.click(await screen.findByRole('button', { name: 'Open settings' }));
+  await user.click(screen.getByRole('button', { name: 'Solvents' }));
+  await user.click(screen.getByLabelText('Chloroform-d'));
+
+  await waitFor(() => {
+    expect(fetchExerciseDetail).toHaveBeenCalledWith(1, { trackSelection: false });
+  });
+  expect(screen.getAllByTestId('spectrum-mock')[0]).toBe(spectrumViewer);
+});
+
 it('ignores an older settings response after a newer toggle has been saved', async () => {
   const user = userEvent.setup();
   const pendingResponses: Array<(response: Response) => void> = [];

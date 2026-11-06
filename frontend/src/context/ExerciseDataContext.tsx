@@ -22,6 +22,7 @@ type ExerciseDataContextValue = {
   loadingSelectedExercise: boolean;
   selectedExerciseError: string | null;
   selectExerciseById: (exerciseId: number) => Promise<void>;
+  refreshExerciseDetail: () => Promise<void>;
   clearSelectedExercise: () => Promise<void>;
   setSelectedExerciseStatistics: (statistics: ExerciseStatistics | null) => void;
 };
@@ -48,6 +49,9 @@ export function ExerciseDataProvider({
   const [selectedExerciseError, setSelectedExerciseError] = useState<string | null>(null);
   
   const selectRequestIdRef = useRef(0);
+  const refreshRequestIdRef = useRef(0);
+  const selectedExerciseIdRef = useRef(selectedExerciseId);
+  selectedExerciseIdRef.current = selectedExerciseId;
 
   // Keep a persistent mutable reference of the current state values
   const trackingRef = useRef({ id: selectedExerciseId, completed: selectedExercise?.completed });
@@ -122,8 +126,27 @@ export function ExerciseDataProvider({
     }
   }, []);
 
+  const refreshExerciseDetail = useCallback(async () => {
+    if (selectedExerciseId === null) return;
+
+    const requestId = ++refreshRequestIdRef.current;
+    const selectionRequestId = selectRequestIdRef.current;
+    const detail = await fetchExerciseDetail(selectedExerciseId, { trackSelection: false });
+
+    if (
+      requestId !== refreshRequestIdRef.current ||
+      selectionRequestId !== selectRequestIdRef.current ||
+      selectedExerciseIdRef.current !== selectedExerciseId
+    ) {
+      return;
+    }
+
+    setSelectedExercise(detail);
+  }, [selectedExerciseId]);
+
   const clearSelectedExercise = useCallback(async () => {
     selectRequestIdRef.current += 1;
+    refreshRequestIdRef.current += 1;
 
     // Handles intentional Pause or manual backing out
     if (selectedExercise?.completed !== true && selectedExerciseId !== null) {
@@ -146,6 +169,7 @@ export function ExerciseDataProvider({
         loadingSelectedExercise,
         selectedExerciseError,
         selectExerciseById,
+        refreshExerciseDetail,
         clearSelectedExercise,
         setSelectedExerciseStatistics,
       }}

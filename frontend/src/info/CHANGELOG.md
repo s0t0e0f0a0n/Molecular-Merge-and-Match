@@ -27,12 +27,14 @@ following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 - Large logbook saves no longer use `keepalive`, avoiding Chromium's 64 KiB request-body limit.
 - ZIP import now loads JSZip only when needed, reducing the initial frontend bundle.
 - Frontend postinstall copies RDKit files using Node.js, so installations without development dependencies work. The frontend README documents prerequisites for a future Vite 8 upgrade.
+- Exercise timer updates now tick once per second in the timer display instead of re-rendering the whole page every 250 ms. Spectrum SVG display formatting is memoized to avoid repeating work on unrelated renders.
 
 ### Removed
 - Removed the NMRGlue test bench (nmrglue and matplotlib preview); NMRium replaces it.
 - Removed the unused `vite-plugin-node-polyfills` and `shx` development dependencies.
 
 ### Fixed
+- Changing a solvent preference refreshes the selected exercise detail without reselecting it, unmounting spectrum viewers, or restarting its study timer.
 - Switching exercises no longer lets late fragment, working-solution, or spectrum responses overwrite the current exercise.
 - Legacy database migrations now preserve statistics columns and their data when converting `cheats_used` to text.
 - Failed logbook saves now display a warning.

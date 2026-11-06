@@ -516,14 +516,17 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.2, 10))
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.2, 1))
  
-  const displaySvg = svgContent.replace(
-    /<svg([^>]*)>/,
-    (match, attrs) => {
-      const cleanAttrs = attrs
-        .replace(/preserveAspectRatio="[^"]*"/g, '')
-        .replace(/\s*style="[^"]*"/g, '')
-      return `<svg${cleanAttrs} preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:100%;">`
-    }
+  const displaySvg = useMemo(
+    () => svgContent.replace(
+      /<svg([^>]*)>/,
+      (match, attrs) => {
+        const cleanAttrs = attrs
+          .replace(/preserveAspectRatio="[^"]*"/g, '')
+          .replace(/\s*style="[^"]*"/g, '')
+        return `<svg${cleanAttrs} preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:100%;">`
+      }
+    ),
+    [svgContent, showSolventText, showExchangeText, showIntegralCurves],
   )
   
   const renderContent = (isModal: boolean) => (

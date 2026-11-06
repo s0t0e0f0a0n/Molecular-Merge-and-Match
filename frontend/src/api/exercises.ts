@@ -161,8 +161,10 @@ export async function fetchExerciseSummaries(): Promise<ExerciseSummary[]> {
 // This fetches all the data of one specific exercise.
 export async function fetchExerciseDetail(
   exerciseId: number,
+  options: { trackSelection?: boolean } = {},
 ): Promise<ExerciseDetail> {
-  const response = await fetch(`/api/v1/exercises/${exerciseId}`);
+  const trackQuery = options.trackSelection === false ? '?track=false' : '';
+  const response = await fetch(`/api/v1/exercises/${exerciseId}${trackQuery}`);
 
   if (!response.ok) {
     throw new Error(`Failed to load exercise ${exerciseId} (${response.status})`);

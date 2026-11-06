@@ -27,7 +27,6 @@ function formatElapsedTime(totalSeconds: number): string {
 type UseExerciseTimingStateOptions = {
   selectedExerciseId: number | null;
   isExerciseCompleted: boolean;
-  selectedExerciseStatistics: ExerciseStatistics | null;
   setSelectedExerciseStatistics: (statistics: ExerciseStatistics | null) => void;
 };
 
@@ -35,7 +34,6 @@ type UseExerciseTimingStateResult = {
   exercisePaused: boolean;
   pausingExercise: boolean;
   resumingExercise: boolean;
-  formattedDisplayedTimer: string;
   handlePauseExercise: () => Promise<void>;
   handleResumeExercise: () => Promise<void>;
   pauseButtonDisabled: boolean;
@@ -45,64 +43,17 @@ type UseExerciseTimingStateResult = {
 export function useExerciseTimingState({
   selectedExerciseId,
   isExerciseCompleted,
-  selectedExerciseStatistics,
   setSelectedExerciseStatistics,
 }: UseExerciseTimingStateOptions): UseExerciseTimingStateResult {
   const [exercisePaused, setExercisePaused] = useState(false);
   const [pausingExercise, setPausingExercise] = useState(false);
   const [resumingExercise, setResumingExercise] = useState(false);
-  const [timerNow, setTimerNow] = useState(() => Date.now());
 
   useEffect(() => {
     setExercisePaused(false);
     setPausingExercise(false);
     setResumingExercise(false);
-    setTimerNow(Date.now());
   }, [selectedExerciseId]);
-
-  useEffect(() => {
-    const startCountingMs = parseStatisticsTimestamp(selectedExerciseStatistics?.start_counting);
-    const stopCountingMs = parseStatisticsTimestamp(selectedExerciseStatistics?.stop_counting);
-    const completedAtMs = parseStatisticsTimestamp(selectedExerciseStatistics?.completed_at);
-
-    if (startCountingMs === null || stopCountingMs !== null || completedAtMs !== null) {
-      return;
-    }
-
-    setTimerNow(Date.now());
-
-    const intervalId = window.setInterval(() => {
-      setTimerNow(Date.now());
-    }, 250);
-
-    return () => window.clearInterval(intervalId);
-  }, [
-    selectedExerciseStatistics?.completed_at,
-    selectedExerciseStatistics?.start_counting,
-    selectedExerciseStatistics?.stop_counting,
-  ]);
-
-  const displayedTimerTotalSeconds = useMemo(() => {
-    if (!selectedExerciseStatistics) {
-      return 0;
-    }
-
-    const startCountingMs = parseStatisticsTimestamp(selectedExerciseStatistics.start_counting);
-    const stopCountingMs = parseStatisticsTimestamp(selectedExerciseStatistics.stop_counting);
-    const completedAtMs = parseStatisticsTimestamp(selectedExerciseStatistics.completed_at);
-    let totalSeconds = selectedExerciseStatistics.timer_total ?? 0;
-
-    if (startCountingMs !== null && stopCountingMs === null && completedAtMs === null) {
-      totalSeconds += Math.max(0, Math.floor((timerNow - startCountingMs) / 1000));
-    }
-
-    return totalSeconds;
-  }, [selectedExerciseStatistics, timerNow]);
-
-  const formattedDisplayedTimer = useMemo(
-    () => formatElapsedTime(displayedTimerTotalSeconds),
-    [displayedTimerTotalSeconds],
-  );
 
   const handlePauseExercise = useCallback(async () => {
     if (selectedExerciseId === null) return;
@@ -179,7 +130,6 @@ export function useExerciseTimingState({
     exercisePaused,
     pausingExercise,
     resumingExercise,
-    formattedDisplayedTimer,
     handlePauseExercise,
     handleResumeExercise,
     pauseButtonDisabled,
@@ -188,10 +138,50 @@ export function useExerciseTimingState({
 }
 
 type ExerciseTimerDisplayProps = {
-  formattedDisplayedTimer: string;
+  selectedExerciseStatistics: ExerciseStatistics | null;
 };
 
-export function ExerciseTimerDisplay({ formattedDisplayedTimer }: ExerciseTimerDisplayProps) {
+export function ExerciseTimerDisplay({ selectedExerciseStatistics }: ExerciseTimerDisplayProps) {
+  const [timerNow, setTimerNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const startCountingMs = parseStatisticsTimestamp(selectedExerciseStatistics?.start_counting);
+    const stopCountingMs = parseStatisticsTimestamp(selectedExerciseStatistics?.stop_counting);
+    const completedAtMs = parseStatisticsTimestamp(selectedExerciseStatistics?.completed_at);
+
+    setTimerNow(Date.now());
+    if (startCountingMs === null || stopCountingMs !== null || completedAtMs !== null) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setTimerNow(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [
+    selectedExerciseStatistics?.completed_at,
+    selectedExerciseStatistics?.start_counting,
+    selectedExerciseStatistics?.stop_counting,
+  ]);
+
+  const formattedDisplayedTimer = useMemo(() => {
+    if (!selectedExerciseStatistics) {
+      return formatElapsedTime(0);
+    }
+
+    const startCountingMs = parseStatisticsTimestamp(selectedExerciseStatistics.start_counting);
+    const stopCountingMs = parseStatisticsTimestamp(selectedExerciseStatistics.stop_counting);
+    const completedAtMs = parseStatisticsTimestamp(selectedExerciseStatistics.completed_at);
+    let totalSeconds = selectedExerciseStatistics.timer_total ?? 0;
+
+    if (startCountingMs !== null && stopCountingMs === null && completedAtMs === null) {
+      totalSeconds += Math.max(0, Math.floor((timerNow - startCountingMs) / 1000));
+    }
+
+    return formatElapsedTime(totalSeconds);
+  }, [selectedExerciseStatistics, timerNow]);
+
   return (
     <span
       data-testid="exercise-timer-display"
@@ -258,21 +248,21 @@ export function PauseExerciseButton({ onPause, disabled, title }: PauseExerciseB
 }
 
 type TimingPanelProps = {
-  formattedDisplayedTimer: string;
+  selectedExerciseStatistics: ExerciseStatistics | null;
   onPause: () => void;
   pauseButtonDisabled: boolean;
   pauseButtonTitle: string;
 };
 
 export function TimingPanel({
-  formattedDisplayedTimer,
+  selectedExerciseStatistics,
   onPause,
   pauseButtonDisabled,
   pauseButtonTitle,
 }: TimingPanelProps) {
   return (
     <>
-      <ExerciseTimerDisplay formattedDisplayedTimer={formattedDisplayedTimer} />
+      <ExerciseTimerDisplay selectedExerciseStatistics={selectedExerciseStatistics} />
       <PauseExerciseButton
         onPause={onPause}
         disabled={pauseButtonDisabled}

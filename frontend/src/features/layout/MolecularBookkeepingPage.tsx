@@ -257,6 +257,7 @@ export function MolecularBookkeepingPage() {
   loadingSelectedExercise,
   selectedExerciseError,
   selectExerciseById,
+  refreshExerciseDetail,
   clearSelectedExercise,
   setSelectedExerciseStatistics,
   } = useExerciseData();
@@ -312,7 +313,6 @@ export function MolecularBookkeepingPage() {
   const {
     exercisePaused,
     resumingExercise,
-    formattedDisplayedTimer,
     handlePauseExercise,
     handleResumeExercise,
     pauseButtonDisabled,
@@ -320,7 +320,6 @@ export function MolecularBookkeepingPage() {
   } = useExerciseTimingState({
     selectedExerciseId,
     isExerciseCompleted: selectedExercise?.completed === true,
-    selectedExerciseStatistics,
     setSelectedExerciseStatistics,
   });
 
@@ -944,14 +943,18 @@ useEffect(() => {
           .sort((a, b) => (b.count - a.count) || (a.id - b.id)));
 
         if (selectedExerciseId !== null) {
-          void selectExerciseById(selectedExerciseId);
+          try {
+            await refreshExerciseDetail();
+          } catch (error) {
+            console.error('failed to refresh exercise after solvent preference update', error);
+          }
         }
       } catch (err) {
         console.error('failed to update solvent preference', err);
         setSolvents(prev);
       }
     },
-    [solvents, selectedExerciseId, selectExerciseById],
+    [solvents, selectedExerciseId, refreshExerciseDetail],
   );
 
 const handleChangeLinkInheritMode = useCallback(
@@ -2202,7 +2205,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
           */}
 
           {showTimer && (
-            <ExerciseTimerDisplay formattedDisplayedTimer={formattedDisplayedTimer} />
+            <ExerciseTimerDisplay selectedExerciseStatistics={selectedExerciseStatistics} />
           )}
 
           <PauseExerciseButton

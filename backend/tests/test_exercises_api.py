@@ -106,6 +106,60 @@ def test_list_exercises_empty_initially(client):
     assert response.json() == []
 
 
+def test_get_exercise_without_tracking_does_not_modify_statistics(client):
+    created = client.post("/api/v1/exercises/", json=_exercise_payload())
+    assert created.status_code == 201
+    exercise_id = created.json()["id"]
+    started_at = datetime(2026, 1, 1, 12, 0, 0)
+    start_counting = datetime(2026, 1, 1, 12, 1, 0)
+
+    db = SessionLocal()
+    try:
+        db.add(
+            Statistics(
+                exercise_id=str(exercise_id),
+                started_at=started_at,
+                start_counting=start_counting,
+                timer_total=42,
+                SR_status="learning",
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get(f"/api/v1/exercises/{exercise_id}?track=false")
+
+    assert response.status_code == 200
+    db = SessionLocal()
+    try:
+        statistics = db.query(Statistics).filter_by(exercise_id=str(exercise_id)).one()
+        assert statistics.started_at == started_at
+        assert statistics.start_counting == start_counting
+        assert statistics.stop_counting is None
+        assert statistics.timer_total == 42
+    finally:
+        db.close()
+
+
+def test_get_exercise_tracks_selection_by_default(client):
+    created = client.post("/api/v1/exercises/", json=_exercise_payload())
+    assert created.status_code == 201
+    exercise_id = created.json()["id"]
+
+    response = client.get(f"/api/v1/exercises/{exercise_id}")
+
+    assert response.status_code == 200
+    db = SessionLocal()
+    try:
+        statistics = db.query(Statistics).filter_by(exercise_id=str(exercise_id)).one()
+        assert statistics.started_at is not None
+        assert statistics.start_counting is not None
+        assert statistics.stop_counting is None
+    finally:
+        db.close()
+
+
 def test_correct_solution_validation_records_learning_review_before_completion(client):
     created = client.post(
         "/api/v1/exercises/",

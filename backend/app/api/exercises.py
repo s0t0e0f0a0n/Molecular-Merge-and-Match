@@ -1054,7 +1054,7 @@ def update_exercise_from_import(body: ExerciseUpdateRequest) -> ExerciseOut:
         raise
 
 @router.get("/{exercise_id}", response_model=ExerciseOut)
-def get_exercise(exercise_id: int) -> ExerciseOut:
+def get_exercise(exercise_id: int, track: bool = True) -> ExerciseOut:
     with get_db() as db:
         row = (
             db.query(Exercise)
@@ -1067,7 +1067,8 @@ def get_exercise(exercise_id: int) -> ExerciseOut:
         )
         if not row:
             raise HTTPException(status_code=404, detail="Exercise not found.")
-        mark_exercise_selected(exercise_id)
+        if track:
+            mark_exercise_selected(exercise_id)
         return _to_response(row, db)
 
 @router.get("/", response_model=list[ExerciseOut])
