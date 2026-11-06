@@ -135,6 +135,69 @@ async function selectExerciseViaMenu(user: ReturnType<typeof userEvent.setup>, e
   await user.click(await screen.findByRole('button', { name: new RegExp(`^${exerciseName}\\b`) }));
 }
 
+it('deletes exercises concurrently and selects the next remaining exercise', async () => {
+  const user = userEvent.setup();
+  const summaries = [
+    ...mockSummaries,
+    { ...mockSummaries[1], id: 3, name: 'Exercise 3' },
+    { ...mockSummaries[1], id: 4, name: 'Exercise 4' },
+  ];
+  const remainingSummaries = [summaries[0], summaries[3]];
+  let deletionStarted = false;
+  const deleteResolvers: Array<(response: Response) => void> = [];
+  vi.mocked(fetchExerciseSummaries).mockImplementation(async () => (
+    deletionStarted ? remainingSummaries : summaries
+  ));
+  vi.mocked(fetchExerciseDetail).mockImplementation(async (exerciseId: number) => {
+    if (exerciseId === 1) return mockExercise1;
+    if (exerciseId === 2) return mockExercise2;
+    if (exerciseId === 4) return { ...mockExercise2, id: 4, name: 'Exercise 4' };
+    throw new Error(`Unknown mock exercise id: ${exerciseId}`);
+  });
+  mockFetch.mockImplementation((url, init) => {
+    if (url.includes('/api/v1/settings/') && init?.method !== 'PUT') {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ enable_delete: true }),
+      } as Response);
+    }
+    if (url.includes('/api/v1/exercises/') && init?.method === 'DELETE') {
+      deletionStarted = true;
+      return new Promise((resolve) => deleteResolvers.push(resolve));
+    }
+    return Promise.resolve({
+      ok: true,
+      json: async () => (url.includes('/api/v1/settings/') ? { enable_delete: true } : []),
+    } as Response);
+  });
+  const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+  renderPage();
+  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(1));
+  await selectExerciseViaMenu(user, 'Exercise 2');
+  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(2));
+
+  if (!screen.queryByTitle('Delete exercises')) {
+    await user.click(screen.getByTestId('exercise-menu-button'));
+  }
+  await user.click(screen.getByTitle('Delete exercises'));
+  await user.click(screen.getAllByRole('button', { name: /^Exercise 2\b/ }).at(-1)!);
+  await user.click(screen.getAllByRole('button', { name: /^Exercise 3\b/ }).at(-1)!);
+  await user.click(screen.getByRole('button', { name: 'Delete 2 items' }));
+
+  await waitFor(() => expect(deleteResolvers).toHaveLength(2));
+  expect(confirmSpy).toHaveBeenCalledOnce();
+  await act(async () => {
+    deleteResolvers.forEach((resolve) => resolve({
+      ok: true,
+      json: async () => ({}),
+    } as Response));
+  });
+
+  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(4));
+  confirmSpy.mockRestore();
+});
+
 it('renders the top bar with title, current exercise display, and editor button', async () => {
   renderPage();
 
@@ -502,6 +565,45 @@ it('persists formula and integral curve visibility settings', async () => {
 
   await user.click(document.querySelector<HTMLLabelElement>('label[for="setting-show-integral-curves"]')!);
   await waitFor(() => expect(settingsPayloads).toContainEqual({ show_integral_curves: false }));
+  expect(screen.getAllByTestId('spectrum-mock')[0]).toHaveAttribute('data-show-integral-curves', 'false');
+});
+
+it('ignores an older settings response after a newer toggle has been saved', async () => {
+  const user = userEvent.setup();
+  const pendingResponses: Array<(response: Response) => void> = [];
+  mockFetch.mockImplementation((url, init) => {
+    if (url.includes('/api/v1/settings/') && init?.method === 'PUT') {
+      return new Promise((resolve) => pendingResponses.push(resolve));
+    }
+    if (url.includes('/api/v1/settings/')) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ show_formula: true, show_integral_curves: true }),
+      } as Response);
+    }
+    return Promise.resolve({ ok: true, json: async () => [] } as Response);
+  });
+
+  renderPage();
+  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(1));
+  await user.click(await screen.findByRole('button', { name: 'Open settings' }));
+  await user.click(document.querySelector<HTMLLabelElement>('label[for="setting-show-formula"]')!);
+  await user.click(document.querySelector<HTMLLabelElement>('label[for="setting-show-integral-curves"]')!);
+  await waitFor(() => expect(pendingResponses).toHaveLength(2));
+
+  await act(async () => {
+    pendingResponses[1]({
+      ok: true,
+      json: async () => ({ show_formula: false, show_integral_curves: false }),
+    } as Response);
+  });
+  await act(async () => {
+    pendingResponses[0]({
+      ok: true,
+      json: async () => ({ show_formula: false, show_integral_curves: true }),
+    } as Response);
+  });
+
   expect(screen.getAllByTestId('spectrum-mock')[0]).toHaveAttribute('data-show-integral-curves', 'false');
 });
 

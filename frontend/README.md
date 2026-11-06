@@ -21,6 +21,10 @@ npm run test:run      # Vitest single run
 npm run test:coverage # Vitest with coverage report
 ```
 
+## Upgrading Vite
+
+Vite 8 requires `@vitejs/plugin-react` 5+ (4.x supports up to Vite 7). Vite 8 (Rolldown) no longer supports `optimizeDeps.esbuildOptions` plugins, so `NodeGlobalsPolyfillPlugin` must be replaced first.
+
 ## Notes
 
 - `ExerciseCreationForm` (`src/features/exercises/ExerciseCreationForm.tsx`) is implemented but not wired into the main page yet. The bulk CSV import section exists in the source but is not exposed in the UI. When bulk-importing, non-1H/13C spectra (e.g. IR) are matched by filename convention `{N}_<label>.svg` and stored as additional spectra.

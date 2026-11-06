@@ -270,6 +270,7 @@ export function MolecularBookkeepingPage() {
     return Number.isFinite(id) && id > 0 ? id : null;
   });
   const exercisesInitializedRef = useRef(false);
+  const settingsRequestIdRef = useRef(0);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
 
@@ -645,16 +646,10 @@ useEffect(() => {
   }, []);
 
   const handleDeleteExercises = useCallback(async (exerciseIds: number[]): Promise<number[]> => {
-    const failed: number[] = [];
-
-    for (const id of exerciseIds) {
-      try {
-        await deleteExercise(id);
-      } catch (_error) {
-        failed.push(id);
-      }
-    }
-    
+    const results = await Promise.allSettled(exerciseIds.map((id) => deleteExercise(id)));
+    const failed = results.flatMap((result, index) => (
+      result.status === 'rejected' ? [exerciseIds[index]] : []
+    ));
 
     try {
       const updatedSummaries = await fetchExerciseSummaries();
@@ -678,7 +673,7 @@ useEffect(() => {
     }
 
     return failed;
-  }, [selectedExerciseId, selectExerciseById, clearSelectedExercise, loadSolventPreferences]);
+  }, [exerciseSummaries, selectedExerciseId, selectExerciseById, clearSelectedExercise, loadSolventPreferences]);
 
   const currentPeaks = useMemo<PeakDef[]>(() => {
     if (!selectedExercise) {
@@ -869,8 +864,14 @@ useEffect(() => {
       if (overrides.SR_mode !== undefined) payload.SR_mode = overrides.SR_mode;
 
       try {
+        const requestId = ++settingsRequestIdRef.current;
         const saved = await updateUserSettings(payload);
-        if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+        if (
+          requestId === settingsRequestIdRef.current
+          && saved
+          && typeof saved === 'object'
+          && !Array.isArray(saved)
+        ) {
           applyIncomingSettings(saved);
         }
       } catch (err) {

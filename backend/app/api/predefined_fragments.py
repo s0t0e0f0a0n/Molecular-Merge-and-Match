@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
@@ -33,11 +31,13 @@ def list_predefined_fragments(
     with get_db() as db:
         frags = db.query(PredefinedFragment).order_by(PredefinedFragment.id).all()
         if search:
-            try:
-                pat = re.compile(search, re.IGNORECASE)
-            except re.error:
-                raise HTTPException(400, detail="Invalid regex")
-            frags = [f for f in frags if pat.search(f.keywords) or pat.search(f.name)]
+            normalized_search = search.casefold()
+            frags = [
+                f
+                for f in frags
+                if normalized_search in f.keywords.casefold()
+                or normalized_search in f.name.casefold()
+            ]
         return frags
 
 @router.post("/", response_model=PredefinedFragmentOut, status_code=201)

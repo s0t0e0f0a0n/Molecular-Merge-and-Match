@@ -4,15 +4,8 @@ export type ResetLevel = 'logbook' | 'workspace' | 'completion' | 'progression' 
 
 export async function resetExercises(exerciseIds: number[], level: ResetLevel): Promise<void> {
   if (level === 'exercise') {
-    let failed = false;
-    for (const exerciseId of exerciseIds) {
-      try {
-        await deleteExercise(exerciseId);
-      } catch {
-        failed = true;
-      }
-    }
-    if (failed) {
+    const results = await Promise.allSettled(exerciseIds.map((exerciseId) => deleteExercise(exerciseId)));
+    if (results.some((result) => result.status === 'rejected')) {
       throw new Error('Failed to delete one or more exercises');
     }
     return;

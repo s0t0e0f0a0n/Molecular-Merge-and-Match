@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type CSSProperties } from "react";
-import JSZip, { type JSZipObject } from "jszip";
+import type { JSZipObject } from "jszip";
+import type JSZip from "jszip";
 import {
   DEFAULT_AXIS_BEGIN,
   DEFAULT_AXIS_END,
@@ -221,6 +222,7 @@ export function ExerciseZipImport({ onImported, onImportingChange }: ExerciseZip
     setProgress(null);
 
     try {
+      const { default: JSZip } = await import("jszip");
       const zip = await JSZip.loadAsync(file);
       const allCsvEntries = getAllCsvEntries(zip);
       const jsonEntry = getJsonEntry(zip);

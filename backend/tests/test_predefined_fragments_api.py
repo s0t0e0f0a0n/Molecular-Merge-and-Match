@@ -35,7 +35,7 @@ def test_search_by_keyword(client):
     assert results[0]["name"] == "Methyl group"
 
 
-def test_search_by_regex(client):
+def test_search_by_multiple_terms(client):
     client.post("/api/v1/predefined-fragments/", json={
         "name": "Hydroxyl group", "smiles": "O", "keywords": "hydroxyl,OH,alcohol"
     })
@@ -46,17 +46,20 @@ def test_search_by_regex(client):
         "name": "Phenyl ring", "smiles": "c1ccccc1", "keywords": "phenyl,benzene,ring"
     })
 
-    resp = client.get("/api/v1/predefined-fragments/", params={"search": "acid|alcohol"})
+    for term, expected_name in (("acid", "Carboxyl group"), ("alcohol", "Hydroxyl group")):
+        resp = client.get("/api/v1/predefined-fragments/", params={"search": term})
+        assert resp.status_code == 200
+        assert [result["name"] for result in resp.json()] == [expected_name]
+
+
+def test_search_treats_regex_syntax_as_literal(client):
+    client.post("/api/v1/predefined-fragments/", json={
+        "name": "Literal (a+)+$ pattern", "smiles": "C", "keywords": ""
+    })
+
+    resp = client.get("/api/v1/predefined-fragments/", params={"search": "(a+)+$"})
     assert resp.status_code == 200
-    results = resp.json()
-    assert len(results) == 2
-    names = {r["name"] for r in results}
-    assert names == {"Hydroxyl group", "Carboxyl group"}
-
-
-def test_search_invalid_regex(client):
-    resp = client.get("/api/v1/predefined-fragments/", params={"search": "[invalid"})
-    assert resp.status_code == 400
+    assert [result["name"] for result in resp.json()] == ["Literal (a+)+$ pattern"]
 
 
 def test_search_matches_name_too(client):

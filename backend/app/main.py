@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -45,7 +46,14 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title=settings.app_name, lifespan=lifespan)
+    enable_docs = os.environ.get("ENABLE_DOCS") == "1"
+    app = FastAPI(
+        title=settings.app_name,
+        lifespan=lifespan,
+        docs_url="/docs" if enable_docs else None,
+        redoc_url="/redoc" if enable_docs else None,
+        openapi_url="/openapi.json" if enable_docs else None,
+    )
 
     app.add_middleware(RequireRequestedWithMiddleware)
     app.add_middleware(
@@ -58,13 +66,17 @@ def create_app() -> FastAPI:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts)
 
     app.include_router(api_router, prefix=settings.api_v1_prefix)
-    Path("data/uploads").mkdir(parents=True, exist_ok=True)
-    Path("data/examples").mkdir(parents=True, exist_ok=True)
-    Path("data/references").mkdir(parents=True, exist_ok=True)
+    data_directory = Path(settings.sqlite_path).resolve().parent
+    uploads_directory = data_directory / "uploads"
+    examples_directory = data_directory / "examples"
+    references_directory = data_directory / "references"
+    uploads_directory.mkdir(parents=True, exist_ok=True)
+    examples_directory.mkdir(parents=True, exist_ok=True)
+    references_directory.mkdir(parents=True, exist_ok=True)
     SVG_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
-    app.mount("/uploads", StaticFiles(directory="data/uploads"), name="uploads")
-    app.mount("/examples", StaticFiles(directory="data/examples"), name="examples")
-    app.mount("/references", StaticFiles(directory="data/references"), name="references")
+    app.mount("/uploads", StaticFiles(directory=str(uploads_directory)), name="uploads")
+    app.mount("/examples", StaticFiles(directory=str(examples_directory)), name="examples")
+    app.mount("/references", StaticFiles(directory=str(references_directory)), name="references")
     app.mount("/nmrium-temp", StaticFiles(directory=str(SVG_TEMP_ROOT)), name="nmrium-temp")
 
     return app

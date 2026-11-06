@@ -13,7 +13,7 @@ from typing import NamedTuple
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 
@@ -131,6 +131,18 @@ class AxisScale(BaseModel):
         if self.begin == self.end:
             raise ValueError("Axis begin and end cannot be equal.")
         return self
+
+
+def _formula_dbe_or_400(molecular_formula: str | None) -> float:
+    if not molecular_formula:
+        return 0.0
+    try:
+        return calculate_dbe(parse_formula(molecular_formula))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid molecular formula: {molecular_formula}",
+        ) from exc
 
 
 class UploadedSvgPayload(BaseModel):
@@ -897,6 +909,30 @@ def update_exercise_from_import(body: ExerciseUpdateRequest) -> ExerciseOut:
                 raise HTTPException(status_code=404, detail="No exercise matched the supplied identifiers.")
 
             fields = body.update
+            for axis_name, start_field, end_field in (
+                ("1H", "h1_axis_start", "h1_axis_end"),
+                ("13C", "c13_axis_start", "c13_axis_end"),
+            ):
+                if start_field not in fields.model_fields_set and end_field not in fields.model_fields_set:
+                    continue
+                begin = (
+                    getattr(fields, start_field)
+                    if start_field in fields.model_fields_set
+                    else getattr(exercise, start_field)
+                )
+                end = (
+                    getattr(fields, end_field)
+                    if end_field in fields.model_fields_set
+                    else getattr(exercise, end_field)
+                )
+                try:
+                    AxisScale(begin=begin, end=end)
+                except ValidationError as exc:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid {axis_name} axis scale.",
+                    ) from exc
+
             if "solution_inchi_hash" in fields.model_fields_set:
                 exercise.solution_inchi_hash = _normalize_solution_hash(fields.solution_inchi_hash)
             if "solution_cas_hash" in fields.model_fields_set:
@@ -917,7 +953,7 @@ def update_exercise_from_import(body: ExerciseUpdateRequest) -> ExerciseOut:
             if "molecular_formula" in fields.model_fields_set:
                 formula = fields.molecular_formula.strip() if fields.molecular_formula else None
                 exercise.molecular_formula = formula
-                exercise.dbe = calculate_dbe(parse_formula(formula)) if formula else 0.0
+                exercise.dbe = _formula_dbe_or_400(formula)
 
             if "tags" in fields.model_fields_set:
                 old_tag_ids = extract_tag_ids(exercise.tags_csv)
@@ -1269,15 +1305,7 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
     alt2_cas_hash = _prepare_solution_cas_fields(body.alt2_cas_number)
 
     molecular_formula = body.molecular_formula.strip() if body.molecular_formula else None
-    formula_dbe = 0.0
-    if molecular_formula:
-        try:
-            formula_dbe = calculate_dbe(parse_formula(molecular_formula))
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid molecular formula: {molecular_formula}",
-            ) from exc
+    formula_dbe = _formula_dbe_or_400(molecular_formula)
 
     created_file_paths: list[str] = []
 

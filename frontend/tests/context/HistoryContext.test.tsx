@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { useEffect } from 'react';
 
 import { HistoryProvider, useHistory } from '../../src/context/HistoryContext';
 import * as logbookApi from '../../src/api/logbook';
@@ -12,16 +13,30 @@ vi.mock('../../src/context/ExerciseDataContext', () => ({
   useExerciseData: () => ({ selectedExerciseId: exerciseSelection.id }),
 }));
 
+const historyHandlers = {
+  deleteFragment: vi.fn(async () => {}),
+  restoreFragment: vi.fn(async () => {}),
+  updateFragment: vi.fn(async () => {}),
+  setSolution: vi.fn(async () => {}),
+  clearSolution: vi.fn(async () => {}),
+  setDbe: vi.fn(async () => {}),
+};
 
 function TestComponent() {
-  const { entries, record, clearHistory } = useHistory();
+  const { entries, cursor, record, clearHistory, undo, redo, registerHandlers } = useHistory();
+  useEffect(() => {
+    registerHandlers(historyHandlers);
+  }, [registerHandlers]);
   return (
     <div>
       <div data-testid="count">{entries.length}</div>
+      <div data-testid="cursor">{cursor}</div>
       <button data-testid="add" onClick={() =>
         record({ kind: 'create-fragment', fragmentId: 1, fragLabel: 'A' })
       }>add</button>
       <button data-testid="clear" onClick={clearHistory}>clear</button>
+      <button data-testid="undo" onClick={() => void undo()}>undo</button>
+      <button data-testid="redo" onClick={() => void redo()}>redo</button>
     </div>
   );
 }
@@ -143,6 +158,45 @@ describe('HistoryProvider talks to logbook api', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Logbook save failed. Your recent changes may not be saved.',
     );
+  });
+
+  it('ignores a re-entrant undo while the first undo is still applying', async () => {
+    let finishDelete!: () => void;
+    historyHandlers.deleteFragment.mockImplementationOnce(
+      () => new Promise<void>((resolve) => { finishDelete = resolve; }),
+    );
+    renderProvider();
+    await waitFor(() => expect(logbookApi.fetchLogbook).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByTestId('add'));
+    await waitFor(() => expect(screen.getByTestId('cursor')).toHaveTextContent('1'));
+    fireEvent.click(screen.getByTestId('undo'));
+    fireEvent.click(screen.getByTestId('undo'));
+
+    expect(historyHandlers.deleteFragment).toHaveBeenCalledTimes(1);
+    await act(async () => finishDelete());
+    await waitFor(() => expect(screen.getByTestId('cursor')).toHaveTextContent('0'));
+  });
+
+  it('ignores a re-entrant redo while the first redo is still applying', async () => {
+    let finishRestore!: () => void;
+    renderProvider();
+    await waitFor(() => expect(logbookApi.fetchLogbook).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByTestId('add'));
+    await waitFor(() => expect(screen.getByTestId('cursor')).toHaveTextContent('1'));
+    fireEvent.click(screen.getByTestId('undo'));
+    await waitFor(() => expect(screen.getByTestId('cursor')).toHaveTextContent('0'));
+
+    historyHandlers.restoreFragment.mockImplementationOnce(
+      () => new Promise<void>((resolve) => { finishRestore = resolve; }),
+    );
+    fireEvent.click(screen.getByTestId('redo'));
+    fireEvent.click(screen.getByTestId('redo'));
+
+    expect(historyHandlers.restoreFragment).toHaveBeenCalledTimes(1);
+    await act(async () => finishRestore());
+    await waitFor(() => expect(screen.getByTestId('cursor')).toHaveTextContent('1'));
   });
 
   it('asks the server to clear logbook when user clears it', async () => {

@@ -5,7 +5,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 
@@ -616,7 +616,14 @@ def rate_exercise_difficulty(
                 cheats_off=row.cheats_off,
             )
             row.mastery_index = spaced_repetition["mastery_index"]
-            exercise = db.query(Exercise).filter(Exercise.id == int(exercise_id)).first()
+            try:
+                numeric_exercise_id = int(exercise_id)
+            except (TypeError, ValueError) as exc:
+                raise HTTPException(
+                    status_code=400,
+                    detail="A completed exercise must have a numeric exercise_id.",
+                ) from exc
+            exercise = db.query(Exercise).filter(Exercise.id == numeric_exercise_id).first()
             if exercise is not None:
                 exercise.due_time = row.completed_at + timedelta(
                     days=spaced_repetition["next_review_days"]

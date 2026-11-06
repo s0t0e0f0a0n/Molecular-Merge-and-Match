@@ -1,4 +1,4 @@
-const { app, BrowserWindow, nativeImage, protocol, net, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, nativeImage, protocol, net, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const { spawn, execFile } = require('child_process');
 const fs = require('fs');
@@ -252,6 +252,30 @@ function setupApiProxy() {
     });
 }
 
+function protectWindowNavigation(win) {
+    win.webContents.setWindowOpenHandler(({ url }) => {
+        if (/^https?:\/\//.test(url)) {
+            void shell.openExternal(url).catch((error) => {
+                console.error(`Failed to open external URL: ${url}`, error);
+            });
+        }
+        return { action: 'deny' };
+    });
+
+    win.webContents.on('will-navigate', (event, url) => {
+        const currentUrl = win.webContents.getURL();
+        const target = new URL(url);
+        const current = currentUrl ? new URL(currentUrl) : null;
+        if (!current
+            || target.protocol !== 'file:'
+            || current.protocol !== 'file:'
+            || target.host !== current.host
+            || target.pathname !== current.pathname) {
+            event.preventDefault();
+        }
+    });
+}
+
 function createWindow() {
     let iconAsset;
     // Linux doesn't scale the .png or .icns very well, unless using nativeImage or selecting a dedicated size.
@@ -279,6 +303,7 @@ function createWindow() {
             sandbox: true
         }
     });
+    protectWindowNavigation(win);
     mainWindow = win;
 
     win.on('close', (event) => {
@@ -337,6 +362,7 @@ function openNmriumWindow(key, title, htmlFile) {
             sandbox: true
         }
     });
+    protectWindowNavigation(win);
     nmriumWindows[key] = win;
     win.on('closed', () => {
         if (nmriumWindows[key] === win) nmriumWindows[key] = null;

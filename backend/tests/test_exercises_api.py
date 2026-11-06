@@ -664,6 +664,34 @@ def test_import_update_replaces_additional_spectrum_row_and_file(client):
         db.close()
 
 
+@pytest.mark.parametrize(
+    ("update_fields", "expected_detail"),
+    [
+        ({"molecular_formula": "not-a-formula"}, "Invalid molecular formula: not-a-formula"),
+        ({"h1_axis_end": 10.1}, "Invalid 1H axis scale."),
+    ],
+)
+def test_import_update_rejects_invalid_formula_and_axis_values(
+    client, update_fields, expected_detail
+):
+    created = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_HASH_CCO),
+    )
+    assert created.status_code == 201
+
+    response = client.post(
+        "/api/v1/exercises/import-update",
+        json={
+            "match": {"inchi_hash": INCHI_HASH_CCO},
+            "update": update_fields,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == expected_detail
+
+
 def test_create_exercise_parses_solvent_with_parentheses(client):
     payload = _exercise_payload()
     payload["h1_nmr_text"] = (

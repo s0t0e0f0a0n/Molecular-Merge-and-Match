@@ -32,6 +32,7 @@ export function RDKitProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         })
         .catch((e) => {
+          console.error('Failed to initialize RDKit', e);
           setError('Failed to load RDKit: ' + e.message);
           setLoading(false);
         });

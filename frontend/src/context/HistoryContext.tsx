@@ -510,31 +510,43 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
   }, [exerciseKey]);
 
   const undo = useCallback(async () => {
-    const state = allHistories[exerciseKey] ?? emptyHistory;
-    if (state.cursor === 0) return;
-    const entry = state.entries[state.cursor - 1];
-    const updated = await applyReverse(entry);
-    dirtyRef.current.add(exerciseKey);
-    setAllHistories((prev) => {
-      const prior = prev[exerciseKey] ?? emptyHistory;
-      const entries = [...prior.entries];
-      entries[state.cursor - 1] = updated;
-      return { ...prev, [exerciseKey]: { ...prior, entries, cursor: state.cursor - 1 } };
-    });
+    if (applyingHistoryRef.current) return;
+    applyingHistoryRef.current = true;
+    try {
+      const state = allHistories[exerciseKey] ?? emptyHistory;
+      if (state.cursor === 0) return;
+      const entry = state.entries[state.cursor - 1];
+      const updated = await applyReverse(entry);
+      dirtyRef.current.add(exerciseKey);
+      setAllHistories((prev) => {
+        const prior = prev[exerciseKey] ?? emptyHistory;
+        const entries = [...prior.entries];
+        entries[state.cursor - 1] = updated;
+        return { ...prev, [exerciseKey]: { ...prior, entries, cursor: state.cursor - 1 } };
+      });
+    } finally {
+      applyingHistoryRef.current = false;
+    }
   }, [allHistories, exerciseKey, applyReverse]);
 
   const redo = useCallback(async () => {
-    const state = allHistories[exerciseKey] ?? emptyHistory;
-    if (state.cursor >= state.entries.length) return;
-    const entry = state.entries[state.cursor];
-    const updated = await applyForward(entry);
-    dirtyRef.current.add(exerciseKey);
-    setAllHistories((prev) => {
-      const prior = prev[exerciseKey] ?? emptyHistory;
-      const entries = [...prior.entries];
-      entries[state.cursor] = updated;
-      return { ...prev, [exerciseKey]: { ...prior, entries, cursor: state.cursor + 1 } };
-    });
+    if (applyingHistoryRef.current) return;
+    applyingHistoryRef.current = true;
+    try {
+      const state = allHistories[exerciseKey] ?? emptyHistory;
+      if (state.cursor >= state.entries.length) return;
+      const entry = state.entries[state.cursor];
+      const updated = await applyForward(entry);
+      dirtyRef.current.add(exerciseKey);
+      setAllHistories((prev) => {
+        const prior = prev[exerciseKey] ?? emptyHistory;
+        const entries = [...prior.entries];
+        entries[state.cursor] = updated;
+        return { ...prev, [exerciseKey]: { ...prior, entries, cursor: state.cursor + 1 } };
+      });
+    } finally {
+      applyingHistoryRef.current = false;
+    }
   }, [allHistories, exerciseKey, applyForward]);
 
   const jumpTo = useCallback(

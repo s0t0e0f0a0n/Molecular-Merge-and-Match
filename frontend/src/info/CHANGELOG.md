@@ -4,7 +4,7 @@ Releases are listed in reverse chronological order. Each release uses the
 following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 
 ### Versions in this document:  
-- [v1.5.10](#v1510)
+- [v1.6.0](#v160)
 - [v1.5.0](#v150)
 - [v1.4.0](#v140)
 - [v1.3.0](#v130)
@@ -13,7 +13,7 @@ following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 - [v1.1.0](#v110)
 - [v1.0.0](#v100)
 
-## v1.5.10
+## v1.6.0
 ### Added
 - NMRium integration, replacing the NMRGlue test bench. Press F2 (Command+F2 on macOS) to open the NMRium spectrum viewer in its own window.
 - Press F8 (Command+F8 on macOS) to open the NMRium exercise-creation workflow. Load a Bruker dataset, pick and process the spectra, and the workflow stores the 1D peaks, multiplets and integrals as a draft that is saved to the database and restored the next time you open it.
@@ -25,15 +25,22 @@ following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 ### Changed
 - Resetting a logbook now invalidates and reloads cached history, preventing stale entries from returning. Switching exercises or loading history no longer triggers an unnecessary save.
 - Large logbook saves no longer use `keepalive`, avoiding Chromium's 64 KiB request-body limit.
+- ZIP import now loads JSZip only when needed, reducing the initial frontend bundle.
+- Frontend postinstall copies RDKit files using Node.js, so installations without development dependencies work. The frontend README documents prerequisites for a future Vite 8 upgrade.
 
 ### Removed
 - Removed the NMRGlue test bench (nmrglue and matplotlib preview); NMRium replaces it.
+- Removed the unused `vite-plugin-node-polyfills` and `shx` development dependencies.
 
 ### Fixed
 - Switching exercises no longer lets late fragment, working-solution, or spectrum responses overwrite the current exercise.
 - Legacy database migrations now preserve statistics columns and their data when converting `cheats_used` to text.
 - Failed logbook saves now display a warning.
 - Closing the app no longer shows a false "timer could not be saved" warning; the timer save on close now sends the required request header.
+- Undo and redo ignore overlapping history actions, exercise deletion runs concurrently, and out-of-order settings responses no longer overwrite newer toggles.
+- Difficulty updates with invalid completed-exercise IDs and exercise imports with invalid formulas or axis scales now return client errors instead of server errors. Static exercise files follow the configured data directory.
+- Removed the duplicate RDKit script injection and added console logging for RDKit initialization failures.
+- Adjusted the main page's Content Security Policy to allow RDKit initialization and blob workers needed by the app. The policy permits `unsafe-eval` because the current RDKit build requires it.
 
 ### Security
 - Updated Ketcher to 3.16.2 (pinned) and DOMPurify to 3.4.17, resolving all known runtime dependency vulnerabilities. CI now audits runtime npm and Python dependencies.
@@ -41,6 +48,9 @@ following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 - Uploaded and rendered spectrum SVGs are sanitized.
 - API requests are protected against cross-site requests through trusted-host validation and a required custom header on non-GET requests. Web deployments can configure trusted hosts with `ALLOWED_HOSTS`.
 - Exercise uploads limit SVG text to 5 MiB and base64-encoded spectra to 10 MiB. PNG and JPEG files whose signatures do not match their extensions are rejected.
+- Predefined-fragment searches treat input as literal text instead of compiling user-supplied regular expressions.
+- Electron windows block navigation away from the local app and open HTTP(S) pop-ups in the system browser.
+- Web deployment adds Content Security Policies and Nginx security headers, raises the Nginx request-body limit to 100 MiB, runs the backend container as a non-root user, and disables backend API documentation by default. The backend port is no longer published directly.
 
 ## v1.5.0
 ### Added

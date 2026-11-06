@@ -796,3 +796,21 @@ def test_behavior_events_endpoint_includes_failed_validation_events(client):
         "occurred_at": reviewed_at.isoformat(),
         "event_type": "incorrect-validation",
     }]
+
+
+def test_difficulty_rating_rejects_non_numeric_id_for_completed_exercise(client):
+    db = SessionLocal()
+    try:
+        db.add(Statistics(exercise_id="exercise-5", completed_at=datetime.now()))
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.post(
+        "/api/v1/statistics/difficulty",
+        params={"exercise_id": "exercise-5"},
+        json={"rating": "E"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "A completed exercise must have a numeric exercise_id."
