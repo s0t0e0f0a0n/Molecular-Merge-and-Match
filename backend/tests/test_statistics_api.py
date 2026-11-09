@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
 
 from app.api.spacedrep import calculate_spaced_repetition_interval
 from app.api.statistics import (
@@ -24,6 +25,7 @@ from app.db.models import (
 from app.db.session import (
     SessionLocal,
     _migrate_add_missing_columns,
+    _migrate_statistics_exercise_ids,
     _reopen_overdue_exercises_for_sr,
     engine,
 )
@@ -44,6 +46,25 @@ def _spaced_repetition_test_exercise(
         c13_nmr_text="c13",
         due_time=due_time,
     )
+
+
+def _complete_exercise(exercise_id: int) -> None:
+    with SessionLocal() as db:
+        exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()
+        if exercise is None:
+            exercise = _spaced_repetition_test_exercise()
+            exercise.id = exercise_id
+            db.add(exercise)
+            db.flush()
+        mark_exercise_completed(db, exercise)
+        db.commit()
+
+
+def _run_timer_helper(helper, exercise_id: int) -> None:
+    with SessionLocal() as db:
+        exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()
+        helper(db, exercise_id, exercise)
+        db.commit()
 
 
 def test_spaced_repetition_status_moves_from_new_to_learning():
@@ -327,6 +348,76 @@ def test_statistics_type_migration_preserves_model_columns(tmp_path, monkeypatch
         migration_engine.dispose()
 
 
+def test_statistics_key_migration_normalizes_and_merges_duplicate_rows():
+    db = SessionLocal()
+    try:
+        db.execute(text("DROP INDEX uq_statistics_exercise_id"))
+        db.add_all([
+            Statistics(
+                exercise_id="701",
+                incorrect_count=2,
+                timer_total=40,
+                started_at=datetime(2026, 1, 2),
+                mastery_index=0.25,
+            ),
+            Statistics(
+                exercise_id="exercise-701",
+                incorrect_count=5,
+                timer_total=70,
+                started_at=datetime(2026, 1, 1),
+                completed_at=datetime(2026, 1, 3),
+                mastery_index=0.8,
+            ),
+        ])
+        db.add(StatisticsReviewEvent(
+            exercise_id="exercise-701",
+            reviewed_at=datetime(2026, 1, 3),
+            status_at_review="learning",
+            is_correct=True,
+        ))
+        db.add(StatisticsBehaviorEvent(
+            exercise_id="exercise-701",
+            occurred_at=datetime(2026, 1, 3),
+            event_type="exercise-closed",
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+    _migrate_statistics_exercise_ids()
+
+    db = SessionLocal()
+    try:
+        rows = db.query(Statistics).filter(
+            Statistics.exercise_id.in_(("701", "exercise-701"))
+        ).all()
+        assert len(rows) == 1
+        assert rows[0].exercise_id == "701"
+        assert rows[0].incorrect_count == 5
+        assert rows[0].timer_total == 70
+        assert rows[0].started_at == datetime(2026, 1, 1)
+        assert rows[0].completed_at == datetime(2026, 1, 3)
+        assert rows[0].mastery_index == pytest.approx(0.8)
+        assert db.query(StatisticsReviewEvent).filter_by(exercise_id="701").count() == 1
+        assert db.query(StatisticsBehaviorEvent).filter_by(exercise_id="701").count() == 1
+        unique_index = next(
+            index
+            for index in db.execute(text("PRAGMA index_list('statistics')")).all()
+            if index[1] == "uq_statistics_exercise_id"
+        )
+        assert unique_index[2] == 1
+        assert not any(
+            index[1] == "ix_statistics_exercise_id"
+            for index in db.execute(text("PRAGMA index_list('statistics')")).all()
+        )
+        with pytest.raises(IntegrityError):
+            db.add(Statistics(exercise_id="701"))
+            db.commit()
+        db.rollback()
+    finally:
+        db.close()
+
+
 def test_reopening_overdue_review_preserves_previous_completion_for_interval():
     due_time = datetime.now() - timedelta(days=1)
     previous_completed_at = due_time - timedelta(days=45)
@@ -393,7 +484,7 @@ def test_completion_stores_active_cheats(client):
     finally:
         db.close()
 
-    mark_exercise_completed(42)
+    _complete_exercise(42)
 
     db = SessionLocal()
     try:
@@ -459,7 +550,7 @@ def test_completion_stores_final_logbook_counts(client):
     finally:
         db.close()
 
-    mark_exercise_completed(43)
+    _complete_exercise(43)
 
     db = SessionLocal()
     try:
@@ -502,7 +593,7 @@ def test_completion_saves_mastery_index_and_next_review_time(client):
     finally:
         db.close()
 
-    mark_exercise_completed(44)
+    _complete_exercise(44)
 
     db = SessionLocal()
     try:
@@ -546,7 +637,7 @@ def test_completion_reuses_prefixed_statistics_row(client):
     finally:
         db.close()
 
-    mark_exercise_completed(54)
+    _complete_exercise(54)
 
     db = SessionLocal()
     try:
@@ -563,8 +654,8 @@ def test_completion_reuses_prefixed_statistics_row(client):
 
 
 def test_timer_restarts_are_saved_with_the_timer_interval(client):
-    mark_exercise_resumed(45)
-    mark_exercise_paused(45)
+    _run_timer_helper(mark_exercise_resumed, 45)
+    _run_timer_helper(mark_exercise_paused, 45)
 
     db = SessionLocal()
     try:
@@ -580,9 +671,9 @@ def test_timer_restarts_are_saved_with_the_timer_interval(client):
 
 
 def test_pause_and_switch_each_increment_pause_total(client):
-    mark_exercise_resumed(50)
-    mark_exercise_paused(50)
-    mark_exercise_resumed(50)
+    _run_timer_helper(mark_exercise_resumed, 50)
+    _run_timer_helper(mark_exercise_paused, 50)
+    _run_timer_helper(mark_exercise_resumed, 50)
 
     response = client.post("/api/v1/statistics/stop", params={"exercise_id": "50"})
     assert response.status_code == 200
@@ -595,6 +686,32 @@ def test_pause_and_switch_each_increment_pause_total(client):
         assert len(json.loads(logbook.pause_events_json)) == 2
     finally:
         db.close()
+
+
+def test_pausing_completed_exercise_returns_existing_statistics(client):
+    db = SessionLocal()
+    try:
+        exercise = _spaced_repetition_test_exercise()
+        exercise.id = 55
+        exercise.completed = True
+        db.add(exercise)
+        db.add(Statistics(
+            exercise_id="55",
+            completed_at=datetime.now(),
+            timer_total=83,
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.post(
+        "/api/v1/statistics/pause",
+        params={"exercise_id": "55"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["timer_total"] == 83
+    assert response.json()["completed_at"] is not None
 
 
 def test_stopping_timer_persists_short_elapsed_segment(client):

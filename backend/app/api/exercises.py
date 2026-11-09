@@ -14,7 +14,6 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
-from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 
 from app.api.statistics import (
@@ -36,11 +35,12 @@ from app.core.solvent_tokens import (
 from app.core.statistics_keys import canonical_statistics_exercise_id, statistics_exercise_id_keys
 from app.core.svg_sanitize import sanitize_svg
 from app.core.tag_tokens import (
-    apply_tag_count_delta as apply_tag_count_delta,
-)
-from app.core.tag_tokens import (
+    TAG_TOKEN_RE,
     encode_tags_list,
     resolve_tag_tokens,
+)
+from app.core.tag_tokens import (
+    apply_tag_count_delta as apply_tag_count_delta,
 )
 from app.core.tag_tokens import (
     extract_tag_ids as extract_tag_ids,
@@ -61,6 +61,14 @@ from app.db.models import (
     WorkingSolution,
 )
 from app.db.session import get_db
+
+_EXERCISE_DETAIL_OPTIONS = (
+    selectinload(Exercise.h1_peaks),
+    selectinload(Exercise.c13_peaks),
+    selectinload(Exercise.c13_couplings),
+    selectinload(Exercise.alt_nuclei),
+    selectinload(Exercise.additional_spectra),
+)
 
 _ADDITIONAL_SPECTRUM_PRIORITY_BY_NAME = {
     "ir": 1,
@@ -733,11 +741,39 @@ def _prepare_solution_cas_fields(raw_cas_number: str | None) -> str | None:
 # API RESPONSE CONVERTERS
 # =====================================================================
 
-def _to_response(row: Exercise, db) -> ExerciseOut:
+def _resolve_tag_tokens_from_rows(
+    tag_text: str | None,
+    tags_by_id: dict[int, TagsUsed],
+    *,
+    omit_hidden: bool = False,
+) -> str | None:
+    if not tag_text:
+        return tag_text
+
+    def replace_tag(match: re.Match[str]) -> str:
+        tag = tags_by_id.get(int(match.group(1)))
+        if tag is None:
+            return "" if omit_hidden else match.group(0)
+        if omit_hidden and tag.is_hidden:
+            return ""
+        return tag.tag_name
+
+    return TAG_TOKEN_RE.sub(replace_tag, tag_text)
+
+
+def _to_response(
+    row: Exercise,
+    db,
+    tags_by_id: dict[int, TagsUsed] | None = None,
+) -> ExerciseOut:
     tags = []
     parts: list[str] = []
     if row.tags_csv:
-        resolved = resolve_tag_tokens(db, row.tags_csv)
+        resolved = (
+            _resolve_tag_tokens_from_rows(row.tags_csv, tags_by_id)
+            if tags_by_id is not None
+            else resolve_tag_tokens(db, row.tags_csv)
+        )
         parts.extend([p.strip() for p in (resolved or "").split(",") if p and p.strip()])
     seen = set()
     for p in parts:
@@ -766,39 +802,27 @@ def _to_response(row: Exercise, db) -> ExerciseOut:
 
 def _to_summary_response(
     row: Exercise,
+    tags_by_id: dict[int, TagsUsed],
+    hidden_tag_names: set[str],
     statistics: Statistics | None = None,
     has_saved_progress: bool = False,
 ) -> ExerciseSummaryOut:
     tags = []
     parts: list[str] = []
     statistics_parts: list[str] = []
-    hidden_names: set[str] = set()
-    try:
-        with get_db() as _db:
-            if row.tags_csv:
-                resolved = resolve_tag_tokens(_db, row.tags_csv, omit_hidden=True)
-                parts.extend([p.strip() for p in (resolved or "").split(",") if p and p.strip()])
-                statistics_resolved = resolve_tag_tokens(_db, row.tags_csv)
-                statistics_parts.extend(
-                    [p.strip() for p in (statistics_resolved or "").split(",") if p and p.strip()]
-                )
-            if parts:
-                normalized_names = {p.lower() for p in parts if p}
-                hidden_names = {
-                    hidden.tag_name.lower() for hidden in (
-                        _db.query(TagsUsed)
-                        .filter(func.lower(TagsUsed.tag_name).in_(normalized_names))
-                        .filter(TagsUsed.is_hidden.is_(True)).all()
-                    )
-                }
-    except Exception:
-        if row.tags_csv:
-            parts = [p.strip() for p in row.tags_csv.split(",") if p and p.strip()]
-            statistics_parts = parts.copy()
+    if row.tags_csv:
+        resolved = _resolve_tag_tokens_from_rows(
+            row.tags_csv, tags_by_id, omit_hidden=True
+        )
+        parts.extend([p.strip() for p in (resolved or "").split(",") if p and p.strip()])
+        statistics_resolved = _resolve_tag_tokens_from_rows(row.tags_csv, tags_by_id)
+        statistics_parts.extend(
+            [p.strip() for p in (statistics_resolved or "").split(",") if p and p.strip()]
+        )
 
     seen = set()
     for p in parts:
-        if p and p.lower() not in hidden_names and p not in seen:
+        if p and p.lower() not in hidden_tag_names and p not in seen:
             seen.add(p)
             tags.append(p)
 
@@ -846,6 +870,10 @@ def _to_summary_response(
 def list_exercise_summaries() -> list[ExerciseSummaryOut]:
     with get_db() as db:
         rows = db.query(Exercise).order_by(Exercise.id.desc()).all()
+        tags_by_id = {tag.id: tag for tag in db.query(TagsUsed).all()}
+        hidden_tag_names = {
+            tag.tag_name.lower() for tag in tags_by_id.values() if tag.is_hidden
+        }
         exercise_ids = {str(row.id) for row in rows}
         statistics_keys = {
             key for exercise_id in exercise_ids
@@ -876,6 +904,8 @@ def list_exercise_summaries() -> list[ExerciseSummaryOut]:
         return [
             _to_summary_response(
                 row,
+                tags_by_id,
+                hidden_tag_names,
                 None if (row.exercise_set or "").strip().lower() == "references" else statistics_by_exercise_id.get(str(row.id)),
                 has_saved_progress=f"exercise-{row.id}" in storage_keys_with_progress,
             )
@@ -1027,11 +1057,12 @@ def update_exercise_from_import(body: ExerciseUpdateRequest) -> ExerciseOut:
                     existing.label = spectrum.label
 
             db.commit()
-            refreshed = db.query(Exercise).options(
-                selectinload(Exercise.h1_peaks), selectinload(Exercise.c13_peaks),
-                selectinload(Exercise.c13_couplings), selectinload(Exercise.alt_nuclei),
-                selectinload(Exercise.additional_spectra),
-            ).filter(Exercise.id == exercise.id).first()
+            refreshed = (
+                db.query(Exercise)
+                .options(*_EXERCISE_DETAIL_OPTIONS)
+                .filter(Exercise.id == exercise.id)
+                .first()
+            )
             if not refreshed:
                 raise HTTPException(status_code=500, detail="Failed to load updated exercise.")
 
@@ -1058,31 +1089,28 @@ def get_exercise(exercise_id: int, track: bool = True) -> ExerciseOut:
     with get_db() as db:
         row = (
             db.query(Exercise)
-            .options(
-                selectinload(Exercise.h1_peaks), selectinload(Exercise.c13_peaks),
-                selectinload(Exercise.c13_couplings), selectinload(Exercise.alt_nuclei),
-                selectinload(Exercise.additional_spectra),
-            )
+            .options(*_EXERCISE_DETAIL_OPTIONS)
             .filter(Exercise.id == exercise_id).first()
         )
         if not row:
             raise HTTPException(status_code=404, detail="Exercise not found.")
         if track:
-            mark_exercise_selected(exercise_id)
+            mark_exercise_selected(db, row)
+            response = _to_response(row, db)
+            db.commit()
+            return response
         return _to_response(row, db)
 
 @router.get("/", response_model=list[ExerciseOut])
 def list_exercises() -> list[ExerciseOut]:
     with get_db() as db:
+        tags_by_id = {tag.id: tag for tag in db.query(TagsUsed).all()}
         rows = (
             db.query(Exercise)
-            .options(
-                selectinload(Exercise.h1_peaks), selectinload(Exercise.c13_peaks),
-                selectinload(Exercise.c13_couplings), selectinload(Exercise.additional_spectra),
-            )
+            .options(*_EXERCISE_DETAIL_OPTIONS)
             .order_by(Exercise.id.desc()).all()
         )
-        return [_to_response(row, db) for row in rows]
+        return [_to_response(row, db, tags_by_id) for row in rows]
 
 def _exercise_already_validated(db, row: Exercise) -> bool:
     statistics_row = _find_statistics_row(db, str(row.id))
@@ -1132,8 +1160,8 @@ def validate_cas_answer(
                 db, statistics_row, row, is_correct=True
             )
         row.completed = True
+        mark_exercise_completed(db, row)
         db.commit()
-        mark_exercise_completed(exercise_id)
         return CasAnswerValidationOut(
             is_correct=True,
             should_iterate_difficulty=should_iterate_difficulty,
@@ -1179,8 +1207,8 @@ def validate_solution_answer(
 
         statistics_row.confidence = body.confidence
         row.completed = True
+        mark_exercise_completed(db, row)
         db.commit()
-        mark_exercise_completed(exercise_id)
         return SolutionValidationOut(
             is_correct=True,
             should_iterate_difficulty=should_iterate_difficulty,
@@ -1441,11 +1469,7 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
 
             created = (
                 db.query(Exercise)
-                .options(
-                    selectinload(Exercise.h1_peaks),
-                    selectinload(Exercise.c13_peaks),
-                    selectinload(Exercise.additional_spectra)
-                )
+                .options(*_EXERCISE_DETAIL_OPTIONS)
                 .filter(Exercise.id == exercise.id)
                 .first()
             )

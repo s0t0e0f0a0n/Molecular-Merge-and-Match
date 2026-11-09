@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
-from sqlalchemy import text
+from sqlalchemy import event, text
 
 from app.api.exercises import (
     MAX_FILE_BASE64_LENGTH,
@@ -22,7 +22,7 @@ from app.db.models import (
     StatisticsReviewEvent,
     TagsUsed,
 )
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, engine
 
 INCHI_CCO = "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3"
 INCHI_HASH_CCO = hashlib.sha256(INCHI_CCO.encode("utf-8")).hexdigest()
@@ -106,6 +106,23 @@ def test_list_exercises_empty_initially(client):
     assert response.json() == []
 
 
+def test_list_exercises_resolves_tags_and_loads_detail_relations(client):
+    payload = _exercise_payload()
+    payload["tags"] = ["list-route-tag"]
+    payload["alt_nuc_text"] = "31P-NMR (CDCl3, 162 MHz): -14.2 (s);"
+    create_response = client.post("/api/v1/exercises/", json=payload)
+    assert create_response.status_code == 201
+
+    response = client.get("/api/v1/exercises/")
+
+    assert response.status_code == 200
+    exercise = next(
+        item for item in response.json() if item["id"] == create_response.json()["id"]
+    )
+    assert exercise["tags"] == ["list-route-tag"]
+    assert exercise["alt_nuclei"][0]["nucleus"] == "31P"
+
+
 def test_get_exercise_without_tracking_does_not_modify_statistics(client):
     created = client.post("/api/v1/exercises/", json=_exercise_payload())
     assert created.status_code == 201
@@ -187,6 +204,44 @@ def test_correct_solution_validation_records_learning_review_before_completion(c
         assert statistics.completed_at is not None
         assert event.status_at_review == "learning"
         assert event.is_correct is True
+    finally:
+        db.close()
+
+
+def test_correct_solution_validation_rolls_back_if_completion_recording_fails(
+    client, monkeypatch
+):
+    created = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_CCO),
+    )
+    assert created.status_code == 201
+    exercise_id = created.json()["id"]
+
+    def fail_completion(_db, _exercise):
+        raise RuntimeError("completion update failed")
+
+    monkeypatch.setattr(
+        "app.api.exercises.mark_exercise_completed",
+        fail_completion,
+    )
+    with pytest.raises(RuntimeError, match="completion update failed"):
+        client.post(
+            f"/api/v1/exercises/{exercise_id}/validate-solution",
+            json={"solution_hash": INCHI_CCO, "confidence": 4},
+        )
+
+    db = SessionLocal()
+    try:
+        exercise = db.query(Exercise).filter_by(id=exercise_id).one()
+        assert exercise.completed is not True
+        assert db.query(Statistics).filter_by(exercise_id=str(exercise_id)).count() == 0
+        assert (
+            db.query(StatisticsReviewEvent)
+            .filter_by(exercise_id=str(exercise_id))
+            .count()
+            == 0
+        )
     finally:
         db.close()
 
@@ -467,6 +522,59 @@ def test_exercise_summary_finds_prefixed_statistics_row(client):
         ).delete(synchronize_session=False)
         db.commit()
         db.close()
+
+
+def test_exercise_summaries_query_count_is_constant_for_many_tagged_exercises(client):
+    tag_name = "test-summary-query-count-tag"
+    db = SessionLocal()
+    try:
+        tag = TagsUsed(tag_name=tag_name, is_persistent=False, is_hidden=False)
+        db.add(tag)
+        db.flush()
+        db.add_all(
+            [
+                Exercise(
+                    name=f"Summary query count {index}",
+                    dbe=0,
+                    tags_csv=f"%tag{{{tag.id}}}",
+                    h1_svg_path="",
+                    h1_axis_start=0,
+                    h1_axis_end=0,
+                    c13_svg_path="",
+                    c13_axis_start=0,
+                    c13_axis_end=0,
+                    h1_nmr_text="",
+                    c13_nmr_text="",
+                )
+                for index in range(20)
+            ]
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    statements: list[str] = []
+
+    def count_statement(_connection, _cursor, statement, _parameters, _context, _executemany):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", count_statement)
+    try:
+        response = client.get("/api/v1/exercises/summaries")
+    finally:
+        event.remove(engine, "before_cursor_execute", count_statement)
+        db = SessionLocal()
+        try:
+            db.query(TagsUsed).filter(TagsUsed.tag_name == tag_name).delete()
+            db.commit()
+        finally:
+            db.close()
+
+    assert response.status_code == 200
+    summaries = response.json()
+    assert len(summaries) == 20
+    assert all(summary["tags"] == [tag_name] for summary in summaries)
+    assert len(statements) == 5
 
 
 def test_no_solution_inchi_disables_hashing(client):

@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -214,7 +215,9 @@ class Fragment(Base):
     __tablename__ = "fragments"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    exercise_id: Mapped[str] = mapped_column(String(50), nullable=False, default="ex1")
+    exercise_id: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="ex1", index=True
+    )
     label: Mapped[str] = mapped_column(String(255), nullable=False)
     smiles: Mapped[str] = mapped_column(Text, nullable=False)
     mol_file: Mapped[str] = mapped_column(Text, nullable=False)
@@ -302,6 +305,9 @@ class LogbookState(Base):
 
 class Statistics(Base):
     __tablename__ = "statistics"
+    __table_args__ = (
+        Index("uq_statistics_exercise_id", "exercise_id", unique=True),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     exercise_id: Mapped[str] = mapped_column(String(50), nullable=False, default="ex1")

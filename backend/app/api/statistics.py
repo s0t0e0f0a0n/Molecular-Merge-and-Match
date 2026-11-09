@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.api.spacedrep import calculate_spaced_repetition_interval
 from app.core.statistics_keys import (
@@ -64,16 +66,25 @@ class DifficultyRatingIn(BaseModel):
     iterate: bool = False
 
 
-def _is_reference_exercise(db, exercise_id: int | str) -> bool:
-    try:
-        exercise = db.query(Exercise).filter(Exercise.id == int(exercise_id)).first()
-    except (TypeError, ValueError):
-        return False
+def _is_reference_exercise(
+    db,
+    exercise_id: int | str,
+    exercise: Exercise | None = None,
+) -> bool:
+    if exercise is None:
+        try:
+            exercise = db.query(Exercise).filter(Exercise.id == int(exercise_id)).first()
+        except (TypeError, ValueError):
+            return False
     return exercise is not None and (exercise.exercise_set or "").strip().lower() == "references"
 
 
-def _ensure_statistics_row(db, exercise_id: int | str) -> tuple[Statistics | None, bool]:
-    if _is_reference_exercise(db, exercise_id):
+def _ensure_statistics_row(
+    db,
+    exercise_id: int | str,
+    exercise: Exercise | None = None,
+) -> tuple[Statistics | None, bool]:
+    if _is_reference_exercise(db, exercise_id, exercise):
         return None, False
 
     row = _find_statistics_row(db, str(exercise_id))
@@ -89,11 +100,14 @@ def _ensure_statistics_row(db, exercise_id: int | str) -> tuple[Statistics | Non
 def _find_statistics_row(db, exercise_id: str) -> Statistics | None:
     """Try to find a statistics row for the given id, accepting both
     bare numeric ids ("8") and prefixed keys ("exercise-8")."""
-    for key in statistics_exercise_id_keys(exercise_id):
-        row = db.query(Statistics).filter(Statistics.exercise_id == key).first()
-        if row is not None:
-            return row
-    return None
+    rows = db.query(Statistics).filter(
+        Statistics.exercise_id.in_(statistics_exercise_id_keys(exercise_id))
+    ).all()
+    canonical_key = canonical_statistics_exercise_id(exercise_id)
+    return next(
+        (row for row in rows if row.exercise_id == canonical_key),
+        rows[0] if rows else None,
+    )
 
 
 def _logbook_event_counts(db, exercise_id: int | str) -> tuple[int, int, int]:
@@ -134,7 +148,13 @@ def _exercise_is_incomplete(db, exercise_id: int | str) -> bool:
     return exercise is None or exercise.completed is not True
 
 
-def _exercise_is_completed(db, exercise_id: int | str) -> bool:
+def _exercise_is_completed(
+    db,
+    exercise_id: int | str,
+    exercise: Exercise | None = None,
+) -> bool:
+    if exercise is not None:
+        return exercise.completed is True
     return _exercise_is_incomplete(db, exercise_id) is False
 
 
@@ -299,142 +319,145 @@ def checkpoint_short_timer_for_logbook_entry(
     return True
 
 
-def mark_exercise_selected(exercise_id: int | str) -> None:
-    with get_db() as db:
-        if _exercise_is_completed(db, exercise_id):
-            return
+def mark_exercise_selected(db: Session, exercise: Exercise) -> Statistics | None:
+    if _exercise_is_completed(db, exercise.id, exercise):
+        return None
 
-        row, created = _ensure_statistics_row(db, exercise_id)
-        if row is None:
-            return
-        if created or row.started_at is None:
-            row.started_at = datetime.now()
-        if _exercise_is_incomplete(db, exercise_id):
-            now = datetime.now()
-            if row.start_counting is not None and row.stop_counting is None:
-                _finalize_timer(db, row, now, count_short_elapsed=True)
-            row.start_counting = now + timedelta(seconds=3)
-            row.stop_counting = None
-            _record_timer_start(db, row.exercise_id, row.start_counting)
-        db.commit()
-        db.refresh(row)
+    row, created = _ensure_statistics_row(db, exercise.id, exercise)
+    if row is None:
+        return None
+    if created or row.started_at is None:
+        row.started_at = datetime.now()
+    now = datetime.now()
+    if row.start_counting is not None and row.stop_counting is None:
+        _finalize_timer(db, row, now, count_short_elapsed=True)
+    row.start_counting = now + timedelta(seconds=3)
+    row.stop_counting = None
+    _record_timer_start(db, row.exercise_id, row.start_counting)
+    return row
 
 
-def mark_exercise_closed(exercise_id: int | str) -> None:
-    with get_db() as db:
-        # Closing a seeded, already-completed exercise must not create its statistics row.
-        if _exercise_is_completed(db, exercise_id) and _find_statistics_row(db, str(exercise_id)) is None:
-            return
-        row, _ = _ensure_statistics_row(db, exercise_id)
-        if row is None:
-            return
+def mark_exercise_closed(
+    db: Session,
+    exercise_id: int | str,
+    exercise: Exercise | None = None,
+) -> Statistics | None:
+    # Closing a seeded, already-completed exercise must not create its statistics row.
+    if (
+        _exercise_is_completed(db, exercise_id, exercise)
+        and _find_statistics_row(db, str(exercise_id)) is None
+    ):
+        return None
+    row, _ = _ensure_statistics_row(db, exercise_id, exercise)
+    if row is None:
+        return None
 
-        closed_at = datetime.now()
-        row.pause_total += 1
-        if row.started_at is not None and row.completed_at is None:
-            db.add(StatisticsBehaviorEvent(
-                exercise_id=str(row.exercise_id),
-                occurred_at=closed_at,
-                event_type="exercise-closed",
-            ))
-        if row.start_counting is not None and row.stop_counting is None:
-            _record_pause_event(db, row.exercise_id, closed_at)
-            _finalize_timer(db, row, closed_at, count_short_elapsed=True)
-
-        db.commit()
-        db.refresh(row)
-
-
-def mark_exercise_paused(exercise_id: int | str) -> None:
-    with get_db() as db:
-        if _exercise_is_completed(db, exercise_id):
-            return
-
-        row, _ = _ensure_statistics_row(db, exercise_id)
-        if row is None:
-            return
-        row.pause_total += 1
-        paused_at = datetime.now()
-        _record_pause_event(db, row.exercise_id, paused_at)
-        if row.start_counting is None or row.stop_counting is not None:
-            db.commit()
-            db.refresh(row)
-            return
-
-        # A user-initiated pause should always flush the elapsed segment.
-        _finalize_timer(db, row, paused_at, count_short_elapsed=True)
-
-        db.commit()
-        db.refresh(row)
+    closed_at = datetime.now()
+    row.pause_total += 1
+    if row.started_at is not None and row.completed_at is None:
+        db.add(StatisticsBehaviorEvent(
+            exercise_id=str(row.exercise_id),
+            occurred_at=closed_at,
+            event_type="exercise-closed",
+        ))
+    if row.start_counting is not None and row.stop_counting is None:
+        _record_pause_event(db, row.exercise_id, closed_at)
+        _finalize_timer(db, row, closed_at, count_short_elapsed=True)
+    return row
 
 
-def mark_exercise_completed(exercise_id: int | str) -> None:
-    with get_db() as db:
-        # Once completion was recorded, repeated completion calls must not mutate statistics.
-        existing = _find_statistics_row(db, str(exercise_id))
-        if existing is not None and existing.completed_at is not None:
-            return
+def mark_exercise_paused(
+    db: Session,
+    exercise_id: int | str,
+    exercise: Exercise | None = None,
+) -> Statistics | None:
+    if _exercise_is_completed(db, exercise_id, exercise):
+        return None
 
-        row, _ = _ensure_statistics_row(db, exercise_id)
-        if row is None:
-            return
-        settings = db.query(UserSettings).filter(UserSettings.name == "User").first()
-        row.cheats_used = settings.cheats if settings is not None else "000000000000"
-        completed_at = row.completed_at or datetime.now()
-        row.completed_at = completed_at
-        row.fragments_drawn, row.matches_done, row.merges_done = _logbook_event_counts(db, exercise_id)
-        _finalize_timer(db, row, completed_at, count_short_elapsed=True)
-        spaced_repetition = calculate_spaced_repetition_interval(
-            timer_total=row.timer_total,
-            incorrect_count=row.incorrect_count,
-            cheats_used=row.cheats_used,
-            confidence=row.confidence,
-            difficulty=row.difficulty,
-            completed_at=completed_at,
-            cheats_off=row.cheats_off,
-        )
-        row.mastery_index = spaced_repetition["mastery_index"]
-        exercise = db.query(Exercise).filter(Exercise.id == int(exercise_id)).first()
-        if exercise is not None:
-            exercise.due_time = completed_at + timedelta(
-                days=spaced_repetition["next_review_days"]
-            )
-        db.commit()
-        db.refresh(row)
+    row, _ = _ensure_statistics_row(db, exercise_id, exercise)
+    if row is None:
+        return None
+    row.pause_total += 1
+    paused_at = datetime.now()
+    _record_pause_event(db, row.exercise_id, paused_at)
+    if row.start_counting is None or row.stop_counting is not None:
+        return row
+
+    # A user-initiated pause should always flush the elapsed segment.
+    _finalize_timer(db, row, paused_at, count_short_elapsed=True)
+    return row
 
 
-def mark_exercise_resumed(exercise_id: int | str) -> None:
-    with get_db() as db:
-        if _exercise_is_completed(db, exercise_id):
-            return
+def mark_exercise_completed(
+    db: Session,
+    exercise: Exercise,
+) -> Statistics | None:
+    exercise_id = exercise.id
+    existing = _find_statistics_row(db, str(exercise_id))
+    if existing is not None and existing.completed_at is not None:
+        return existing
 
-        row, _ = _ensure_statistics_row(db, exercise_id)
-        if row is None:
-            return
-        if row.stop_counting is None and row.start_counting is not None:
-            db.refresh(row)
-            return
+    row, _ = _ensure_statistics_row(db, exercise_id, exercise)
+    if row is None:
+        return None
+    settings = db.query(UserSettings).filter(UserSettings.name == "User").first()
+    row.cheats_used = settings.cheats if settings is not None else "000000000000"
+    completed_at = row.completed_at or datetime.now()
+    row.completed_at = completed_at
+    row.fragments_drawn, row.matches_done, row.merges_done = _logbook_event_counts(
+        db, exercise_id
+    )
+    _finalize_timer(db, row, completed_at, count_short_elapsed=True)
+    spaced_repetition = calculate_spaced_repetition_interval(
+        timer_total=row.timer_total,
+        incorrect_count=row.incorrect_count,
+        cheats_used=row.cheats_used,
+        confidence=row.confidence,
+        difficulty=row.difficulty,
+        completed_at=completed_at,
+        cheats_off=row.cheats_off,
+    )
+    row.mastery_index = spaced_repetition["mastery_index"]
+    exercise.due_time = completed_at + timedelta(
+        days=spaced_repetition["next_review_days"]
+    )
+    return row
 
-        now = datetime.now()
-        row.start_counting = now
-        row.stop_counting = None
-        _record_timer_start(db, row.exercise_id, now)
 
-        db.commit()
-        db.refresh(row)
+def mark_exercise_resumed(
+    db: Session,
+    exercise_id: int | str,
+    exercise: Exercise | None = None,
+) -> Statistics | None:
+    if _exercise_is_completed(db, exercise_id, exercise):
+        return None
+
+    row, _ = _ensure_statistics_row(db, exercise_id, exercise)
+    if row is None:
+        return None
+    if row.stop_counting is None and row.start_counting is not None:
+        return row
+
+    now = datetime.now()
+    row.start_counting = now
+    row.stop_counting = None
+    _record_timer_start(db, row.exercise_id, now)
+    return row
 
 
-def increment_incorrect_count(exercise_id: int | str) -> None:
-    with get_db() as db:
-        if _exercise_is_completed(db, exercise_id):
-            return
+def increment_incorrect_count(
+    db: Session,
+    exercise_id: int | str,
+    exercise: Exercise | None = None,
+) -> Statistics | None:
+    if _exercise_is_completed(db, exercise_id, exercise):
+        return None
 
-        row, _ = _ensure_statistics_row(db, exercise_id)
-        if row is None:
-            return
-        row.incorrect_count += 1
-        db.commit()
-        db.refresh(row)
+    row, _ = _ensure_statistics_row(db, exercise_id, exercise)
+    if row is None:
+        return None
+    row.incorrect_count += 1
+    return row
 
 
 def reset_difficulty_counter(row: Statistics) -> None:
@@ -535,6 +558,33 @@ def get_statistics(exercise_id: str = Query(...)) -> StatisticsOut:
             db.commit()
             db.refresh(row)
         return StatisticsOut.model_validate(row)
+
+
+def _apply_timer_action(
+    db: Session,
+    exercise_id: str,
+    action: Callable[[Session, int | str, Exercise | None], Statistics | None],
+) -> StatisticsOut:
+    exercise = None
+    try:
+        numeric_exercise_id = int(exercise_id)
+    except ValueError:
+        numeric_exercise_id = None
+    if numeric_exercise_id is not None:
+        exercise = db.query(Exercise).filter(
+            Exercise.id == numeric_exercise_id
+        ).first()
+
+    row = action(db, exercise_id, exercise)
+    if row is None and not _is_reference_exercise(db, exercise_id, exercise):
+        row = _find_statistics_row(db, exercise_id)
+    response = (
+        StatisticsOut.model_validate(row)
+        if row is not None
+        else StatisticsOut(exercise_id=str(exercise_id))
+    )
+    db.commit()
+    return response
 
 
 @router.get("/review-history", response_model=list[StatisticsReviewDayOut])
@@ -650,17 +700,17 @@ def rate_exercise_difficulty(
 
 @router.post("/stop", response_model=StatisticsOut)
 def stop_exercise_timer(exercise_id: str = Query(...)) -> StatisticsOut:
-    mark_exercise_closed(exercise_id)
-    return get_statistics(exercise_id=exercise_id)
+    with get_db() as db:
+        return _apply_timer_action(db, exercise_id, mark_exercise_closed)
 
 
 @router.post("/pause", response_model=StatisticsOut)
 def pause_exercise_timer(exercise_id: str = Query(...)) -> StatisticsOut:
-    mark_exercise_paused(exercise_id)
-    return get_statistics(exercise_id=exercise_id)
+    with get_db() as db:
+        return _apply_timer_action(db, exercise_id, mark_exercise_paused)
 
 
 @router.post("/resume", response_model=StatisticsOut)
 def resume_exercise_timer(exercise_id: str = Query(...)) -> StatisticsOut:
-    mark_exercise_resumed(exercise_id)
-    return get_statistics(exercise_id=exercise_id)
+    with get_db() as db:
+        return _apply_timer_action(db, exercise_id, mark_exercise_resumed)

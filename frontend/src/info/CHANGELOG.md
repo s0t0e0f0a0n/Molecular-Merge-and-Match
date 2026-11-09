@@ -23,6 +23,8 @@ following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 - The statistics reset tools can reset exercises that are due for spaced repetition.
 
 ### Changed
+- Exercise summaries now bulk-load tag metadata, avoiding per-exercise database queries.
+- Statistics updates now share the caller's transaction; legacy duplicate exercise statistics are merged before a unique index is added, and batch resets use bulk queries.
 - Resetting a logbook now invalidates and reloads cached history, preventing stale entries from returning. Switching exercises or loading history no longer triggers an unnecessary save.
 - Large logbook saves no longer use `keepalive`, avoiding Chromium's 64 KiB request-body limit.
 - ZIP import now loads JSZip only when needed, reducing the initial frontend bundle.

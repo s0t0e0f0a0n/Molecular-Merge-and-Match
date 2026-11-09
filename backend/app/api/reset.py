@@ -10,6 +10,11 @@ from app.core.statistics_keys import statistics_exercise_id_keys
 from app.core.usage_counts import recount_exercise_usage
 from app.db.models import (
     Exercise,
+    ExerciseAdditionalNuclei,
+    ExerciseAdditionalSpectrum,
+    ExerciseC13Coupling,
+    ExerciseC13Peak,
+    ExerciseH1Peak,
     Fragment,
     LogbookState,
     Statistics,
@@ -68,11 +73,106 @@ def reset_exercise_data(db, exercise_id: int, level: str) -> None:
         db.delete(exercise)
 
 
+def _reset_exercises_data(db, exercise_ids: set[int], level: str) -> None:
+    if not exercise_ids:
+        return
+
+    exercise_key_to_id = {
+        key: exercise_id
+        for exercise_id in exercise_ids
+        for key in statistics_exercise_id_keys(exercise_id)
+    }
+    if level == "exercise":
+        eligible_ids = exercise_ids
+    else:
+        existing_statistics_keys = {
+            key
+            for (key,) in db.query(Statistics.exercise_id)
+            .filter(Statistics.exercise_id.in_(exercise_key_to_id))
+            .distinct()
+            .all()
+        }
+        eligible_ids = {
+            exercise_key_to_id[key]
+            for key in existing_statistics_keys
+        }
+    if not eligible_ids:
+        return
+
+    eligible_keys = {
+        key
+        for exercise_id in eligible_ids
+        for key in statistics_exercise_id_keys(exercise_id)
+    }
+    if level in {"logbook", "workspace", "completion"}:
+        db.query(LogbookState).filter(
+            LogbookState.exercise_id.in_(eligible_keys),
+            LogbookState.archived.is_(None),
+        ).update(
+            {LogbookState.archived: datetime.now()},
+            synchronize_session=False,
+        )
+    if level in {"progression", "exercise"}:
+        db.query(LogbookState).filter(
+            LogbookState.exercise_id.in_(eligible_keys)
+        ).delete(synchronize_session=False)
+    if level in {"workspace", "completion", "progression", "exercise"}:
+        db.query(Fragment).filter(
+            Fragment.exercise_id.in_(eligible_keys)
+        ).delete(synchronize_session=False)
+        db.query(WorkingSolution).filter(
+            WorkingSolution.exercise_id.in_(eligible_keys)
+        ).delete(synchronize_session=False)
+    if level in {"completion", "progression"}:
+        db.query(Exercise).filter(
+            Exercise.id.in_(eligible_ids)
+        ).update(
+            {Exercise.completed: False},
+            synchronize_session=False,
+        )
+    if level == "completion":
+        db.query(Statistics).filter(
+            Statistics.exercise_id.in_(eligible_keys)
+        ).update(
+            {
+                Statistics.started_at: None,
+                Statistics.timer_total: 0,
+                Statistics.completed_at: None,
+            },
+            synchronize_session=False,
+        )
+    if level in {"progression", "exercise"}:
+        db.query(StatisticsReviewEvent).filter(
+            StatisticsReviewEvent.exercise_id.in_(eligible_keys)
+        ).delete(synchronize_session=False)
+        db.query(Statistics).filter(
+            Statistics.exercise_id.in_(eligible_keys)
+        ).delete(synchronize_session=False)
+    if level == "exercise":
+        db.query(ExerciseAdditionalNuclei).filter(
+            ExerciseAdditionalNuclei.exercise_id.in_(eligible_ids)
+        ).delete(synchronize_session=False)
+        db.query(ExerciseAdditionalSpectrum).filter(
+            ExerciseAdditionalSpectrum.exercise_id.in_(eligible_ids)
+        ).delete(synchronize_session=False)
+        db.query(ExerciseC13Coupling).filter(
+            ExerciseC13Coupling.exercise_id.in_(eligible_ids)
+        ).delete(synchronize_session=False)
+        db.query(ExerciseC13Peak).filter(
+            ExerciseC13Peak.exercise_id.in_(eligible_ids)
+        ).delete(synchronize_session=False)
+        db.query(ExerciseH1Peak).filter(
+            ExerciseH1Peak.exercise_id.in_(eligible_ids)
+        ).delete(synchronize_session=False)
+        db.query(Exercise).filter(
+            Exercise.id.in_(eligible_ids)
+        ).delete(synchronize_session=False)
+
+
 @router.post("/reset-batch", status_code=204, response_model=None)
 def reset_exercises(body: ResetExercisesRequest) -> None:
     with get_db() as db:
-        for exercise_id in set(body.exercise_ids):
-            reset_exercise_data(db, exercise_id, body.level)
+        _reset_exercises_data(db, set(body.exercise_ids), body.level)
         if body.level == "exercise":
             db.flush()
             recount_exercise_usage(db)

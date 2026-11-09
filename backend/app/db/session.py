@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.calculation import calculate_dbe, parse_formula
@@ -22,6 +22,7 @@ from app.db.models import (
     PredefinedFragment,
     SolventsUsed,
     Statistics,
+    StatisticsBehaviorEvent,
     StatisticsReviewEvent,
     TagsUsed,
     UserSettings,
@@ -783,17 +784,19 @@ def _migrate_add_missing_columns() -> None:
             conn.execute(text("DROP TABLE statistics_mastery_index_migration"))
             conn.commit()
 
-        conn.execute(text(
-            "UPDATE exercises SET due_time = COALESCE("
-            "(SELECT due_time FROM statistics "
-            "WHERE statistics.exercise_id = CAST(exercises.id AS TEXT) LIMIT 1), "
-            "(SELECT due_time FROM statistics "
-            "WHERE statistics.exercise_id = 'exercise-' || CAST(exercises.id AS TEXT) LIMIT 1)) "
-            "WHERE exercises.due_time IS NULL"
-        ))
-        conn.commit()
-
-        if any(row[1] == "due_time" for row in conn.execute(text("PRAGMA table_info(statistics)"))):
+        statistics_columns = {
+            row[1] for row in conn.execute(text("PRAGMA table_info(statistics)"))
+        }
+        if "due_time" in statistics_columns:
+            conn.execute(text(
+                "UPDATE exercises SET due_time = COALESCE("
+                "(SELECT due_time FROM statistics "
+                "WHERE statistics.exercise_id = CAST(exercises.id AS TEXT) LIMIT 1), "
+                "(SELECT due_time FROM statistics "
+                "WHERE statistics.exercise_id = 'exercise-' || CAST(exercises.id AS TEXT) LIMIT 1)) "
+                "WHERE exercises.due_time IS NULL"
+            ))
+            conn.commit()
             conn.execute(text("ALTER TABLE statistics DROP COLUMN due_time"))
             conn.commit()
 
@@ -896,6 +899,120 @@ def _migrate_add_missing_columns() -> None:
             )
             conn.commit()
 
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_fragments_exercise_id "
+            "ON fragments (exercise_id)"
+        ))
+        conn.commit()
+
+
+def _migrate_statistics_exercise_ids() -> None:
+    from app.core.statistics_keys import canonical_statistics_exercise_id
+
+    db = SessionLocal()
+    try:
+        indexes = db.execute(text("PRAGMA index_list('statistics')")).all()
+        if any(
+            index[1] == "uq_statistics_exercise_id" and index[2]
+            for index in indexes
+        ):
+            db.execute(text("DROP INDEX IF EXISTS ix_statistics_exercise_id"))
+            db.commit()
+            return
+
+        grouped_rows: dict[str, list[Statistics]] = {}
+        for row in db.query(Statistics).order_by(Statistics.id).all():
+            canonical_key = canonical_statistics_exercise_id(row.exercise_id)
+            grouped_rows.setdefault(canonical_key, []).append(row)
+
+        count_fields = (
+            "incorrect_count",
+            "merges_done",
+            "matches_done",
+            "fragments_drawn",
+            "dbe_set",
+            "timer_total",
+            "pause_total",
+            "confidence",
+            "mastery_index",
+        )
+        for canonical_key, rows in grouped_rows.items():
+            canonical_row = next(
+                (row for row in rows if row.exercise_id == canonical_key),
+                rows[0],
+            )
+            for field in count_fields:
+                values = [getattr(row, field) for row in rows if getattr(row, field) is not None]
+                if values:
+                    setattr(canonical_row, field, max(values))
+            for field in ("started_at", "completed_at", "cheats_off", "paused_at"):
+                values = [getattr(row, field) for row in rows if getattr(row, field) is not None]
+                if values:
+                    setattr(
+                        canonical_row,
+                        field,
+                        min(values) if field == "started_at" else max(values),
+                    )
+
+            active_timer_row = max(
+                rows,
+                key=lambda row: (row.start_counting or datetime.min, row.id),
+            )
+            canonical_row.start_counting = active_timer_row.start_counting
+            canonical_row.stop_counting = active_timer_row.stop_counting
+            for field, default in (
+                ("cheats_used", "000000000000"),
+                ("difficulty", "O0"),
+                ("SR_status", "new"),
+            ):
+                meaningful_rows = [
+                    row for row in rows if getattr(row, field) != default
+                ]
+                source = max(
+                    meaningful_rows or rows,
+                    key=lambda row: (
+                        row.completed_at or row.started_at or datetime.min,
+                        row.id,
+                    ),
+                )
+                setattr(canonical_row, field, getattr(source, field))
+
+            canonical_row.exercise_id = canonical_key
+            for row in rows:
+                if row is canonical_row:
+                    continue
+                db.delete(row)
+
+            for legacy_key in {row.exercise_id for row in rows}:
+                if legacy_key == canonical_key:
+                    continue
+                db.query(StatisticsReviewEvent).filter(
+                    StatisticsReviewEvent.exercise_id == legacy_key
+                ).update(
+                    {StatisticsReviewEvent.exercise_id: canonical_key},
+                    synchronize_session=False,
+                )
+                db.query(StatisticsBehaviorEvent).filter(
+                    StatisticsBehaviorEvent.exercise_id == legacy_key
+                ).update(
+                    {StatisticsBehaviorEvent.exercise_id: canonical_key},
+                    synchronize_session=False,
+                )
+
+        db.flush()
+        db.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_statistics_exercise_id "
+            "ON statistics (exercise_id)"
+        ))
+        db.execute(text("DROP INDEX IF EXISTS ix_statistics_exercise_id"))
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 def _purge_soft_deleted_fragments() -> None:
     """Hard-delete any fragment rows still flagged as soft-deleted from a
     previous backend session. The undo logbook lives in browser sessionStorage,
@@ -994,6 +1111,7 @@ def init_db() -> None:
 
     Base.metadata.create_all(bind=engine)
     _migrate_add_missing_columns()
+    _migrate_statistics_exercise_ids()
     _seed_user_settings_presets()
     _purge_soft_deleted_fragments()
     _seed_predefined_fragments()

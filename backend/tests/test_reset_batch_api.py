@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import pytest
+from sqlalchemy import event
 
 from app.db.models import (
     Exercise,
@@ -14,7 +15,7 @@ from app.db.models import (
     Statistics,
     WorkingSolution,
 )
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, engine
 
 
 def _seed_exercise() -> int:
@@ -209,6 +210,27 @@ def test_reset_due_reopens_overdue_exercises_without_changing_due_time(client):
         assert future_exercise.completed is True
     finally:
         db.close()
+
+
+def test_reset_batch_query_count_is_constant_for_many_exercises(client):
+    exercise_ids = [_seed_exercise() for _ in range(20)]
+    statements: list[str] = []
+
+    def count_statement(_connection, _cursor, statement, _parameters, _context, _executemany):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", count_statement)
+    try:
+        response = client.post(
+            "/api/v1/exercises/reset-batch",
+            json={"exercise_ids": exercise_ids, "level": "workspace"},
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", count_statement)
+
+    assert response.status_code == 204
+    assert len(statements) == 4
+    assert all(_counts(exercise_id)["fragment"] == 0 for exercise_id in exercise_ids)
 
 
 @pytest.mark.parametrize("level", ["logbook", "workspace", "completion", "progression"])
