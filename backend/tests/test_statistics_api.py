@@ -582,6 +582,7 @@ def test_timer_restarts_are_saved_with_the_timer_interval(client):
 def test_pause_and_switch_each_increment_pause_total(client):
     mark_exercise_resumed(50)
     mark_exercise_paused(50)
+    mark_exercise_resumed(50)
 
     response = client.post("/api/v1/statistics/stop", params={"exercise_id": "50"})
     assert response.status_code == 200
@@ -589,7 +590,9 @@ def test_pause_and_switch_each_increment_pause_total(client):
     db = SessionLocal()
     try:
         statistics = db.query(Statistics).filter(Statistics.exercise_id == "50").one()
+        logbook = db.query(LogbookState).filter(LogbookState.exercise_id == "exercise-50").one()
         assert statistics.pause_total == 2
+        assert len(json.loads(logbook.pause_events_json)) == 2
     finally:
         db.close()
 

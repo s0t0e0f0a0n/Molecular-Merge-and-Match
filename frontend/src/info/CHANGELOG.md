@@ -34,6 +34,8 @@ following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 - Removed the unused `vite-plugin-node-polyfills` and `shx` development dependencies.
 
 ### Fixed
+- Progression counts and elapsed time no longer get clipped when the available width or displayed values change.
+- Logbook pause counts now use explicit pause and unfinished-exercise stop events instead of treating timer checkpoint intervals as pauses.
 - Changing a solvent preference refreshes the selected exercise detail without reselecting it, unmounting spectrum viewers, or restarting its study timer.
 - Switching exercises no longer lets late fragment, working-solution, or spectrum responses overwrite the current exercise.
 - Legacy database migrations now preserve statistics columns and their data when converting `cheats_used` to text.

@@ -336,6 +336,7 @@ describe('Advanced logbook distribution', () => {
           { start: '2026-08-01T00:00:00Z', stop: '2026-08-01T00:01:00Z' },
           { start: '2026-08-03T00:00:00Z', stop: '2026-08-03T00:01:00Z' },
         ]),
+        pause_events_json: '[]',
       }],
     });
     const user = userEvent.setup();
@@ -362,8 +363,52 @@ describe('Advanced logbook distribution', () => {
     expect(await screen.findByTitle('25-30%: 2 events')).toBeInTheDocument();
     expect(screen.getByTitle('75-80%: 1 event')).toBeInTheDocument();
     expect(screen.getByTitle('95-100%: 0 events')).toBeInTheDocument();
+    expect(
+      [...document.querySelectorAll<HTMLElement>('.statistics-logbook-pause')]
+        .every((segment) => segment.style.height === '0%'),
+    ).toBe(true);
     expect(screen.getByTitle('25-30%: 2 events').querySelector('.statistics-logbook-dbe'))
       .toHaveStyle({ height: '50%' });
+  });
+
+  it('counts explicit pause and stop events instead of timer interval boundaries', async () => {
+    vi.mocked(fetchLogbookHistory).mockResolvedValue({
+      '72': [{
+        entries_json: '[]',
+        cursor: 0,
+        links_json: '[]',
+        restarts: JSON.stringify([
+          { start: '2026-08-01T00:00:00Z', stop: '2026-08-01T00:01:00Z' },
+          { start: '2026-08-01T00:01:00Z', stop: '2026-08-01T00:02:00Z' },
+        ]),
+        pause_events_json: JSON.stringify(['2026-08-01T00:00:45Z']),
+      }],
+    });
+    const user = userEvent.setup();
+    render(
+      <StatisticsPanel
+        isOpen
+        onClose={() => undefined}
+        exerciseSummaries={[
+          {
+            id: 72,
+            name: 'Explicit pause',
+            exercise_set: 'set-a',
+            tags: [],
+            started_at: '2026-08-01T00:00:00Z',
+            completed_at: '2026-08-01T00:02:00Z',
+          },
+        ]}
+        selectedExerciseId={72}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Time distribution/ }));
+
+    expect(await screen.findByTitle('35-40%: 1 event')).toBeInTheDocument();
+    expect(screen.getByTitle('35-40%: 1 event').querySelector('.statistics-logbook-pause'))
+      .toHaveStyle({ height: '100%' });
+    expect(screen.getByTitle('50-55%: 0 events')).toBeInTheDocument();
   });
 });
 

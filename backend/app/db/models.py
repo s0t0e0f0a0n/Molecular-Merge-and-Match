@@ -289,6 +289,7 @@ class LogbookState(Base):
     cursor: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     links_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     restarts: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    pause_events_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     archived: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True, default=None
     )

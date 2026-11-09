@@ -18,7 +18,13 @@ def test_empty_logbook_gives_back_defaults(client):
     resp = client.get("/api/v1/logbook/", params={"exercise_id": "ex1"})
     assert resp.status_code == 200
     data = resp.json()
-    assert data == {"entries_json": "[]", "cursor": 0, "links_json": "[]", "restarts": "[]"}
+    assert data == {
+        "entries_json": "[]",
+        "cursor": 0,
+        "links_json": "[]",
+        "restarts": "[]",
+        "pause_events_json": "[]",
+    }
 
 
 def test_fetching_needs_an_exercise_id(client):
@@ -36,11 +42,13 @@ def test_saved_logbook_is_fetched_back(client):
     assert resp.status_code == 200
     assert {key: resp.json()[key] for key in body} == body
     assert resp.json()["restarts"] == "[]"
+    assert resp.json()["pause_events_json"] == "[]"
 
     resp = client.get("/api/v1/logbook/", params={"exercise_id": "ex1"})
     assert resp.status_code == 200
     assert {key: resp.json()[key] for key in body} == body
     assert resp.json()["restarts"] == "[]"
+    assert resp.json()["pause_events_json"] == "[]"
 
 
 def test_saving_overwrites_the_previous_one(client):
@@ -111,7 +119,13 @@ def test_clearing_removes_logbook(client):
     assert resp.status_code == 204
 
     fetched = client.get("/api/v1/logbook/", params={"exercise_id": "ex1"}).json()
-    assert fetched == {"entries_json": "[]", "cursor": 0, "links_json": "[]", "restarts": "[]"}
+    assert fetched == {
+        "entries_json": "[]",
+        "cursor": 0,
+        "links_json": "[]",
+        "restarts": "[]",
+        "pause_events_json": "[]",
+    }
 
 
 def test_clearing_logbook_preserves_restart_history(client):
@@ -135,6 +149,30 @@ def test_clearing_logbook_preserves_restart_history(client):
         row = db.query(LogbookState).filter(LogbookState.exercise_id == "ex1").one()
         assert row.entries_json == "[]"
         assert row.restarts == '[{"start":"2026-09-01T10:00:00","stop":"2026-09-01T10:01:00"}]'
+    finally:
+        db.close()
+
+
+def test_clearing_logbook_preserves_pause_event_history(client):
+    client.put(
+        "/api/v1/logbook/",
+        json={"entries_json": "[]", "cursor": 0, "links_json": "[]"},
+        params={"exercise_id": "ex1"},
+    )
+    db = SessionLocal()
+    try:
+        row = db.query(LogbookState).filter(LogbookState.exercise_id == "ex1").one()
+        row.pause_events_json = '["2026-09-01T10:00:00"]'
+        db.commit()
+    finally:
+        db.close()
+
+    client.delete("/api/v1/logbook/", params={"exercise_id": "ex1"})
+
+    db = SessionLocal()
+    try:
+        row = db.query(LogbookState).filter(LogbookState.exercise_id == "ex1").one()
+        assert row.pause_events_json == '["2026-09-01T10:00:00"]'
     finally:
         db.close()
 

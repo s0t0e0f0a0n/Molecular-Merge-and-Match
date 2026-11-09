@@ -203,6 +203,18 @@ def _record_timer_stop(db, row: Statistics, stopped_at: datetime) -> None:
     logbook.restarts = json.dumps(intervals)
 
 
+def _record_pause_event(db, exercise_id: int | str, occurred_at: datetime) -> None:
+    logbook = _find_or_create_logbook_state(db, exercise_id)
+    try:
+        events = json.loads(logbook.pause_events_json or "[]")
+    except (TypeError, json.JSONDecodeError):
+        events = []
+    if not isinstance(events, list):
+        events = []
+    events.append(occurred_at.isoformat())
+    logbook.pause_events_json = json.dumps(events)
+
+
 def _finalize_timer(
     db,
     row: Statistics,
@@ -326,6 +338,7 @@ def mark_exercise_closed(exercise_id: int | str) -> None:
                 event_type="exercise-closed",
             ))
         if row.start_counting is not None and row.stop_counting is None:
+            _record_pause_event(db, row.exercise_id, closed_at)
             _finalize_timer(db, row, closed_at, count_short_elapsed=True)
 
         db.commit()
@@ -341,13 +354,15 @@ def mark_exercise_paused(exercise_id: int | str) -> None:
         if row is None:
             return
         row.pause_total += 1
+        paused_at = datetime.now()
+        _record_pause_event(db, row.exercise_id, paused_at)
         if row.start_counting is None or row.stop_counting is not None:
             db.commit()
             db.refresh(row)
             return
 
         # A user-initiated pause should always flush the elapsed segment.
-        _finalize_timer(db, row, datetime.now(), count_short_elapsed=True)
+        _finalize_timer(db, row, paused_at, count_short_elapsed=True)
 
         db.commit()
         db.refresh(row)

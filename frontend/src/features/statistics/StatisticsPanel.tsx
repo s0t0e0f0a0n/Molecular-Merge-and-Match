@@ -318,6 +318,19 @@ function parseLogbookRestarts(value: unknown): Array<{ start: number; stop: numb
   }
 }
 
+function parseLogbookPauseEvents(value: unknown): number[] {
+  if (typeof value !== 'string') return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map(parseLogbookTimestamp)
+      .filter((timestamp): timestamp is number => timestamp !== null);
+  } catch {
+    return [];
+  }
+}
+
 function exerciseLogbooks(
   logbooks: Record<string, ApiLogbookState[]>,
   exercise: ExerciseSummary,
@@ -398,14 +411,10 @@ function buildLogbookDistribution(
         if (eventKinds.has(entry.kind ?? '')) addToBucket(elapsed, entry.kind ?? '');
       });
 
-      // Every stop of the timer except the final one (completion) is a pause.
-      if (restarts.length > 1) {
-        let elapsedBeforeInterval = 0;
-        restarts.slice(0, -1).forEach((interval) => {
-          elapsedBeforeInterval += interval.stop - interval.start;
-          addToBucket(Math.min(elapsedBeforeInterval, totalDuration - 1), 'pause');
-        });
-      }
+      parseLogbookPauseEvents(logbook.pause_events_json).forEach((timestamp) => {
+        const elapsed = elapsedAt(timestamp);
+        if (elapsed !== null) addToBucket(Math.min(elapsed, totalDuration - 1), 'pause');
+      });
 
       // Each gap over 30 s between consecutive logbook entries is one rest, placed at the gap's midpoint.
       activity.sort((left, right) => left - right);

@@ -24,6 +24,7 @@ class LogbookStateOut(BaseModel):
     cursor: int
     links_json: str
     restarts: str = "[]"
+    pause_events_json: str = "[]"
 
     model_config = {"from_attributes": True}
 

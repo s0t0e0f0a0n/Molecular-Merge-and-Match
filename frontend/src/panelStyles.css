@@ -870,12 +870,6 @@
     width: 130px;
 }
 
-.statistics-total-progression-row .statistics-progression-counts {
-    flex: 0 0 250px;
-    width: 250px;
-    margin-left: 20px;
-}
-
 .statistics-progression-panel {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -922,6 +916,7 @@
 
 .statistics-progression-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     font-weight: 400;
@@ -938,18 +933,21 @@
 }
 
 .statistics-progression-row .statistics-progression-bar {
-    flex: 1 1 auto;
+    flex: 1 1 32px;
     width: auto;
+    min-width: 32px;
     height: 8px;
 }
 
 .statistics-progression-row .statistics-progression-counts {
-    flex: 0 0 190px;
-    width: 190px;
-    min-width: 0;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    width: max-content;
+    min-width: min(190px, 100%);
+    max-width: 100%;
     box-sizing: border-box;
-    overflow: hidden;
     justify-content: space-between;
+    white-space: nowrap;
     font-weight: 400;
     font-size: 12px;
 }
@@ -988,6 +986,12 @@
     margin-left: 6px;
     color: #475569;
     font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 700px) {
+    .statistics-progression-panel {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 .statistics-contribution-legend {

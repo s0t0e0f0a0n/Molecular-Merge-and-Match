@@ -424,6 +424,11 @@ def _migrate_add_missing_columns() -> None:
                 text("ALTER TABLE logbook_states ADD COLUMN restarts TEXT NOT NULL DEFAULT '[]'")
             )
             conn.commit()
+        if "pause_events_json" not in existing_logbook_columns:
+            conn.execute(
+                text("ALTER TABLE logbook_states ADD COLUMN pause_events_json TEXT NOT NULL DEFAULT '[]'")
+            )
+            conn.commit()
 
         # Update Exercise model
         result_exercise = conn.execute(text("PRAGMA table_info(exercises)"))
@@ -853,6 +858,7 @@ def _migrate_add_missing_columns() -> None:
                     cursor INTEGER NOT NULL,
                     links_json TEXT NOT NULL,
                     restarts TEXT NOT NULL DEFAULT '[]',
+                    pause_events_json TEXT NOT NULL DEFAULT '[]',
                     archived DATETIME,
                     updated_at DATETIME NOT NULL DEFAULT (CURRENT_TIMESTAMP)
                 )
@@ -861,8 +867,8 @@ def _migrate_add_missing_columns() -> None:
             conn.execute(text(
                 """
                 INSERT INTO logbook_states
-                    (id, exercise_id, entries_json, cursor, links_json, restarts, archived, updated_at)
-                SELECT id, exercise_id, entries_json, cursor, links_json, restarts, archived, updated_at
+                    (id, exercise_id, entries_json, cursor, links_json, restarts, pause_events_json, archived, updated_at)
+                SELECT id, exercise_id, entries_json, cursor, links_json, restarts, pause_events_json, archived, updated_at
                 FROM logbook_states_legacy
                 """
             ))

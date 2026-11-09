@@ -3,6 +3,7 @@ export type ApiLogbookState = {
   cursor: number;
   links_json: string;
   restarts?: string;
+  pause_events_json?: string;
   archived?: string | null;
   timer_checkpointed?: boolean;
 };

@@ -138,7 +138,13 @@ def test_logbook_reset_batch_hides_archived_entries_from_get(client):
         params={"exercise_id": f"exercise-{exercise_id}"},
     )
     assert fetched.status_code == 200
-    assert fetched.json() == {"entries_json": "[]", "cursor": 0, "links_json": "[]", "restarts": "[]"}
+    assert fetched.json() == {
+        "entries_json": "[]",
+        "cursor": 0,
+        "links_json": "[]",
+        "restarts": "[]",
+        "pause_events_json": "[]",
+    }
 
 
 def test_reset_batch_completion_clears_exercise_completion_without_deleting_statistics(client):

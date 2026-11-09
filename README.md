@@ -157,7 +157,7 @@ The calculations are in `frontend/src/features/statistics/metaCognitive.ts`.
 
 The Statistics panel loads exercise summaries from `GET /api/v1/exercises/summaries`. The backend combines exercise fields with the matching `statistics` row when one exists. Common fields used below include `Exercise.id`, `name`, `exercise_set`, `completed`, `due_time`; tags from the exercise/tag associations; and `Statistics.started_at`, `completed_at`, `timer_total`, `incorrect_count`, `cheats_used`, `cheats_off`, `difficulty`, `confidence`, `mastery_index`, `fragments_drawn`, `merges_done`, `matches_done`, and `dbe_set`. `has_statistics` identifies whether a statistics row was found. Example/reference summaries may therefore have exercise data without a statistics row.
 
-Graphs that need action history also load `GET /api/v1/logbook/history`. Each `logbook_states` record contributes its `exercise_id`, `entries_json`, `restarts`, and `archived` fields. `entries_json` is parsed for timestamped action entries; `restarts` is parsed for timer start/stop intervals. These endpoints return data for the current local database; graph values are calculated in the frontend from the returned fields.
+Graphs that need action history also load `GET /api/v1/logbook/history`. Each `logbook_states` record contributes its `exercise_id`, `entries_json`, `restarts`, `pause_events_json`, and `archived` fields. `entries_json` is parsed for timestamped action entries; `restarts` is parsed for timer start/stop intervals; `pause_events_json` stores explicit pause-button and unfinished-exercise stop timestamps. These endpoints return data for the current local database; graph values are calculated in the frontend from the returned fields.
 
 ### Exercise overview
 
@@ -179,7 +179,7 @@ Graphs that need action history also load `GET /api/v1/logbook/history`. Each `l
 
 ### Time distribution
 
-- **Logbook events during completed exercises:** 20 bins show event positions across each eligible attempt's active duration, using timestamps in `entries_json` and the exercise `started_at`/`completed_at` fields. Stacked counts include create-fragment, link, merge-fragments and set-DBE actions. A rest is a gap longer than 30 seconds between consecutive logbook activity timestamps; it is placed at the gap midpoint. Pause counts come from timer `restarts` intervals, excluding the final interval stop. Paused wall-clock time is excluded when positioning events.
+- **Logbook events during completed exercises:** 20 bins show event positions across each eligible attempt's active duration, using timestamps in `entries_json` and the exercise `started_at`/`completed_at` fields. Stacked counts include create-fragment, link, merge-fragments and set-DBE actions. A rest is a gap longer than 30 seconds between consecutive logbook activity timestamps; it is placed at the gap midpoint. Pause counts use explicit pause-button and unfinished-exercise stop timestamps from `pause_events_json`, not timer interval boundaries. Paused wall-clock time is excluded when positioning events.
 - **Completed exercises by time:** completed exercises are grouped by `timer_total`, rounded to the nearest 30 seconds. The stacked bar colour comes from the first letter of `difficulty` (E/M/D). The axis shows at least 10 minutes and caps at a final 60+ minute bin.
 - **Rests duration:** counts the same >30-second logbook gaps as the event graph, by rounded 30-second duration bin and exercise difficulty. It uses the same 10-to-60+ minute display range as completed exercise time.
 
