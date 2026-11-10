@@ -56,7 +56,9 @@ export function useWorkingSolution(exerciseId: string) {
 
   useEffect(() => {
     const controller = new AbortController();
-    setSolutionState(null);
+    // Removed setSolutionState(null) to prevent flickering of WorkingFragmentsStrip
+    // during exercise transitions - let the old solution fade out smoothly instead
+    // setSolutionState(null);
     setError(null);
     if (exerciseId === 'exercise-none') {
       setLoading(false);

@@ -274,7 +274,6 @@ export function MolecularBookkeepingPage() {
   const settingsRequestIdRef = useRef(0);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
-
   const [casAnswerInput, setCasAnswerInput] = useState('');
   const [casAnswerIsCorrect, setCasAnswerIsCorrect] = useState<boolean | null>(null);
   const [casAlreadyValidated, setCasAlreadyValidated] = useState(false);
@@ -323,12 +322,13 @@ export function MolecularBookkeepingPage() {
     setSelectedExerciseStatistics,
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setCasAnswerInput('');
     setCasAnswerIsCorrect(null);
     setValidatingCasAnswer(false);
     setValidationAttemptExerciseId(null);
     setValidatedCorrectExerciseId(null);
+    setMergeState({ phase: 'idle' });
   }, [selectedExerciseId]);
 
   useEffect(() => {
@@ -2223,23 +2223,6 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
 
         </div>
       </div>
-
-      {loadingSelectedExercise && (
-        <div
-            style={{
-              position: 'fixed',
-              top: 70,
-              right: 20,
-              fontSize: 12,
-              padding: '6px 10px',
-              borderRadius: 8,
-              background: 'rgba(255,255,255,0.9)',
-              border: '1px solid #ddd',
-              zIndex: 1000,
-            }}
-          >
-          </div>
-        )}
 
        {selectedExerciseError && (
          <div
