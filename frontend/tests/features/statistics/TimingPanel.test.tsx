@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ExerciseStatistics } from '../../../src/api/exercises';
-import { ExerciseTimerDisplay } from '../../../src/features/statistics/TimingPanel';
+import { ExerciseTimerDisplay, PauseExerciseButton, StopExerciseButton } from '../../../src/features/statistics/TimingPanel';
 
 const runningStatistics: ExerciseStatistics = {
   exercise_id: '1',
@@ -22,6 +22,23 @@ const runningStatistics: ExerciseStatistics = {
 describe('ExerciseTimerDisplay', () => {
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('renders a centered square stop icon with the same button styling as pause', () => {
+    render(
+      <>
+        <PauseExerciseButton onPause={() => {}} disabled={false} title="Pause exercise" />
+        <StopExerciseButton onStop={() => {}} disabled={false} title="Stop exercise" />
+      </>,
+    );
+    const pause = screen.getByTestId('pause-exercise-button');
+    const stop = screen.getByTestId('stop-exercise-button');
+    expect(stop.getAttribute('style')).toBe(pause.getAttribute('style'));
+    const square = stop.querySelector('svg rect');
+    expect(square).toHaveAttribute('x', '3');
+    expect(square).toHaveAttribute('y', '3');
+    expect(square).toHaveAttribute('width', '8');
+    expect(square).toHaveAttribute('height', '8');
   });
 
   it('updates the displayed time once per second without updating its parent', () => {

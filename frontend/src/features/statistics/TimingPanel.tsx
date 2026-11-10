@@ -1,15 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   pauseExerciseTimer,
   resumeExerciseTimer,
   type ExerciseStatistics,
 } from '../../api/exercises';
-
-function parseStatisticsTimestamp(value: string | null | undefined): number | null {
-  if (!value) return null;
-  const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? null : parsed;
-}
+import { isExerciseTimerRunning, parseStatisticsTimestamp } from './exerciseTimer';
 
 function formatElapsedTime(totalSeconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(totalSeconds));
@@ -143,14 +138,11 @@ type ExerciseTimerDisplayProps = {
 
 export function ExerciseTimerDisplay({ selectedExerciseStatistics }: ExerciseTimerDisplayProps) {
   const [timerNow, setTimerNow] = useState(() => Date.now());
+  const timerRunning = isExerciseTimerRunning(selectedExerciseStatistics);
 
   useEffect(() => {
-    const startCountingMs = parseStatisticsTimestamp(selectedExerciseStatistics?.start_counting);
-    const stopCountingMs = parseStatisticsTimestamp(selectedExerciseStatistics?.stop_counting);
-    const completedAtMs = parseStatisticsTimestamp(selectedExerciseStatistics?.completed_at);
-
     setTimerNow(Date.now());
-    if (startCountingMs === null || stopCountingMs !== null || completedAtMs !== null) {
+    if (!timerRunning) {
       return;
     }
 
@@ -160,6 +152,7 @@ export function ExerciseTimerDisplay({ selectedExerciseStatistics }: ExerciseTim
 
     return () => window.clearInterval(intervalId);
   }, [
+    timerRunning,
     selectedExerciseStatistics?.completed_at,
     selectedExerciseStatistics?.start_counting,
     selectedExerciseStatistics?.stop_counting,
@@ -205,18 +198,26 @@ type PauseExerciseButtonProps = {
   title: string;
 };
 
-export function PauseExerciseButton({ onPause, disabled, title }: PauseExerciseButtonProps) {
+type TimerControlButtonProps = {
+  onClick: () => void;
+  disabled: boolean;
+  title: string;
+  testId: string;
+  children: ReactNode;
+};
+
+function TimerControlButton({ onClick, disabled, title, testId, children }: TimerControlButtonProps) {
   const [hovered, setHovered] = useState(false);
 
   return (
     <button
       type="button"
-      onClick={onPause}
+      onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       disabled={disabled}
       title={title}
-      data-testid="pause-exercise-button"
+      data-testid={testId}
       style={{
         width: 28,
         height: 28,
@@ -233,6 +234,14 @@ export function PauseExerciseButton({ onPause, disabled, title }: PauseExerciseB
         whiteSpace: 'nowrap',
       }}
     >
+      {children}
+    </button>
+  );
+}
+
+export function PauseExerciseButton({ onPause, disabled, title }: PauseExerciseButtonProps) {
+  return (
+    <TimerControlButton onClick={onPause} disabled={disabled} title={title} testId="pause-exercise-button">
       <svg
         aria-hidden="true"
         width="14"
@@ -243,7 +252,23 @@ export function PauseExerciseButton({ onPause, disabled, title }: PauseExerciseB
         <rect x="3" y="2" width="3" height="10" rx="1" />
         <rect x="8" y="2" width="3" height="10" rx="1" />
       </svg>
-    </button>
+    </TimerControlButton>
+  );
+}
+
+type StopExerciseButtonProps = {
+  onStop: () => void;
+  disabled: boolean;
+  title: string;
+};
+
+export function StopExerciseButton({ onStop, disabled, title }: StopExerciseButtonProps) {
+  return (
+    <TimerControlButton onClick={onStop} disabled={disabled} title={title} testId="stop-exercise-button">
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+        <rect x="3" y="3" width="8" height="8" rx="1" />
+      </svg>
+    </TimerControlButton>
   );
 }
 

@@ -15,6 +15,7 @@ following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 
 ## v1.6.0
 ### Added
+- A stop button switches a running exercise to Sucrose, or another example or reference if Sucrose is unavailable.
 - NMRium integration, replacing the NMRGlue test bench. Press F2 (Command+F2 on macOS) to open the NMRium spectrum viewer in its own window.
 - Press F8 (Command+F8 on macOS) to open the NMRium exercise-creation workflow. Load a Bruker dataset, pick and process the spectra, and the workflow stores the 1D peaks, multiplets and integrals as a draft that is saved to the database and restored the next time you open it.
 - Spectra can be exported as SVG, previewed with an adjustable ppm range and integral position, and stored temporarily in the backend (`NMRiumtemp`) for use in the new exercise.
@@ -36,6 +37,7 @@ following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 - Removed the unused `vite-plugin-node-polyfills` and `shx` development dependencies.
 
 ### Fixed
+- Switching exercises no longer briefly shows an empty loading indicator. The existing loading overlay still appears when loading takes longer than 250 ms.
 - Progression counts and elapsed time no longer get clipped when the available width or displayed values change.
 - Logbook pause counts now use explicit pause and unfinished-exercise stop events instead of treating timer checkpoint intervals as pauses.
 - Changing a solvent preference refreshes the selected exercise detail without reselecting it, unmounting spectrum viewers, or restarting its study timer.

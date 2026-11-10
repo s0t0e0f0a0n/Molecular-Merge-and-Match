@@ -8,6 +8,7 @@ import { WarningProvider } from '../../../src/context/WarningContext';
 import {
   fetchExerciseSummaries,
   fetchExerciseDetail,
+  type ExerciseStatistics,
 } from '../../../src/api/exercises';
 import { mockSummaries, mockExercise1, mockExercise2 } from './MockExercises';
 
@@ -134,6 +135,100 @@ async function selectExerciseViaMenu(user: ReturnType<typeof userEvent.setup>, e
   await user.click(await screen.findByTestId('exercise-menu-button'));
   await user.click(await screen.findByRole('button', { name: new RegExp(`^${exerciseName}\\b`) }));
 }
+
+describe('stop exercise', () => {
+  const statistics: ExerciseStatistics = {
+    exercise_id: '1',
+    incorrect_count: 0,
+    cheats_used: '',
+    fragments_drawn: 0,
+    merges_done: 0,
+    matches_done: 0,
+    start_counting: '2026-11-06T14:00:00.000Z',
+    stop_counting: null,
+    timer_total: 0,
+    started_at: '2026-11-06T14:00:00.000Z',
+    completed_at: null,
+    difficulty: '',
+    SR_status: '',
+  };
+  const sucrose = { ...mockSummaries[1], id: 9, name: 'Sucrose', exercise_set: 'Examples' };
+
+  function setupStopExercise(options: {
+    currentId?: number;
+    completed?: boolean;
+    stats?: ExerciseStatistics | null;
+    includeTarget?: boolean;
+  } = {}) {
+    const currentId = options.currentId ?? 1;
+    const stats = options.stats === undefined ? statistics : options.stats;
+    const summaries = options.includeTarget === false ? [mockSummaries[0]] : [mockSummaries[0], sucrose];
+    vi.mocked(fetchExerciseSummaries).mockResolvedValue(summaries);
+    vi.mocked(fetchExerciseDetail).mockImplementation(async (id) => ({
+      ...mockExercise1,
+      id,
+      name: id === 9 ? 'Sucrose' : 'Exercise 1',
+      completed: id === 9 ? false : options.completed ?? false,
+    }));
+    mockFetch.mockImplementation((url) => Promise.resolve({
+      ok: true,
+      json: async () => url.startsWith('/api/v1/statistics/?') ? stats : [],
+    } as Response));
+    window.history.replaceState(null, '', `/?exercise=${currentId}`);
+    renderPage();
+  }
+
+  it.each(['stop button', 'exercise menu'])('uses the same switch and timer-stop path via the %s', async (method) => {
+    const user = userEvent.setup();
+    setupStopExercise();
+    await waitFor(() => expect(screen.getByTestId('stop-exercise-button')).toBeEnabled());
+    mockFetch.mockClear();
+
+    if (method === 'stop button') {
+      await user.click(screen.getByTestId('stop-exercise-button'));
+    } else {
+      await user.click(screen.getByTestId('exercise-menu-button'));
+      await user.click(screen.getByRole('button', { name: 'Expand Examples' }));
+      await user.click(screen.getByRole('button', { name: /^Sucrose\b/ }));
+    }
+
+    await waitFor(() => expect(screen.getByTestId('exercise-menu-button')).toHaveTextContent('Sucrose'));
+    expect(fetchExerciseDetail).toHaveBeenCalledWith(9);
+    expect(mockFetch).toHaveBeenCalledWith('/api/v1/statistics/stop?exercise_id=1', { method: 'POST' });
+  });
+
+  it.each([
+    ['completed exercise', { completed: true }],
+    ['stopped timer', { stats: { ...statistics, stop_counting: '2026-11-06T14:01:00Z' } }],
+    ['completed timer', { stats: { ...statistics, completed_at: '2026-11-06T14:01:00Z' } }],
+    ['timer not started', { stats: { ...statistics, start_counting: null } }],
+    ['unavailable statistics', { stats: null }],
+    ['statistics for another exercise', { stats: { ...statistics, exercise_id: '2' } }],
+    ['current target', { currentId: 9, stats: { ...statistics, exercise_id: '9' } }],
+    ['missing target', { includeTarget: false }],
+  ])('does nothing for %s', async (_label, options) => {
+    const user = userEvent.setup();
+    setupStopExercise(options);
+    await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByTestId('exercise-menu-button')).toHaveTextContent(
+      'currentId' in options && options.currentId === 9 ? 'Sucrose' : 'Exercise 1',
+    ));
+    const calls = vi.mocked(fetchExerciseDetail).mock.calls.length;
+    const button = screen.getByTestId('stop-exercise-button');
+    expect(button).toBeDisabled();
+    await user.click(button);
+    expect(fetchExerciseDetail).toHaveBeenCalledTimes(calls);
+  });
+
+  it('does nothing while the timer is paused', async () => {
+    const user = userEvent.setup();
+    setupStopExercise();
+    await waitFor(() => expect(screen.getByTestId('stop-exercise-button')).toBeEnabled());
+    await user.click(screen.getByTestId('pause-exercise-button'));
+    await screen.findByTestId('paused-exercise-overlay');
+    expect(screen.getByTestId('stop-exercise-button')).toBeDisabled();
+  });
+});
 
 it('deletes exercises concurrently and selects the next remaining exercise', async () => {
   const user = userEvent.setup();
@@ -964,7 +1059,7 @@ it('validates solution answer and sends a solution hash', async () => {
   renderPage();
 
   await screen.findByText('2.46');
-  await user.click(screen.getByRole('button', { name: /Validate answer/i }));
+  await user.click(await screen.findByRole('button', { name: /Validate answer/i }));
 
   await waitFor(() => {
     const validationCalls = mockFetch.mock.calls.filter(
@@ -1027,7 +1122,7 @@ it('shows incorrect solution feedback when validation fails', async () => {
   renderPage();
 
   await screen.findByText('2.46');
-  await user.click(screen.getByRole('button', { name: /Validate answer/i }));
+  await user.click(await screen.findByRole('button', { name: /Validate answer/i }));
 
   expect(await screen.findByText('Your answer is incorrect.')).toBeInTheDocument();
 });

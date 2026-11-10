@@ -18,6 +18,7 @@ import { parseMolBlock, molGraphToMolBlock } from '../../utils/molParser';
 import { mergeAtAtoms } from '../../utils/mergeFragments';
 import type { MolGraph } from '../../types/molecule';
 import { ExerciseMenu } from '../exercises/ExerciseMenu';
+import { getStopExerciseTarget } from '../exercises/stopExerciseTarget';
 import { getSpacedRepetitionQueue } from '../exercises/spacedRepetitionQueue';
 import {
   fetchExerciseStatistics,
@@ -56,8 +57,10 @@ import { StatisticsPanel } from '../statistics/StatisticsPanel';
 import {
   ExerciseTimerDisplay,
   PauseExerciseButton,
+  StopExerciseButton,
   useExerciseTimingState,
 } from '../statistics/TimingPanel';
+import { isExerciseTimerRunning } from '../statistics/exerciseTimer';
 
 function toRegularC13DisplayPeaks(c13Peaks: ApiC13Peak[]): PeakDef[] {
   return c13Peaks.map((peak) => ({
@@ -311,6 +314,7 @@ export function MolecularBookkeepingPage() {
 
   const {
     exercisePaused,
+    pausingExercise,
     resumingExercise,
     handlePauseExercise,
     handleResumeExercise,
@@ -476,6 +480,20 @@ export function MolecularBookkeepingPage() {
   const [activeTagsLoaded, setActiveTagsLoaded] = useState(false);
   const [loadingExerciseSummaries, setLoadingExerciseSummaries] = useState(true);
   const [exerciseSummariesError, setExerciseSummariesError] = useState<string | null>(null);
+
+  const stopTarget = useMemo(() => getStopExerciseTarget(exerciseSummaries), [exerciseSummaries]);
+  const stopButtonDisabled =
+    loadingSelectedExercise ||
+    selectedExerciseId === null ||
+    selectedExercise === null ||
+    selectedExercise.completed === true ||
+    selectedExerciseStatistics?.exercise_id !== String(selectedExerciseId) ||
+    !isExerciseTimerRunning(selectedExerciseStatistics) ||
+    exercisePaused ||
+    pausingExercise ||
+    resumingExercise ||
+    !stopTarget ||
+    stopTarget.id === selectedExerciseId;
 
   const loadActiveTags = useCallback(async () => {
     try {
@@ -2214,6 +2232,14 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
             }}
             disabled={pauseButtonDisabled}
             title={pauseButtonTitle}
+          />
+
+          <StopExerciseButton
+            onStop={() => {
+              if (!stopButtonDisabled && stopTarget) void selectExerciseById(stopTarget.id);
+            }}
+            disabled={stopButtonDisabled}
+            title={stopTarget ? `Stop exercise and switch to ${stopTarget.name ?? `Exercise ${stopTarget.id}`}` : 'No example or reference exercise available'}
           />
 
 
