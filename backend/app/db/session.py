@@ -539,6 +539,16 @@ def _migrate_add_missing_columns() -> None:
         if "SR_mode" not in existing_settings:
             conn.execute(text("ALTER TABLE user_settings ADD COLUMN SR_mode BOOLEAN NOT NULL DEFAULT 0"))
             conn.commit()
+        if "start_at_mode" not in existing_settings:
+            conn.execute(
+                text("ALTER TABLE user_settings ADD COLUMN start_at_mode VARCHAR(30) NOT NULL DEFAULT 'custom'")
+            )
+            conn.commit()
+        if "start_at_exercise_id" not in existing_settings:
+            conn.execute(
+                text("ALTER TABLE user_settings ADD COLUMN start_at_exercise_id INTEGER NOT NULL DEFAULT 9")
+            )
+            conn.commit()
         conn.execute(text("UPDATE user_settings SET name = 'user' WHERE name IS NULL OR TRIM(name) = ''"))
         conn.commit()
         conn.execute(text("DELETE FROM user_settings WHERE name = 'user' AND id NOT IN (SELECT MIN(id) FROM user_settings WHERE name = 'user')"))

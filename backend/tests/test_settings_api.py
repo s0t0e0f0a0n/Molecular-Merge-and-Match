@@ -28,6 +28,40 @@ def test_settings_response_includes_spaced_repetition_mode(client):
     assert response.json()["SR_mode"] is True
 
 
+def test_start_at_settings_default_to_sucrose_and_persist(client):
+    with SessionLocal() as db:
+        settings = db.query(UserSettings).filter_by(name="User").first()
+        if settings is None:
+            settings = UserSettings(name="User")
+            db.add(settings)
+        settings.start_at_mode = "custom"
+        settings.start_at_exercise_id = 9
+        db.commit()
+
+    initial = client.get("/api/v1/settings/")
+    assert initial.status_code == 200
+    assert initial.json()["start_at_mode"] == "custom"
+    assert initial.json()["start_at_exercise_id"] == 9
+
+    updated = client.put(
+        "/api/v1/settings/",
+        json={"start_at_mode": "last_incomplete", "start_at_exercise_id": 42},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["start_at_mode"] == "last_incomplete"
+    assert updated.json()["start_at_exercise_id"] == 42
+
+    fetched = client.get("/api/v1/settings/")
+    assert fetched.json()["start_at_mode"] == "last_incomplete"
+    assert fetched.json()["start_at_exercise_id"] == 42
+
+
+def test_start_at_mode_rejects_unknown_values(client):
+    response = client.put("/api/v1/settings/", json={"start_at_mode": "latest"})
+
+    assert response.status_code == 422
+
+
 def test_new_display_settings_can_be_saved_and_fetched(client):
     response = client.put(
         "/api/v1/settings/",

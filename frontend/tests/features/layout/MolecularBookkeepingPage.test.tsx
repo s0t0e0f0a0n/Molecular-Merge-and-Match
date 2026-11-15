@@ -1813,6 +1813,16 @@ it('shows incorrect solution feedback when validation fails', async () => {
       });
     });
 
+    it('uses the start-at preference instead of a previously app-selected URL exercise', async () => {
+      window.history.replaceState({ appManagedExerciseSelection: true }, '', '?exercise=2');
+      renderPage();
+
+      await waitFor(() => {
+        expect(fetchExerciseDetail).toHaveBeenCalledWith(1);
+        expect(fetchExerciseDetail).not.toHaveBeenCalledWith(2);
+      });
+    });
+
     it('falls back to the first exercise when no URL param is present', async () => {
       renderPage();
 

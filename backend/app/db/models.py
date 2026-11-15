@@ -395,6 +395,8 @@ class UserSettings(Base):
     enable_delete: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     cheats: Mapped[str] = mapped_column(String(15), nullable=False, default="000000000000")
     SR_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    start_at_mode: Mapped[str] = mapped_column(String(30), nullable=False, default="custom")
+    start_at_exercise_id: Mapped[int] = mapped_column(Integer, nullable=False, default=9)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,

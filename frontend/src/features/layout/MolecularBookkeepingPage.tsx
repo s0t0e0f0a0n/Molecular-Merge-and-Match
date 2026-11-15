@@ -44,7 +44,8 @@ import { FullscreenButton } from '../../components/FullscreenButton';
 import { ValidationOverlay } from '../../components/DifficultyRating';
 import { LoadingExerciseOverlay, PausedExerciseOverlay } from './LoadingExerciseOverlay';
 import { LinkInheritOptionsPopup, type LinkInheritMode } from '../linking/LinkInheritOptionsPopup';
-import { applySettingsPreset, fetchUserSettings, updateUserSettings, type UpdateUserSettingsRequest, type UserSettings } from '../../api/settings';
+import { applySettingsPreset, fetchUserSettings, updateUserSettings, type StartAtMode, type UpdateUserSettingsRequest, type UserSettings } from '../../api/settings';
+import { getStartAtExerciseId } from '../exercises/startAt';
 import {
   fetchSolventPreferences,
   updateSolventPreference,
@@ -269,6 +270,7 @@ export function MolecularBookkeepingPage() {
   selectedExerciseId !== null ? `exercise-${selectedExerciseId}` : 'exercise-none';
 
   const [initialUrlId] = useState<number | null>(() => {
+    if (window.history.state?.appManagedExerciseSelection === true) return null;
     const raw = new URLSearchParams(window.location.search).get('exercise');
     const id = Number(raw);
     return Number.isFinite(id) && id > 0 ? id : null;
@@ -300,6 +302,8 @@ export function MolecularBookkeepingPage() {
   const [showTags, setShowTags] = useState(false);
   const [enableDelete, setEnableDelete] = useState(false);
   const [srMode, setSrMode] = useState(false);
+  const [startAtMode, setStartAtMode] = useState<StartAtMode>('custom');
+  const [startAtExerciseId, setStartAtExerciseId] = useState(9);
   const [selectedTheme, setSelectedTheme] = useState('Light');
   const [selectedPreset, setSelectedPreset] = useState('User');
   const [availablePresets, setAvailablePresets] = useState<string[]>(['Default', 'Beginner', 'Exam', 'User']);
@@ -545,8 +549,10 @@ useEffect(() => {
             await clearSelectedExercise();
           }
         } else {
-          const initialId = data.find((exercise) => exercise.id === initialUrlId)?.id ?? data[0].id;
-          await selectExerciseById(initialId);
+          const initialId = initialUrlId === null
+            ? getStartAtExerciseId(data, startAtMode, startAtExerciseId)
+            : data.find((exercise) => exercise.id === initialUrlId)?.id ?? data[0].id;
+          if (initialId !== null) await selectExerciseById(initialId);
         }
       }
     } catch (error) {
@@ -559,7 +565,7 @@ useEffect(() => {
   }
 
   void initExercises();
-}, [clearSelectedExercise, loadActiveTags, initialUrlId, selectExerciseById, settingsLoaded, srMode]);
+}, [clearSelectedExercise, loadActiveTags, initialUrlId, selectExerciseById, settingsLoaded, srMode, startAtExerciseId, startAtMode]);
 
 useEffect(() => {
   const handleExerciseSummariesRefresh = () => {
@@ -583,7 +589,11 @@ useEffect(() => {
   if (selectedExerciseId === null) return;
   const params = new URLSearchParams(window.location.search);
   params.set('exercise', String(selectedExerciseId));
-  window.history.replaceState(null, '', `?${params.toString()}`);
+  const historyState = window.history.state;
+  const nextHistoryState = historyState && typeof historyState === 'object'
+    ? { ...historyState, appManagedExerciseSelection: true }
+    : { appManagedExerciseSelection: true };
+  window.history.replaceState(nextHistoryState, '', `?${params.toString()}`);
 }, [selectedExerciseId]);
 
   const showCheatTags = cheating.showSecretTags;
@@ -842,6 +852,8 @@ useEffect(() => {
     setShowTags(settings.show_tags ?? false);
     setEnableDelete(settings.enable_delete ?? false);
     setSrMode(settings.SR_mode === true);
+    setStartAtMode(settings.start_at_mode ?? 'custom');
+    setStartAtExerciseId(settings.start_at_exercise_id ?? 9);
     setSelectedTheme(settings.theme ?? 'Light');
 
     if (settings.active_preset) {
@@ -879,6 +891,10 @@ useEffect(() => {
       if (overrides.show_tags !== undefined) payload.show_tags = overrides.show_tags;
       if (overrides.enable_delete !== undefined) payload.enable_delete = overrides.enable_delete;
       if (overrides.SR_mode !== undefined) payload.SR_mode = overrides.SR_mode;
+      if (overrides.start_at_mode !== undefined) payload.start_at_mode = overrides.start_at_mode;
+      if (overrides.start_at_exercise_id !== undefined) {
+        payload.start_at_exercise_id = overrides.start_at_exercise_id;
+      }
 
       try {
         const requestId = ++settingsRequestIdRef.current;
@@ -1130,6 +1146,24 @@ const handleEnableDeleteChange = useCallback(
     setEnableDelete(value);
     setSelectedPreset('User');
     void persistUserSettings({ enable_delete: value });
+  },
+  [persistUserSettings],
+);
+
+const handleStartAtModeChange = useCallback(
+  (value: StartAtMode) => {
+    setStartAtMode(value);
+    setSelectedPreset('User');
+    void persistUserSettings({ start_at_mode: value });
+  },
+  [persistUserSettings],
+);
+
+const handleStartAtExerciseIdChange = useCallback(
+  (value: number) => {
+    setStartAtExerciseId(value);
+    setSelectedPreset('User');
+    void persistUserSettings({ start_at_exercise_id: value });
   },
   [persistUserSettings],
 );
@@ -2619,6 +2653,11 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         onSrModeChange={handleSrModeChange}
         cheatBits={cheatBits}
         onCheatBitsChange={handleCheatBitsChange}
+        startAtMode={startAtMode}
+        onStartAtModeChange={handleStartAtModeChange}
+        startAtExerciseId={startAtExerciseId}
+        onStartAtExerciseIdChange={handleStartAtExerciseIdChange}
+        exerciseSummaries={exerciseSummaries}
         solvents={solvents}
         solventsLoading={solventsLoading}
         onSolventPreferenceChange={handleSolventPreferenceChange}

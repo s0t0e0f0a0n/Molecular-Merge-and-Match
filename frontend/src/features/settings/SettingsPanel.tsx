@@ -8,6 +8,8 @@ import type { LinkInheritMode } from '../linking/LinkInheritOptionsPopup';
 import { formatChemistryText } from '../../utils/formatChemistryText';
 import '../../panelStyles.css';
 import { fetchTags, deleteTag, restoreTag, setTagHidden, setTagStatistics, Tag } from '../../api/tags';
+import type { ExerciseSummary } from '../../api/exercises';
+import type { StartAtMode } from '../../api/settings';
 
 type SettingsTabId = 'settingstab' | 'solventstab' | 'tagstab' | 'cheatstab';
 
@@ -50,6 +52,11 @@ type SettingsPanelProps = {
   onSrModeChange: (value: boolean) => void;
   cheatBits: string;
   onCheatBitsChange: (value: string) => void;
+  startAtMode: StartAtMode;
+  onStartAtModeChange: (value: StartAtMode) => void;
+  startAtExerciseId: number;
+  onStartAtExerciseIdChange: (value: number) => void;
+  exerciseSummaries: ExerciseSummary[];
   solvents: SolventPreference[];
   solventsLoading: boolean;
   onSolventPreferenceChange: (solventId: number, preference: number) => void;
@@ -375,6 +382,11 @@ export function SettingsPanel({
   onSrModeChange,
   cheatBits,
   onCheatBitsChange,
+  startAtMode,
+  onStartAtModeChange,
+  startAtExerciseId,
+  onStartAtExerciseIdChange,
+  exerciseSummaries,
   solvents,
   solventsLoading,
   onSolventPreferenceChange,
@@ -477,14 +489,60 @@ export function SettingsPanel({
         <div className="settings-panel-content">
           {activeTab === 'settingstab' && (
             <div className="settings-tab-content settings-main-grid" id="settingstab">
-              <SelectRow
-                id="setting-preset-select"
-                label="Presets"
-                value={selectedPreset}
-                options={availablePresets.map((preset) => ({ value: preset, label: preset }))}
-                onChange={onPresetChange}
-                title="Set the options back to default or one of the other presets. This will overwrite your current settings."
-              />
+              <div className="settings-startup-row">
+                <SelectRow
+                  id="setting-preset-select"
+                  label="Presets"
+                  value={selectedPreset}
+                  options={availablePresets.map((preset) => ({ value: preset, label: preset }))}
+                  onChange={onPresetChange}
+                  title="Set the options back to default or one of the other presets. This will overwrite your current settings."
+                />
+                <div className="settings-start-at" role="group" aria-label="Start at">
+                  <span className="settings-start-at-heading">Start at:</span>
+                  {([
+                    ['last_finished', 'last completed'],
+                    ['last_incomplete', 'last incomplete'],
+                  ] as const).map(([mode, label]) => (
+                    <label className="settings-start-at-option" key={mode}>
+                      <input
+                        type="checkbox"
+                        checked={startAtMode === mode}
+                        onChange={() => onStartAtModeChange(mode)}
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                  <div className="settings-start-at-custom-option">
+                    <label className="settings-start-at-option" htmlFor="setting-start-at-custom">
+                      <input
+                        id="setting-start-at-custom"
+                        type="checkbox"
+                        checked={startAtMode === 'custom'}
+                        onChange={() => onStartAtModeChange('custom')}
+                        aria-label="Custom start exercise"
+                      />
+                    </label>
+                    <select
+                      id="setting-start-at-exercise"
+                      className="settings-select settings-start-at-select"
+                      value={String(startAtExerciseId)}
+                      onChange={(event) => {
+                        onStartAtExerciseIdChange(Number(event.target.value));
+                        if (startAtMode !== 'custom') onStartAtModeChange('custom');
+                      }}
+                      aria-label="Exercise to start at"
+                      title="Choose the exercise that opens when the app starts."
+                    >
+                      {exerciseSummaries.map((exercise) => (
+                        <option key={exercise.id} value={String(exercise.id)}>
+                          {exercise.name || `Exercise ${exercise.id}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
               <section className="settings-category statistics-graph-box" aria-labelledby="settings-function-heading">
                 <h2 className="settings-category-title" id="settings-function-heading">Function</h2>
                 <div className="settings-category-columns">

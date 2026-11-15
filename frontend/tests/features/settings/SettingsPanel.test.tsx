@@ -17,7 +17,11 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function renderSettingsPanel(cheatBits: string) {
+function renderSettingsPanel(
+  cheatBits: string,
+  onStartAtModeChange = vi.fn(),
+  onStartAtExerciseIdChange = vi.fn(),
+) {
   render(
     <SettingsPanel
       isOpen
@@ -58,6 +62,14 @@ function renderSettingsPanel(cheatBits: string) {
       onSrModeChange={vi.fn()}
       cheatBits={cheatBits}
       onCheatBitsChange={vi.fn()}
+      startAtMode="custom"
+      onStartAtModeChange={onStartAtModeChange}
+      startAtExerciseId={9}
+      onStartAtExerciseIdChange={onStartAtExerciseIdChange}
+      exerciseSummaries={[
+        { id: 9, name: 'Sucrose', exercise_set: 'Examples', tags: [] },
+        { id: 10, name: 'Other exercise', exercise_set: 'Examples', tags: [] },
+      ]}
       solvents={[]}
       solventsLoading={false}
       onSolventPreferenceChange={vi.fn()}
@@ -75,6 +87,22 @@ describe('SettingsPanel cheat tags', () => {
     expect(screen.getByLabelText('Theme')).toBeDisabled();
     expect(screen.getByText('Show molecular formula')).toBeInTheDocument();
     expect(screen.getByText('Show Integral Curves')).toBeInTheDocument();
+  });
+
+  it('lets the user select a start-at mode and exercise', async () => {
+    const onStartAtModeChange = vi.fn();
+    const onStartAtExerciseIdChange = vi.fn();
+    renderSettingsPanel('000000000000', onStartAtModeChange, onStartAtExerciseIdChange);
+    const user = userEvent.setup();
+
+    expect(screen.getByRole('checkbox', { name: 'Custom start exercise' })).toBeChecked();
+    expect(screen.getByRole('option', { name: 'Sucrose' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('checkbox', { name: 'last completed' }));
+    expect(onStartAtModeChange).toHaveBeenCalledWith('last_finished');
+
+    await user.selectOptions(screen.getByLabelText('Exercise to start at'), '10');
+    expect(onStartAtExerciseIdChange).toHaveBeenCalledWith(10);
   });
 
   it('keeps a non-hideable tag unchecked when its database record is hidden', async () => {

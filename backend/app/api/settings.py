@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -13,6 +14,7 @@ _DEFAULT_CHEATS = "000000000000"
 _ACTIVE_SETTINGS_NAME = "User"
 _ALLOWED_LINK_INHERIT_MODES = {"none", "transfer", "copy"}
 _ALLOWED_THEMES = {"Light"}
+_ALLOWED_START_AT_MODES = {"last_finished", "last_incomplete", "custom"}
 
 
 def _normalize_cheats(raw: str | int | None) -> str:
@@ -43,6 +45,8 @@ def _serialize_settings(settings: UserSettings) -> dict[str, object]:
         "show_tags": bool(getattr(settings, "show_tags", False)),
         "enable_delete": bool(getattr(settings, "enable_delete", False)),
         "SR_mode": bool(getattr(settings, "SR_mode", False)),
+        "start_at_mode": getattr(settings, "start_at_mode", "custom") or "custom",
+        "start_at_exercise_id": int(getattr(settings, "start_at_exercise_id", 9) or 9),
     }
 
 
@@ -121,6 +125,8 @@ class UserSettingsResponse(BaseModel):
     show_tags: bool
     enable_delete: bool
     SR_mode: bool
+    start_at_mode: str
+    start_at_exercise_id: int
     active_preset: str
     available_presets: list[str]
 
@@ -146,6 +152,8 @@ class UpdateUserSettingsRequest(BaseModel):
     show_tags: bool | None = None
     enable_delete: bool | None = None
     SR_mode: bool | None = None
+    start_at_mode: Literal["last_finished", "last_incomplete", "custom"] | None = None
+    start_at_exercise_id: int | None = None
 
 
 def _build_response(settings: UserSettings, active_preset: str = _ACTIVE_SETTINGS_NAME) -> UserSettingsResponse:
@@ -181,6 +189,8 @@ def _build_response(settings: UserSettings, active_preset: str = _ACTIVE_SETTING
         show_tags=bool(serialized["show_tags"]),
         enable_delete=bool(serialized["enable_delete"]),
         SR_mode=bool(serialized["SR_mode"]),
+        start_at_mode=str(serialized["start_at_mode"]),
+        start_at_exercise_id=int(serialized["start_at_exercise_id"]),
         active_preset=active_preset,
         available_presets=preset_names,
     )
@@ -216,6 +226,8 @@ def update_settings(payload: UpdateUserSettingsRequest) -> UserSettingsResponse:
         raise HTTPException(status_code=400, detail="Invalid link inherit mode")
     if payload.theme is not None and payload.theme not in _ALLOWED_THEMES:
         raise HTTPException(status_code=400, detail="Invalid theme")
+    if payload.start_at_mode is not None and payload.start_at_mode not in _ALLOWED_START_AT_MODES:
+        raise HTTPException(status_code=400, detail="Invalid start-at mode")
 
     with get_db() as db:
         settings = db.query(UserSettings).filter(UserSettings.name == _ACTIVE_SETTINGS_NAME).first()
@@ -269,6 +281,10 @@ def update_settings(payload: UpdateUserSettingsRequest) -> UserSettingsResponse:
             settings.SR_mode = bool(payload.SR_mode)
             if enabling_sr_mode:
                 _reopen_overdue_exercises_in_db(db)
+        if payload.start_at_mode is not None:
+            settings.start_at_mode = payload.start_at_mode
+        if payload.start_at_exercise_id is not None:
+            settings.start_at_exercise_id = payload.start_at_exercise_id
 
         db.commit()
         db.refresh(settings)

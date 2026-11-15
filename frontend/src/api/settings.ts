@@ -1,5 +1,7 @@
 const BASE_URL = '/api/v1/settings/';
 
+export type StartAtMode = 'last_finished' | 'last_incomplete' | 'custom';
+
 export type UserSettings = {
   link_inherit_mode: string;
   theme: string;
@@ -20,6 +22,8 @@ export type UserSettings = {
   SR_mode?: boolean;
   active_preset?: string;
   available_presets?: string[];
+  start_at_mode?: StartAtMode;
+  start_at_exercise_id?: number;
 };
 
 export type UpdateUserSettingsRequest = {
@@ -41,6 +45,8 @@ export type UpdateUserSettingsRequest = {
   show_tags?: boolean;
   enable_delete?: boolean;
   SR_mode?: boolean;
+  start_at_mode?: StartAtMode;
+  start_at_exercise_id?: number;
 };
 
 export async function fetchUserSettings(): Promise<UserSettings> {

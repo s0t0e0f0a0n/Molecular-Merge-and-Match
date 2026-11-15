@@ -17,6 +17,9 @@ following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 
 ## v1.7.0
 
+### Added
+- A startup exercise preference can open the last finished exercise, the last incomplete exercise, or a chosen exercise (defaulting to Sucrose).
+
 ### Changed
 - **Deliberation metric redesign**: Three-component model measuring planning quality (execution efficiency, pace consistency, thinking pause quality) instead of pause frequency. See README for technical details.
 

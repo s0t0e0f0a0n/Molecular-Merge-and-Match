@@ -1131,6 +1131,44 @@
     color: #64748b;
 }
 
+.settings-start-at {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    margin-left: auto;
+    white-space: nowrap;
+    padding: 10px 14px;
+}
+
+.settings-start-at-heading {
+    color: #0f172a;
+    font-size: 14px;
+}
+
+.settings-start-at-option {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 4px;
+    color: #0f172a;
+    font-size: 13px;
+}
+
+.settings-start-at-option input {
+    margin: 0;
+}
+
+.settings-start-at-custom-option {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.settings-start-at-select {
+    min-width: 120px;
+    max-width: 180px;
+}
+
 .settings-select-row {
     display: flex;
     align-items: center;
@@ -1143,6 +1181,23 @@
 .settings-main-grid > .settings-select-row {
     min-height: 0;
     padding: 6px 14px;
+}
+
+.settings-startup-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    min-width: 0;
+    padding: 0 14px;
+}
+
+.settings-startup-row > .settings-select-row {
+    flex: 0 0 auto;
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 6px 0;
+    border-bottom: 0;
 }
 
 .settings-toggle-label {
