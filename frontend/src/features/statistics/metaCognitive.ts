@@ -19,6 +19,7 @@ export type ExerciseSession = {
   cheatActivationTimes: number[];
   exitTimes: number[];
   reversalTimes: number[]; // entries that undo earlier work (delete, unlink, clear)
+  pauseTimes: number[]; // user-initiated thinking pauses
   activeMs: number; // active timer time of the attempt
   completedAt: number;
 };
@@ -53,15 +54,99 @@ export function calibrationScore(session: ExerciseSession): number | null {
   return clamp01(1 - Math.abs(confidenceFraction - sessionAccuracy(session)));
 }
 
-// Gaps over 20 s between consecutive logbook entries, relative to the number of entries.
-export function deliberationScore(session: ExerciseSession): number | null {
+// Deliberation measures quality of planning and intentional execution:
+// - Component 1 (60%): Execution efficiency (few reversals = deliberate planning)
+// - Component 2 (30%): Personal pace consistency (working at own baseline speed)
+// - Component 3 (10%): Thinking pauses (early reflection vs scattered confusion)
+// Flawless, planned execution scores ~1.0; scattered trial-and-error scores ~0.0
+export function deliberationScore(session: ExerciseSession, allSessions?: ExerciseSession[]): number | null {
   const times = [...session.entryTimes].sort((left, right) => left - right);
   if (times.length === 0) return null;
-  let pauses = 0;
-  for (let index = 1; index < times.length; index += 1) {
-    if (times[index] - times[index - 1] > PAUSE_GAP_MS) pauses += 1;
+
+  // Component 1: Execution Efficiency (60%)
+  // Inverse of hesitation: fewer reversals = more deliberate planning
+  const efficiency = 1 - sessionHesitation(session);
+
+  // Component 2: Personal Pace Deviation (30%)
+  // Score based on how this session's time compares to student's typical time
+  // Only score if we have enough historical data (5+ sessions)
+  let paceScore = efficiency; // Default to efficiency if we can't calculate pace
+  if (allSessions && allSessions.length >= 5) {
+    paceScore = calculatePaceConsistency(session, allSessions);
   }
-  return clamp01(pauses / times.length);
+
+  // Component 3: Thinking Pauses (10%)
+  // Score pauses that indicate thinking (early, occasional) vs confusion (scattered)
+  const pauseScore = calculatePauseQuality(session);
+
+  // Combine with geometric mean (weighted):
+  // 60% efficiency + 30% pace + 10% pauses
+  // Use geometric mean to prevent any single perfect score masking weakness
+  const combined = geometricMean([
+    efficiency, efficiency, efficiency,  // 60% weight
+    paceScore, paceScore,                // 20% weight (reduced from 30% to balance)
+    pauseScore,                          // 20% weight (increased from 10% to balance)
+  ]);
+  return clamp01(combined);
+}
+
+// Calculate how consistent this exercise's pace is with student's historical average
+function calculatePaceConsistency(session: ExerciseSession, allSessions: ExerciseSession[]): number {
+  if (allSessions.length < 5) return 1; // Not enough history
+
+  // Group by difficulty for fair comparison
+  const sameOrEasier = allSessions.filter((s) => s.difficulty <= session.difficulty && s !== session);
+  if (sameOrEasier.length < 3) return 1; // Not enough similar exercises
+
+  // Calculate median time (more robust than mean for outlier detection)
+  const times = sameOrEasier.map((s) => s.activeMs).sort((a, b) => a - b);
+  const medianTime = times[Math.floor(times.length / 2)];
+
+  // Calculate MAD (Median Absolute Deviation)
+  const deviations = times.map((t) => Math.abs(t - medianTime)).sort((a, b) => a - b);
+  const mad = deviations[Math.floor(deviations.length / 2)];
+
+  if (mad === 0) return 1; // All times identical (rare)
+
+  // Calculate normalized deviation for this session
+  const currentDeviation = Math.abs(session.activeMs - medianTime);
+  const normalizedDeviation = currentDeviation / (mad > 0 ? mad : medianTime * 0.2);
+
+  // Score: 1.0 at 0 deviation, 0.5 at 1 MAD, 0.2 at 3+ MADs
+  // This captures "within normal range" (1.0), "somewhat unusual" (0.5), "very unusual" (0.2)
+  return Math.max(0.2, 1 - Math.min(1, normalizedDeviation / 3));
+}
+
+// Score pause quality: early thinking is good, scattered hesitation is bad
+function calculatePauseQuality(session: ExerciseSession): number {
+  if (session.pauseTimes.length === 0) return 1; // No pauses can be focused work
+
+  const times = [...session.entryTimes].sort((left, right) => left - right);
+  if (times.length === 0) return 1;
+
+  const totalDuration = times[times.length - 1] - times[0];
+  const earlyPeriod = 30_000; // First 30 seconds
+
+  // Count pauses in early period (thinking time) vs later (hesitation)
+  const earlyPauses = session.pauseTimes.filter((p) => p - times[0] <= earlyPeriod).length;
+  const laterPauses = session.pauseTimes.filter((p) => p - times[0] > earlyPeriod).length;
+
+  // Ideal: some early pauses (thinking), few later pauses (focused execution)
+  // Score higher for balanced pause distribution
+  const totalPauses = session.pauseTimes.length;
+  const earlyRatio = earlyPauses / Math.max(1, totalPauses);
+
+  // Optimal: 40-80% of pauses early = good thinking then execution
+  // Penalize: all pauses early (no execution) or all late (scattered hesitation)
+  let pauseQuality = 1;
+  if (earlyRatio < 0.4) pauseQuality = 0.7 + 0.3 * (earlyRatio / 0.4); // Scattered hesitation
+  else if (earlyRatio > 0.8) pauseQuality = 0.7 + 0.3 * ((1 - earlyRatio) / 0.2); // Mostly thinking, less execution
+  else pauseQuality = 1; // Balanced
+
+  // Also penalize excessive pauses (>3 pauses suggests confusion)
+  if (totalPauses > 3) pauseQuality *= Math.max(0.4, 1 - (totalPauses - 3) * 0.1);
+
+  return clamp01(pauseQuality);
 }
 
 // Share of reversing entries (smoothed so tiny exercises are not noisy), 1 at a 40% reversal rate.
@@ -118,8 +203,10 @@ export function generateGlobalProfile(sessions: ExerciseSession[]): CognitivePro
   return {
     conceptMastery: average(sessions.map(conceptMasteryScore)),
     calibration: average(sessions.map(calibrationScore)),
-    deliberation: average(sessions.map(deliberationScore)),
-    resilience: average(sessions.map(resilienceScore)),
+    deliberation: average(sessions.map((session) => deliberationScore(session, sessions))),
+    resilience: sessions.every((session) => session.incorrectCount <= 0)
+      ? 1
+      : average(sessions.map(resilienceScore)),
     autonomous: calculateAutonomousScore(sessions.filter((session) => session.cheatsUsed).length / sessions.length),
   };
 }

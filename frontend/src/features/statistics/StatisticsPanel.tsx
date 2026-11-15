@@ -1095,6 +1095,11 @@ function buildExerciseSessions(
       return;
     }
     if (entryTimes.length === 0) return;
+    
+    // Extract pause times within exercise window
+    const pauseTimes = parseLogbookPauseEvents(logbook.pause_events_json)
+      .filter((timestamp) => timestamp >= startedAt.getTime() && timestamp <= completedAt.getTime());
+    
     const restartIntervals = parseLogbookRestarts(logbook.restarts);
     const restartMs = restartIntervals.reduce((sum, interval) => sum + interval.stop - interval.start, 0);
     const activeMs = restartMs > 0 ? restartMs : completedAt.getTime() - startedAt.getTime();
@@ -1119,6 +1124,7 @@ function buildExerciseSessions(
       cheatActivationTimes: timesFor('cheat-activation'),
       exitTimes: timesFor('exercise-closed'),
       reversalTimes,
+      pauseTimes,
       activeMs,
       completedAt: completedAt.getTime(),
     });
@@ -1173,8 +1179,8 @@ function BehaviourProfiles({ exerciseSummaries }: { exerciseSummaries: ExerciseS
             axes={[
               { label: 'Concept mastery', value: profile.conceptMastery, description: 'Accuracy (1 / (incorrect validations + 1)) weighted by difficulty. High is good.' },
               { label: 'Calibration', value: profile.calibration, description: 'How closely your confidence rating matches your actual accuracy. High is good.' },
-              { label: 'Deliberation', value: profile.deliberation, description: 'Gaps over 20 s between logbook entries, relative to the number of entries: time spent thinking.' },
-              { label: 'Resilience', value: profile.resilience, description: 'How you react after an incorrect validation: no cheat right away, no giving up, little backtracking.' },
+              { label: 'Deliberation', value: profile.deliberation, description: 'Planning quality: execution efficiency (no reversals), pace consistency, and thoughtful pauses. High is good.' },
+              { label: 'Resilience', value: profile.resilience, description: 'Response to incorrect validations: no immediate cheat, exit or excessive backtracking. If all exercises are error-free, defaults to 100%; resilience has not been tested.' },
               { label: 'Autonomy', value: profile.autonomous, description: 'Solving without cheats. 1 at no cheat use, 0 when 30% or more of exercises used cheats.' },
             ]}
           />

@@ -4,6 +4,7 @@ Releases are listed in reverse chronological order. Each release uses the
 following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 
 ### Versions in this document:  
+- [v1.7.0](#v170)
 - [v1.6.0](#v160)
 - [v1.5.0](#v150)
 - [v1.4.0](#v140)
@@ -12,6 +13,17 @@ following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 - [v1.1.2](#v112)
 - [v1.1.0](#v110)
 - [v1.0.0](#v100)
+
+
+## v1.7.0
+
+### Changed
+- **Deliberation metric redesign**: Three-component model measuring planning quality (execution efficiency, pace consistency, thinking pause quality) instead of pause frequency. See README for technical details.
+
+### Fixed
+- Deliberation metric now correctly scores flawless work high instead of inverting to low.
+- Resilience metric showed 0 when no mistakes were made; now defaults to 1 when all exercises are error-free, since resilience has not been tested.
+
 
 ## v1.6.0
 ### Added

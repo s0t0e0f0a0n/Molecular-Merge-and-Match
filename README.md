@@ -121,8 +121,12 @@ The Study behaviour tab shows an average profile across completed exercises that
 
 - **Concept mastery:** `1 / (incorrect validations + 1)`, multiplied by a difficulty weight: Easy 0.8, Medium 0.9, Difficult 1.0.
 - **Calibration:** compares confidence (1–5, mapped linearly to 0–1) with the same accuracy formula. Exercises with confidence 0 are omitted from this axis.
-- **Deliberation:** number of gaps longer than 20 seconds between consecutive logbook entries, divided by the number of entries.
-- **Resilience:** starts at 1 for exercises with incorrect validations; subtracts 0.5 if a cheat activation is the first recorded event after an incorrect validation, 0.3 if the exercise is closed within 60 seconds after an incorrect validation, and `0.2 × hesitation` measured only on the entries after the first incorrect validation (backtracking after a failure). Exercises without incorrect validations are omitted.
+- **Deliberation:** measures planning quality and execution efficiency through three components:
+  - **Execution Efficiency (60%):** inverse of hesitation ratio; fewer reversals (delete/unlink) indicate more deliberate, planned approach.
+  - **Personal Pace Consistency (30%):** compares exercise time against student's running baseline using MAD (Median Absolute Deviation); scores high for working at normal pace, lower for unusual deviations.
+  - **Thinking Pause Quality (10%):** analyzes user-initiated pauses; rewards early reflection (first 30s), penalizes scattered hesitation throughout. Optimal: 40-80% of pauses early, penalizes >3 total pauses.
+  - Combined via geometric mean: flawless execution (no reversals, normal pace, thinking pauses) scores ~0.94–1.0; scattered work with many reversals scores ~0.0–0.5.
+- **Resilience:** starts at 1 for exercises with incorrect validations; subtracts 0.5 if a cheat activation is the first recorded event after an incorrect validation, 0.3 if the exercise is closed within 60 seconds after an incorrect validation, and `0.2 × hesitation` measured only on the entries after the first incorrect validation (backtracking after a failure). Exercises without incorrect validations are omitted from this average. If all included exercises are error-free, the profile defaults to 1: resilience has not been tested, rather than demonstrated. With no included exercises the profile remains zero.
 - **Autonomy:** based on the proportion of included exercises marked as using cheats. The score falls linearly from 1 at a 0% cheat rate to 0 at 30%, and stays at 0 above 30%.
 
 Cheat use at completion is recorded from the current cheat settings. Cheat activation events are recorded when cheats are switched from off to on during an active exercise, and exercise-close events are recorded for active, incomplete exercises. These timestamped events only exist from the version that introduced behavior-event tracking onward; older activity cannot be reconstructed.

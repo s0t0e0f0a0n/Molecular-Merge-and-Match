@@ -1,15 +1,19 @@
 ## About Molecular Merge and Match
  
 An interactive NMR-based structure elucidation tool for university-level organic chemistry students.  
-Students select molecular fragments, match them to peaks in <sup>1</sup>H-NMR and <sup>13</sup>C-NMR spectra, combine fragments into a complete molecule, and validate their answer against a teacher-defined solution.
+Students select molecular fragments, match them to peaks in <sup>1</sup>H-NMR and <sup>13</sup>C-NMR spectra, combine fragments into a complete molecule, and validate their answer against a teacher-defined solution.  
+The target group is first-year undergraduate students, whos main focus is learning about the spectral properties in relation to moleculair structure. This software is not meant to teach or help understand how to operate a spectrometer, acquire and process the raw data. Although I understand this is often combined at some universities, this software can nevertheless be a useful tool for the students' understanding.
+
 
 > Contact information: **dr. S. van der Vorm** – [s.van.der.vorm@chem.leidenuniv.nl](mailto:s.van.der.vorm@chem.leidenuniv.nl)
  
 In the following sections technical information is shared. You can find more about the instrumentation used to measure the data as well as the development of this software.
-> Current version: **1.5.0**     Available as  .exe .deb .rpm .AppImage .flatpak .pacman .snap .dmg
+> Current version: **1.7.0**     Available as  .exe .deb .rpm .AppImage .flatpak .pacman .dmg
 ### About this software
 
 Software is subject to the MIT license.
+
+Core technologies:
 
 <div style="display: flex; align-items: center; justify-content: space-around; width: 100%;">
 <svg width="36px" height="36px" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><title>Node JS</title>
@@ -251,8 +255,8 @@ Software is subject to the MIT license.
 <path fill-rule="evenodd" clip-rule="evenodd" d="M272.345 256.117C273.918 256.214 274.63 257.084 274.595 258.624C273.46 258.131 272.743 257.268 272.345 256.117Z" fill="#DADAFE"/>
 </svg>  </div>
 
-#### Development of this software
-This software was conceptualized by the teacher, dr. S. van der Vorm, for use in his course “Structural Analysis" at Leiden University.
+#### Development and Acknowledgements
+This software was conceptualized by the teacher, dr. S. van der Vorm, for use in his undergraduate course “Structural Analysis" at Leiden University.
 It was initially developed as a student group project part of the Software Engineering course (2025-2026, LUDev) at Leiden University. More details can be found [here](https://ludev.nl/portfolio/2026/2?year=2026).  
 Credits go to the LUDev student team for their efforts in the app’s development as well as creative input. 
 <div style="display: flex; justify-content: space-around; width: 100%;">
@@ -264,109 +268,14 @@ Credits go to the LUDev student team for their efforts in the app’s developmen
   <span>Ksenia Shileeva</span>
 </div>
 
-Following the initial release of version 1.0.0, the software is developed further by the teacher with the help of AI agents in VSCode. See the Changelog for implemented features, fixes and changes. 
+Following the initial release of version 1.0.0, the software is developed further by the teacher with the help of AI agents in VSCode. See the Changelog for implemented features, fixes and changes.  
+Ksenia Shileeva is acknowledged in provided valuable feedback on auditing the AI generated code, in particular relating to security and data loss.  
+Niels van den Bosch, Jesse van der Waal, Luke Jansen and Jordan de Jong are acknowledged for their help in beta testing release v1.5.0.
 
-
-### Original implementations
-#### Key Features
-
-| Feature | Status | Description |
-|---------|--------|-------------|
-| Ketcher molecule editor | Implemented | Draw molecular structures, export SMILES and MOL block; invalid structures (valence violations) are blocked from export; existing fragments can be re-opened for editing from the Working Fragments strip — peak links are preserved; chunk is prefetched at page load so the editor is ready instantly on first open (prevents edits being lost during the initial load delay) |
-| RDKit molecule viewer | Implemented | Visualize molecules, compute descriptors (MW, LogP, InChI, HBA/HBD, ring count) |
-| Spectrum display | Implemented | Interactive SVG-based 1H-NMR and 13C-NMR viewers with hover, click, zoom, scroll, and fullscreen popup |
-| Peak-to-fragment linking | Implemented | Visualization using badges and hover highlight |
-| Exercise menu | Implemented | Exercises are orderd in sollapsible sets in the menu and filters can be used to select exercises of a specific type |
-| Health/info API | Implemented | Backend health check and server information endpoints |
-| Predefined fragment library | Implemented | Backend API with seed data, frontend dropdown with search and RDKit thumbnails |
-| Fragment merging (to solution) | Implemented | Atom-to-atom merge of a fragment into the working solution |
-| Fragment merging (to fragment) | Implemented | Atom-to-atom merge of two fragments, result appears as a new fragment |
-| Double bond configuration choice | Implemented | After merge, detects new stereogenic double bonds via a graph-level CIP-priority comparison (sphere-by-sphere expansion with multi-bond phantom atoms and ring-closure handling) and prompts the user to choose between the two possible geometric configurations (Option 1 / Option 2). Handles conjugated dienes by reusing shared slashes between adjacent stereo bonds. |
-| Send to fragments (unsolution) | Implemented | Send the working solution back to the fragment list, with option to keep or clear the solution |
-| Exercise/bundle/spectra API | Implemented | Create exercises, parse ACS NMR text, persist spectra files, store peaks |
-| Exercise creation (teacher) | Implemented | Frontend form supports single and bulk CSV exercise creation; bulk import maps `{N}_<label>.svg` files to additional spectra automatically |
-| ZIP exercise import | Implemented | Bulk import via `.zip` containing a CSV manifest plus spectra folders; export is not implemented |
-| Additional spectra popup | Implemented | "Additional Spectra" button opens a modal with one tab per spectrum (IR, MS, …); supports Fit and Scroll (150% default zoom) view modes |
-| Atom count and DBE warning (fragments) | Implemented | From all linked fragments the SMILES are send to the backend when an extra fragment is linked or a fragment is no longer linked, where the atoms are counted and compared the the atoms in the molecule formula, H's are ignored. The DBE is calculated and compared with the student entered DBE. If there are too many H's of DBEs then the warning appears |
-| Atom count and DBE warning (solution) | Implemented | The SMILES is send to the backend on every change, where the atoms are counted and compared the the atoms in the molecule formula, H's are not ignored. The DBE is calculated and compared with the student entered DBE. If there are too many H's of DBEs then the warning appears |
-| Double peak assignment waring | Implemented | If a peak is linked more than once, the warning appears |
-| CAS answer validation | Implemented | Students can enter a CAS number; spaces are removed and the answer is validated via SHA-256 hash comparison |
-| Structure answer validation | Implemented | SMILES are converted to InChI and this is hashed using SHA256 for an exact comparison with the correct answer hash in the database |
-| Undo/redo logbook | Implemented | Per-exercise action history with editable entries, persisted to the backend (`/api/v1/logbook`) and restored on exercise load |
-| Desktop packaging | Implemented | Packaged using electron-builder manually (`packaging.md`), or with the GitHub Actions workflow (`cd-electron.yml`), to create installers for Windows, MacOS & Linux |
-
-
-#### Tech Stack
-
-| Layer        | Technology                                                   |
-|--------------|--------------------------------------------------------------|
-| Frontend     | React 18, TypeScript, Vite                                   |
-| Backend      | Python 3.12, FastAPI, SQLAlchemy                             |
-| Database     | SQLite (local, file-based)                                   |
-| Chemistry    | Ketcher (molecule drawing), RDKit (analysis & rendering)     |
-| Testing      | Vitest + React Testing Library (frontend), Pytest (backend)  |
-| Linting      | ESLint v9 + TypeScript-ESLint (frontend), Ruff (backend)     |
-| Deployment   | Docker + nginx (full-stack), GitHub Pages (frontend preview) |
-| CI/CD        | GitHub Actions                                               |
-| Packaging    | Electron-builder                                             |
-
-#### Architecture Overview
-
-The application follows a client-server architecture running locally on the student's machine:
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│ Frontend (React + TypeScript)                                │
-│                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐    │
-│  │ Spectra      │  │ Molecule     │  │ Exercise &       │    │
-│  │ Viewer       │  │ Workspace    │  │ Logbook UI       │    │
-│  └──────────────┘  └──────────────┘  └──────────────────┘    │
-│                                                              │
-│  ┌──────────────┐  ┌──────────────┐                          │
-│  │ RDKit (WASM) │  │ Ketcher      │                          │
-│  │ Rendering    │  │ Editor       │                          │
-│  └──────────────┘  └──────────────┘                          │
-│                                                              │
-│  React Contexts (Exercise, History, Warnings, RDKit)         │
-└──────────────────────────┬───────────────────────────────────┘
-                           │
-                           │ REST API (/api/v1/*)
-                           │ JSON over HTTP
-                           ▼
-┌──────────────────────────────────────────────────────────────┐
-│ Backend (FastAPI + Python)                                   │
-│                                                              │
-│  ┌────────────┐ ┌────────────┐ ┌────────────┐                │
-│  │ Exercises  │ │ Fragments  │ │ Validation │                │
-│  │ API        │ │ API        │ │ API        │                │
-│  └────────────┘ └────────────┘ └────────────┘                │
-│                                                              │
-│  ┌────────────┐ ┌────────────┐ ┌────────────┐                │
-│  │ Logbook    │ │ Working    │ │ Warnings   │                │
-│  │ API        │ │ Solution   │ │ API        │                │
-│  └────────────┘ │ API        │ └────────────┘                │
-│                 └────────────┘                               │
-│                                                              │
-│  ┌────────────────────────────────────────────┐              │
-│  │ SQLite Database + Exercise Asset Storage   │              │
-│  └────────────────────────────────────────────┘              │
-└──────────────────────────────────────────────────────────────┘
-
-Desktop deployment:
-┌────────────────────┐
-│ Electron Shell     │
-│ (Desktop App)      │
-└────────────────────┘
-```
-
-The frontend is organized as a split-screen structure elucidation workspace. The left side of the interface is dedicated to spectral analysis, displaying stacked ¹H and ¹³C NMR spectra together with peak lists and spectral navigation controls. The right side contains the structure-building workspace, including the current solution, working fragments, and validation tools. A top bar provides access to exercise management functions, validation actions, and warning indicators which provide feedback during the structure elucidation process.
-
-### Releases: building and testing
-The main installers are build through GitHub Actions using the `windows-latest`, `macos-latest`, and `ubuntu-22.04` runners.  
-The alternative CPU architectures are build using `windows-11-arm`, `macos-15-intel`, and `ubuntu-22.04-arm` runners.  
-The Ubuntu runner Virtual Machine is set to 22.04 for glibc compatibility with slightly older Linux distributions.  
-Only .flatpak (using Freedesktop 24.08 as runtime) is provided as a locally build installer. Upon request .snap can be provided (Snap is the least recommended format).
+#### Releases: building and testing
+The main installers are build through GitHub Actions using the `windows-latest`, `macos-latest`, and `ubuntu-latest` runners.  
+The alternative CPU architectures are build using `windows-11-arm`, `macos-15-intel`, and `ubuntu-24.04-arm` runners.  
+Only .flatpak (using Freedesktop 25.08 as runtime) is provided as a locally build installer.
 
 <ascii>
 $yThis software is build for:  
@@ -572,7 +481,7 @@ NMR:
 MestreNova was used to process the data and store the spectra as .svg files.  
 Spectra were used as acquired (after phasing) and if required further zero-filled (from 64k to 128k for example), and baseline corrected (polynomal or Whittaker Smoother).  
 A small exponential window function was used (0.0 to 0.2 for <sup>1</sup>H and 0.2 to 3.0 for <sup>13</sup>C) unless clearity of signal was lost within this range.  
-In rare cases TopSpin was first used to process data (HMBC, NOESY and INADEQUATE are the most relevant cases) and the processing file was imported in MestreNova to get the .svg image.  
+In rare cases TopSpin was first used to process data (HMBC, NOESY and INADEQUATE are the most relevant cases) and the processed file was imported in MestreNova to get the .svg image.  
 MestreNova peak and multiplet reporting scripts and spectral style sheets for this software are available upon request.  
 
 IR:  
