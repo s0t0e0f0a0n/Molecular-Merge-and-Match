@@ -1428,14 +1428,29 @@ function StatisticsSummary({ exerciseSummaries }: { exerciseSummaries: ExerciseS
 }
 
 function perfectStreak(exerciseSummaries: ExerciseSummary[]): number {
-  const completedExercises = exerciseSummaries
-    .map((exercise) => ({ exercise, completedAt: parseExerciseDate(exercise.completed_at) }))
-    .filter((entry): entry is { exercise: ExerciseSummary; completedAt: Date } => entry.completedAt !== null)
-    .sort((left, right) => right.completedAt.getTime() - left.completedAt.getTime());
+  const recentExercises = exerciseSummaries
+    .map((exercise) => {
+      const completedAt = parseExerciseDate(exercise.completed_at);
+      const lastValidationAt = parseExerciseDate(exercise.last_validation_at);
+      const startedAt = parseExerciseDate(exercise.started_at);
+      const hasIncorrectAttempts = (exercise.incorrect_count ?? 0) > 0;
+      if (!completedAt && !hasIncorrectAttempts) return null;
+
+      const activityAt = [completedAt, lastValidationAt, hasIncorrectAttempts ? startedAt : null]
+        .filter((date): date is Date => date !== null)
+        .reduce((latest, date) => date > latest ? date : latest, new Date(0));
+      return { exercise, activityAt, hasIncorrectAttempts };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+    .sort((left, right) => (
+      right.activityAt.getTime() - left.activityAt.getTime()
+      || Number(right.hasIncorrectAttempts) - Number(left.hasIncorrectAttempts)
+    ));
 
   let streak = 0;
-  for (const { exercise } of completedExercises) {
-    if (exercise.incorrect_count !== 0) break;
+  for (const { exercise, hasIncorrectAttempts } of recentExercises) {
+    if (hasIncorrectAttempts) break;
+    if (!exercise.completed_at) continue;
     streak += 1;
   }
   return streak;

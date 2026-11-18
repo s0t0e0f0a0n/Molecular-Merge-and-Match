@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 
 from app.api.statistics import (
@@ -339,6 +340,7 @@ class ExerciseSummaryOut(BaseModel):
     cheats_off: datetime | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    last_validation_at: datetime | None = None
     due_time: datetime | None = None
     fragments_drawn: int | None = None
     merges_done: int | None = None
@@ -805,6 +807,7 @@ def _to_summary_response(
     tags_by_id: dict[int, TagsUsed],
     hidden_tag_names: set[str],
     statistics: Statistics | None = None,
+    last_validation_at: datetime | None = None,
     has_saved_progress: bool = False,
 ) -> ExerciseSummaryOut:
     tags = []
@@ -852,6 +855,7 @@ def _to_summary_response(
         cheats_off=statistics.cheats_off if statistics is not None else None,
         started_at=statistics.started_at if statistics is not None else None,
         completed_at=statistics.completed_at if statistics is not None else None,
+        last_validation_at=last_validation_at,
         due_time=row.due_time,
         fragments_drawn=statistics.fragments_drawn if statistics is not None else None,
         merges_done=statistics.merges_done if statistics is not None else None,
@@ -885,6 +889,24 @@ def list_exercise_summaries() -> list[ExerciseSummaryOut]:
             existing = statistics_by_exercise_id.get(exercise_key)
             if existing is None or statistics.exercise_id == exercise_key:
                 statistics_by_exercise_id[exercise_key] = statistics
+        last_validation_at_by_exercise_id: dict[str, datetime] = {}
+        validation_timestamps = (
+            db.query(
+                StatisticsReviewEvent.exercise_id,
+                func.max(StatisticsReviewEvent.reviewed_at),
+            )
+            .filter(
+                StatisticsReviewEvent.exercise_id.in_(statistics_keys),
+                StatisticsReviewEvent.is_baseline.is_(False),
+            )
+            .group_by(StatisticsReviewEvent.exercise_id)
+            .all()
+        )
+        for exercise_id, last_validation_at in validation_timestamps:
+            exercise_key = canonical_statistics_exercise_id(exercise_id)
+            existing = last_validation_at_by_exercise_id.get(exercise_key)
+            if existing is None or last_validation_at > existing:
+                last_validation_at_by_exercise_id[exercise_key] = last_validation_at
         storage_keys = {f"exercise-{exercise_id}" for exercise_id in exercise_ids}
         storage_keys_with_fragments = {
             fragment_exercise_id
@@ -907,6 +929,7 @@ def list_exercise_summaries() -> list[ExerciseSummaryOut]:
                 tags_by_id,
                 hidden_tag_names,
                 None if (row.exercise_set or "").strip().lower() == "references" else statistics_by_exercise_id.get(str(row.id)),
+                last_validation_at_by_exercise_id.get(str(row.id)),
                 has_saved_progress=f"exercise-{row.id}" in storage_keys_with_progress,
             )
             for row in rows
@@ -1137,8 +1160,16 @@ def validate_cas_answer(
             hmac.compare_digest(c_hash, input_hash) for c_hash in candidate_hashes
         )
 
-        # A completed exercise is never revalidated: report only, change nothing.
         if _exercise_already_validated(db, row):
+            if not is_correct:
+                statistics_row = _find_statistics_row(db, str(exercise_id))
+                if statistics_row is not None:
+                    _record_spaced_repetition_review(
+                        db, statistics_row, row, is_correct=False
+                    )
+                    statistics_row.incorrect_count += 1
+                    reset_difficulty_counter(statistics_row)
+                    db.commit()
             return CasAnswerValidationOut(is_correct=is_correct, already_completed=True)
 
         if not is_correct:
@@ -1186,8 +1217,16 @@ def validate_solution_answer(
             and hmac.compare_digest(row.solution_inchi_hash, input_hash)
         )
 
-        # A completed exercise is never revalidated: report only, change nothing.
         if _exercise_already_validated(db, row):
+            if not is_correct:
+                statistics_row = _find_statistics_row(db, str(exercise_id))
+                if statistics_row is not None:
+                    _record_spaced_repetition_review(
+                        db, statistics_row, row, is_correct=False
+                    )
+                    statistics_row.incorrect_count += 1
+                    reset_difficulty_counter(statistics_row)
+                    db.commit()
             return SolutionValidationOut(is_correct=is_correct, already_completed=True)
 
         statistics_row, _ = _ensure_statistics_row(db, exercise_id)

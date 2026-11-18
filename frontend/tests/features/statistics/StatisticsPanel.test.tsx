@@ -433,4 +433,36 @@ describe('Temporary statistics', () => {
     expect(screen.getByRole('heading', { name: 'Perfect streak' })).toBeInTheDocument();
     expect(screen.getByText('2 exercises')).toBeInTheDocument();
   });
+
+  it('stops at a recent incomplete exercise with an incorrect attempt', () => {
+    render(
+      <StatisticsPanel
+        isOpen
+        onClose={() => undefined}
+        exerciseSummaries={[
+          { id: 101, name: 'Completed', exercise_set: 'set-a', tags: [], completed_at: '2026-09-04T00:00:00Z', incorrect_count: 0 },
+          { id: 102, name: 'Incomplete with mistake', exercise_set: 'set-a', tags: [], started_at: '2026-09-04T01:00:00Z', last_validation_at: '2026-09-05T00:00:00Z', incorrect_count: 1 },
+        ]}
+        selectedExerciseId={101}
+      />,
+    );
+
+    expect(screen.getByText('0 exercises')).toBeInTheDocument();
+  });
+
+  it('stops when an already-completed exercise later receives an incorrect validation', () => {
+    render(
+      <StatisticsPanel
+        isOpen
+        onClose={() => undefined}
+        exerciseSummaries={[
+          { id: 111, name: 'Previously correct', exercise_set: 'set-a', tags: [], completed_at: '2026-09-02T00:00:00Z', last_validation_at: '2026-09-05T00:00:00Z', incorrect_count: 1 },
+          { id: 112, name: 'Most recent perfect', exercise_set: 'set-a', tags: [], completed_at: '2026-09-04T00:00:00Z', incorrect_count: 0 },
+        ]}
+        selectedExerciseId={111}
+      />,
+    );
+
+    expect(screen.getByText('0 exercises')).toBeInTheDocument();
+  });
 });

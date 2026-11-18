@@ -208,6 +208,104 @@ def test_correct_solution_validation_records_learning_review_before_completion(c
         db.close()
 
 
+@pytest.mark.parametrize(
+    ("validation_route", "solution", "correct_answer", "incorrect_answer"),
+    [
+        (
+            "validate-solution",
+            {"solution_inchi": INCHI_CCO},
+            {"solution_hash": INCHI_CCO, "confidence": 4},
+            {"solution_hash": "wrong answer", "confidence": 3},
+        ),
+        (
+            "validate-cas",
+            {"solution_cas_number": "64-17-5"},
+            {"cas_number": "64-17-5"},
+            {"cas_number": "67-56-1"},
+        ),
+    ],
+)
+def test_incorrect_validation_after_completion_is_recorded(
+    client, validation_route, solution, correct_answer, incorrect_answer
+):
+    created = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(**solution),
+    )
+    assert created.status_code == 201
+    exercise_id = created.json()["id"]
+
+    completed = client.post(
+        f"/api/v1/exercises/{exercise_id}/{validation_route}",
+        json=correct_answer,
+    )
+    assert completed.status_code == 200
+    assert completed.json()["is_correct"] is True
+
+    incorrect = client.post(
+        f"/api/v1/exercises/{exercise_id}/{validation_route}",
+        json=incorrect_answer,
+    )
+    assert incorrect.status_code == 200
+    assert incorrect.json()["is_correct"] is False
+    assert incorrect.json()["already_completed"] is True
+
+    db = SessionLocal()
+    try:
+        statistics = db.query(Statistics).filter_by(exercise_id=str(exercise_id)).one()
+        events = (
+            db.query(StatisticsReviewEvent)
+            .filter_by(exercise_id=str(exercise_id), is_baseline=False)
+            .order_by(StatisticsReviewEvent.reviewed_at)
+            .all()
+        )
+        assert statistics.incorrect_count == 1
+        assert len(events) == 2
+        assert [event.is_correct for event in events] == [True, False]
+        incorrect_at = events[-1].reviewed_at
+    finally:
+        db.close()
+
+    summary_response = client.get("/api/v1/exercises/summaries")
+    assert summary_response.status_code == 200
+    summary = next(item for item in summary_response.json() if item["id"] == exercise_id)
+    assert summary["last_validation_at"] == incorrect_at.isoformat()
+
+
+def test_incomplete_incorrect_validation_is_exposed_in_exercise_summary(client):
+    created = client.post(
+        "/api/v1/exercises/",
+        json=_exercise_payload(solution_inchi=INCHI_CCO),
+    )
+    assert created.status_code == 201
+    exercise_id = created.json()["id"]
+
+    incorrect = client.post(
+        f"/api/v1/exercises/{exercise_id}/validate-solution",
+        json={"solution_hash": "wrong answer", "confidence": 3},
+    )
+    assert incorrect.status_code == 200
+    assert incorrect.json()["is_correct"] is False
+
+    db = SessionLocal()
+    try:
+        event = (
+            db.query(StatisticsReviewEvent)
+            .filter_by(exercise_id=str(exercise_id), is_correct=False)
+            .one()
+        )
+        incorrect_at = event.reviewed_at
+    finally:
+        db.close()
+
+    summary_response = client.get("/api/v1/exercises/summaries")
+    assert summary_response.status_code == 200
+    summary = next(item for item in summary_response.json() if item["id"] == exercise_id)
+    assert summary["completed_at"] is None
+    assert summary["incorrect_count"] == 1
+    assert summary["last_validation_at"] == incorrect_at.isoformat()
+
+
 def test_correct_solution_validation_rolls_back_if_completion_recording_fails(
     client, monkeypatch
 ):
@@ -574,7 +672,7 @@ def test_exercise_summaries_query_count_is_constant_for_many_tagged_exercises(cl
     summaries = response.json()
     assert len(summaries) == 20
     assert all(summary["tags"] == [tag_name] for summary in summaries)
-    assert len(statements) == 5
+    assert len(statements) == 6
 
 
 def test_no_solution_inchi_disables_hashing(client):

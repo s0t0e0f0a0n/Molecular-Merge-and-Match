@@ -75,11 +75,3 @@ export function TimeDistributionIcon() {
   </svg>
   );
 }
-
-export function TutorialIcon() {
-  return (
-    <svg aria-hidden="true" width="18px" height="18px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ verticalAlign: 'middle' }}>
-      <path d="M12 7v14m0-14C10.8 5.9 9.2 5.5 7.5 5.5 5.8 5.5 4.2 5.9 3 7v14c1.2-.9 2.8-1.5 4.5-1.5s3.3.6 4.5 1.5m0-14c1.2-1.1 2.8-1.5 4.5-1.5S19.8 5.9 21 7v14c-1.2-.9-2.8-1.5-4.5-1.5s-3.3.6-4.5 1.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}

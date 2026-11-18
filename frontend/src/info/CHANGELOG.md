@@ -27,6 +27,7 @@ following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 ### Fixed
 - Deliberation metric now correctly scores flawless work high instead of inverting to low.
 - Resilience metric showed 0 when no mistakes were made; now defaults to 1 when all exercises are error-free, since resilience has not been tested.
+- Perfect streaks now stop at incorrect attempts on incomplete exercises and at incorrect validations submitted after completion.
 
 
 ## v1.6.0

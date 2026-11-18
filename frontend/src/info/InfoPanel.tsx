@@ -1,7 +1,7 @@
 import { useState, useRef, type ComponentProps, type MouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
-import { AboutIcon, ChangelogIcon, InformationIcon, TutorialIcon } from '../components/PanelIcons';
+import { AboutIcon, ChangelogIcon, InformationIcon } from '../components/PanelIcons';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import rehypeSlug from 'rehype-slug'; 
@@ -10,11 +10,10 @@ import ChangelogMD from './CHANGELOG.md?raw';
 import AboutMD from './ABOUT.md?raw';
 import '../panelStyles.css';
 
-type InfoTabId = 'information' | 'tutorial' | 'changelog' | 'about';
+type InfoTabId = 'information' | 'changelog' | 'about';
 
 const TABS: Array<{ id: InfoTabId; label: ReactNode }> = [
   { id: 'information', label: <><InformationIcon />&nbsp;<span>Information</span></> },
-  { id: 'tutorial', label: <><TutorialIcon />&nbsp;<span>Tutorial</span></> },
   { id: 'changelog', label: <><ChangelogIcon />&nbsp;<span>Changelog</span></> },
   { id: 'about', label: <><AboutIcon />&nbsp;<span>About</span></> },
 ];
@@ -96,27 +95,6 @@ export function InfoPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
                 >
                   {InfoMD}
                 </ReactMarkdown>
-              </div>
-            </div>
-          )}
-          {activeTab === 'tutorial' && (
-            <div className="settings-tab-content" id="tutorialtab">
-              <div className="markdown-body">
-                <h1>Tutorial</h1>
-                <ol>
-                  <li>Choose an exercise from the exercise menu.</li>
-                  <li>Review the spectra and peak data to identify signals that support your structure.</li>
-                  <li>
-                    Add fragments using the fragment menu or draw them in the molecule editor. Match peaks by
-                    selecting a peak and then the fragment it belongs to.
-                  </li>
-                  <li>Connect fragments to build the proposed molecule.</li>
-                  <li>Move the completed structure to the solution workspace and validate your answer.</li>
-                </ol>
-                <p>
-                  You can keep multiple fragments while working and use the settings to control how peak matches
-                  are handled when fragments are combined.
-                </p>
               </div>
             </div>
           )}
