@@ -260,14 +260,21 @@ type StopExerciseButtonProps = {
   onStop: () => void;
   disabled: boolean;
   title: string;
+  isResume?: boolean;
 };
 
-export function StopExerciseButton({ onStop, disabled, title }: StopExerciseButtonProps) {
+export function StopExerciseButton({ onStop, disabled, title, isResume = false }: StopExerciseButtonProps) {
   return (
     <TimerControlButton onClick={onStop} disabled={disabled} title={title} testId="stop-exercise-button">
-      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-        <rect x="3" y="3" width="8" height="8" rx="1" />
-      </svg>
+      {isResume ? (
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+          <path d="M4 2.7a.7.7 0 0 1 1.05-.61l6.3 3.8a1.3 1.3 0 0 1 0 2.22l-6.3 3.8A.7.7 0 0 1 4 11.3V2.7Z" />
+        </svg>
+      ) : (
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+          <rect x="3" y="3" width="8" height="8" rx="1" />
+        </svg>
+      )}
     </TimerControlButton>
   );
 }

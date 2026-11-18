@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getStartAtExerciseId } from '../../../src/features/exercises/startAt';
+import { getLatestUnfinishedExercise, getStartAtExerciseId } from '../../../src/features/exercises/startAt';
 import type { ExerciseSummary } from '../../../src/api/exercises';
 
 const exercises: ExerciseSummary[] = [
@@ -43,6 +43,19 @@ describe('getStartAtExerciseId', () => {
 
   it('selects the most recently started incomplete exercise', () => {
     expect(getStartAtExerciseId(exercises, 'last_incomplete', 9)).toBe(17);
+  });
+
+  it('returns the latest unfinished exercise while excluding the stop target', () => {
+    const stopTarget = {
+      id: 18,
+      name: 'Sucrose',
+      exercise_set: 'Examples',
+      tags: [],
+      started_at: '2026-04-01T10:00:00Z',
+    };
+
+    expect(getLatestUnfinishedExercise([...exercises, stopTarget], stopTarget.id)?.id).toBe(17);
+    expect(getLatestUnfinishedExercise([exercises[0]])).toBeUndefined();
   });
 
   it('selects the configured exercise or falls back to Sucrose', () => {

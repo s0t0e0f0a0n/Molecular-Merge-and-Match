@@ -19,6 +19,7 @@ following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 
 ### Added
 - A startup exercise preference can open the last finished exercise, the last incomplete exercise, or a chosen exercise (defaulting to Sucrose).
+- After switching to the stop-target exercise, the stop button becomes a play button that resumes the latest unfinished exercise.
 
 ### Changed
 - **Deliberation metric redesign**: Three-component model measuring planning quality (execution efficiency, pace consistency, thinking pause quality) instead of pause frequency. See README for technical details.

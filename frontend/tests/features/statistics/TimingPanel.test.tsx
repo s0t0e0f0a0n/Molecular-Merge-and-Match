@@ -41,6 +41,14 @@ describe('ExerciseTimerDisplay', () => {
     expect(square).toHaveAttribute('height', '8');
   });
 
+  it('renders a play icon when resuming', () => {
+    render(<StopExerciseButton onStop={() => {}} disabled={false} title="Resume exercise" isResume />);
+
+    const playButton = screen.getByTestId('stop-exercise-button');
+    expect(playButton.querySelector('svg path')).toBeInTheDocument();
+    expect(playButton.querySelector('svg rect')).not.toBeInTheDocument();
+  });
+
   it('updates the displayed time once per second without updating its parent', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-11-06T14:00:00.000Z'));

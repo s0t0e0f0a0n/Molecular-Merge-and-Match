@@ -45,7 +45,7 @@ import { ValidationOverlay } from '../../components/DifficultyRating';
 import { LoadingExerciseOverlay, PausedExerciseOverlay } from './LoadingExerciseOverlay';
 import { LinkInheritOptionsPopup, type LinkInheritMode } from '../linking/LinkInheritOptionsPopup';
 import { applySettingsPreset, fetchUserSettings, updateUserSettings, type StartAtMode, type UpdateUserSettingsRequest, type UserSettings } from '../../api/settings';
-import { getStartAtExerciseId } from '../exercises/startAt';
+import { getLatestUnfinishedExercise, getStartAtExerciseId } from '../exercises/startAt';
 import {
   fetchSolventPreferences,
   updateSolventPreference,
@@ -486,18 +486,22 @@ export function MolecularBookkeepingPage() {
   const [exerciseSummariesError, setExerciseSummariesError] = useState<string | null>(null);
 
   const stopTarget = useMemo(() => getStopExerciseTarget(exerciseSummaries), [exerciseSummaries]);
-  const stopButtonDisabled =
-    loadingSelectedExercise ||
-    selectedExerciseId === null ||
-    selectedExercise === null ||
-    selectedExercise.completed === true ||
-    selectedExerciseStatistics?.exercise_id !== String(selectedExerciseId) ||
-    !isExerciseTimerRunning(selectedExerciseStatistics) ||
-    exercisePaused ||
-    pausingExercise ||
-    resumingExercise ||
-    !stopTarget ||
-    stopTarget.id === selectedExerciseId;
+  const stopButtonIsResume = stopTarget?.id === selectedExerciseId;
+  const resumableExercise = stopButtonIsResume && stopTarget
+    ? getLatestUnfinishedExercise(exerciseSummaries, stopTarget.id)
+    : undefined;
+  const stopTargetSummaryRefreshRef = useRef<number | null>(null);
+  const stopButtonDisabled = loadingSelectedExercise || pausingExercise || resumingExercise
+    ? true
+    : stopButtonIsResume
+      ? loadingExerciseSummaries || !resumableExercise
+      : selectedExerciseId === null ||
+        selectedExercise === null ||
+        selectedExercise.completed === true ||
+        selectedExerciseStatistics?.exercise_id !== String(selectedExerciseId) ||
+        !isExerciseTimerRunning(selectedExerciseStatistics) ||
+        exercisePaused ||
+        !stopTarget;
 
   const loadActiveTags = useCallback(async () => {
     try {
@@ -566,6 +570,17 @@ useEffect(() => {
 
   void initExercises();
 }, [clearSelectedExercise, loadActiveTags, initialUrlId, selectExerciseById, settingsLoaded, srMode, startAtExerciseId, startAtMode]);
+
+useEffect(() => {
+  if (selectedExerciseId !== stopTarget?.id) {
+    stopTargetSummaryRefreshRef.current = null;
+    return;
+  }
+  if (loadingSelectedExercise || stopTargetSummaryRefreshRef.current === selectedExerciseId) return;
+
+  stopTargetSummaryRefreshRef.current = selectedExerciseId;
+  void loadExerciseSummaries();
+}, [loadExerciseSummaries, loadingSelectedExercise, selectedExerciseId, stopTarget?.id]);
 
 useEffect(() => {
   const handleExerciseSummariesRefresh = () => {
@@ -2270,10 +2285,23 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
 
           <StopExerciseButton
             onStop={() => {
-              if (!stopButtonDisabled && stopTarget) void selectExerciseById(stopTarget.id);
+              if (stopButtonIsResume) {
+                if (!stopButtonDisabled && resumableExercise) {
+                  void selectExerciseById(resumableExercise.id);
+                }
+              } else if (!stopButtonDisabled && stopTarget) {
+                void selectExerciseById(stopTarget.id);
+              }
             }}
             disabled={stopButtonDisabled}
-            title={stopTarget ? `Stop exercise and switch to ${stopTarget.name ?? `Exercise ${stopTarget.id}`}` : 'No example or reference exercise available'}
+            isResume={stopButtonIsResume}
+            title={stopButtonIsResume
+              ? resumableExercise
+                ? `Resume ${resumableExercise.name ?? `Exercise ${resumableExercise.id}`}`
+                : 'No unfinished exercise to resume'
+              : stopTarget
+                ? `Stop exercise and switch to ${stopTarget.name ?? `Exercise ${stopTarget.id}`}`
+                : 'No example or reference exercise available'}
           />
 
 

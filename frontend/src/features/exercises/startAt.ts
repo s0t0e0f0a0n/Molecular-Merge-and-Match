@@ -22,6 +22,21 @@ function latestByTimestamp(
   return latest;
 }
 
+export function getLatestUnfinishedExercise(
+  exercises: ExerciseSummary[],
+  excludeExerciseId?: number,
+): ExerciseSummary | undefined {
+  return latestByTimestamp(
+    exercises.filter(
+      (exercise) =>
+        exercise.id !== excludeExerciseId &&
+        !exercise.completed_at &&
+        exercise.completed !== true,
+    ),
+    (exercise) => exercise.started_at,
+  );
+}
+
 export function getStartAtExerciseId(
   exercises: ExerciseSummary[],
   mode: StartAtMode,
@@ -34,10 +49,7 @@ export function getStartAtExerciseId(
     );
     if (lastFinished) return lastFinished.id;
   } else if (mode === 'last_incomplete') {
-    const lastIncomplete = latestByTimestamp(
-      exercises.filter((exercise) => !exercise.completed_at && exercise.completed !== true),
-      (exercise) => exercise.started_at,
-    );
+    const lastIncomplete = getLatestUnfinishedExercise(exercises);
     if (lastIncomplete) return lastIncomplete.id;
   } else {
     const selectedExercise = exercises.find((exercise) => exercise.id === customExerciseId);
