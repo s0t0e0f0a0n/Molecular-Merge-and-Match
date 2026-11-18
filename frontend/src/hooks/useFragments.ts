@@ -80,10 +80,12 @@ export function useFragments(exerciseId: string) {
       });
       if (!res.ok) return null;
       const created = (await res.json().catch(() => null)) as BackendFragment | null;
-      await refetch();
+      if (created && currentExerciseIdRef.current === exerciseId) {
+        setFragments((current) => [...current, created]);
+      }
       return created?.id ?? null;
     },
-    [exerciseId, refetch],
+    [exerciseId],
   );
 
   const updateFragment = useCallback(
@@ -94,27 +96,41 @@ export function useFragments(exerciseId: string) {
         body: JSON.stringify({ smiles, mol_file: molFile }),
       });
       if (!res.ok) return false;
-      await refetch();
+      const updated = (await res.json().catch(() => null)) as BackendFragment | null;
+      if (updated && currentExerciseIdRef.current === exerciseId) {
+        setFragments((current) => current.map((fragment) =>
+          fragment.id === id ? updated : fragment,
+        ));
+      }
       return true;
     },
-    [refetch],
+    [exerciseId],
   );
 
   const deleteFragment = useCallback(
     async (id: number) => {
       const res = await fetch(`${API}/${id}`, { method: 'DELETE' });
-      if (res.ok) await refetch();
+      if (res.ok && currentExerciseIdRef.current === exerciseId) {
+        setFragments((current) => current.filter((fragment) => fragment.id !== id));
+      }
       return res.ok;
     },
-    [refetch],
+    [exerciseId],
   );
 
   const restoreFragment = useCallback(
     async (id: number) => {
       const res = await fetch(`${API}/${id}/restore`, { method: 'POST' });
-      if (res.ok) await refetch();
+      if (!res.ok) return;
+      const restored = (await res.json().catch(() => null)) as BackendFragment | null;
+      if (restored && currentExerciseIdRef.current === exerciseId) {
+        setFragments((current) => {
+          if (current.some((fragment) => fragment.id === restored.id)) return current;
+          return [...current, restored].sort((a, b) => a.id - b.id);
+        });
+      }
     },
-    [refetch],
+    [exerciseId],
   );
 
   return { fragments, loading, error, createFragment, updateFragment, deleteFragment, restoreFragment, refetch };

@@ -23,6 +23,9 @@ following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 
 ### Changed
 - **Deliberation metric redesign**: Three-component model measuring planning quality (execution efficiency, pace consistency, thinking pause quality) instead of pause frequency. See README for technical details.
+- Fragment and working-solution mutations now update local state from mutation responses instead of refetching the full lists, reducing network requests during editing and history jumps.
+- Logbook saves are now debounced for 500 ms, skip unchanged loaded data, and flush pending exercise changes during exercise switches and page unload.
+- Background exercise-statistics refreshes no longer show loading state or refetch the summary list when updated statistics are already available.
 
 ### Fixed
 - Deliberation metric now correctly scores flawless work high instead of inverting to low.

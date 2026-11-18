@@ -26,7 +26,7 @@ export type ExerciseMenuProps = {
   showCheatTags: boolean;
   showCreation: boolean;
   onSelectExercise: (id: number) => void;
-  onExercisesMutated: () => Promise<void>;
+  onExercisesMutated: (options?: { summariesOnly?: boolean }) => Promise<void>;
   onDeleteExercises: (ids: number[]) => Promise<number[]>;
   onResetExercise: () => void;
 };
@@ -175,7 +175,7 @@ export function ExerciseMenu({
       if (selectedExerciseId !== null && (selectedExercise?.in_SR ?? 0) !== 0) {
         await deferExerciseAfterSkip(selectedExerciseId);
       }
-      await onExercisesMutated();
+      await onExercisesMutated({ summariesOnly: true });
       const currentIndex = nextExercises.findIndex((exercise) => exercise.id === selectedExerciseId);
       const remainingExercises = nextExercises.filter((exercise) => exercise.id !== selectedExerciseId);
       const nextExercise = currentIndex >= 0

@@ -205,6 +205,7 @@ describe('ExerciseMenu spaced repetition queue', () => {
     const user = userEvent.setup();
     const now = Date.now();
     const onSelectExercise = vi.fn();
+    const onExercisesMutated = vi.fn().mockResolvedValue(undefined);
     const props: ExerciseMenuProps = {
       srMode: true,
       enableDelete: false,
@@ -289,7 +290,7 @@ describe('ExerciseMenu spaced repetition queue', () => {
       showCheatTags: false,
       showCreation: false,
       onSelectExercise,
-      onExercisesMutated: vi.fn().mockResolvedValue(undefined),
+      onExercisesMutated,
       onDeleteExercises: vi.fn().mockResolvedValue([]),
       onResetExercise: vi.fn(),
     };
@@ -301,6 +302,7 @@ describe('ExerciseMenu spaced repetition queue', () => {
 
     await user.click(screen.getByRole('button', { name: 'Go to next exercise' }));
     expect(onSelectExercise).toHaveBeenLastCalledWith(2);
+    expect(onExercisesMutated).toHaveBeenCalledWith({ summariesOnly: true });
 
     rerender(<ExerciseMenu {...props} selectedExerciseId={2} />);
     await user.click(screen.getByRole('button', { name: 'Go to next exercise' }));

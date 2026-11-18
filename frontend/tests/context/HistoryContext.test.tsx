@@ -148,6 +148,22 @@ describe('HistoryProvider talks to logbook api', () => {
     );
   });
 
+  it('does not save a loaded logbook and debounces quick changes into one PUT', async () => {
+    renderProvider();
+    await waitFor(() => expect(logbookApi.fetchLogbook).toHaveBeenCalled());
+    await new Promise((resolve) => window.setTimeout(resolve, 600));
+    expect(logbookApi.saveLogbook).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('add'));
+    fireEvent.click(screen.getByTestId('add'));
+
+    await waitFor(() =>
+      expect(logbookApi.saveLogbook).toHaveBeenCalledTimes(1),
+    );
+    await new Promise((resolve) => window.setTimeout(resolve, 600));
+    expect(logbookApi.saveLogbook).toHaveBeenCalledTimes(1);
+  });
+
   it('shows an alert when saving the logbook fails', async () => {
     vi.mocked(logbookApi.saveLogbook).mockRejectedValueOnce(new Error('offline'));
     renderProvider();

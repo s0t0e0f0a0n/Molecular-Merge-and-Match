@@ -124,12 +124,10 @@ function calculatePauseQuality(session: ExerciseSession): number {
   const times = [...session.entryTimes].sort((left, right) => left - right);
   if (times.length === 0) return 1;
 
-  const totalDuration = times[times.length - 1] - times[0];
   const earlyPeriod = 30_000; // First 30 seconds
 
   // Count pauses in early period (thinking time) vs later (hesitation)
   const earlyPauses = session.pauseTimes.filter((p) => p - times[0] <= earlyPeriod).length;
-  const laterPauses = session.pauseTimes.filter((p) => p - times[0] > earlyPeriod).length;
 
   // Ideal: some early pauses (thinking), few later pauses (focused execution)
   // Score higher for balanced pause distribution

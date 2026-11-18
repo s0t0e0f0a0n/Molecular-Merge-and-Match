@@ -77,9 +77,13 @@ export function useWorkingSolution(exerciseId: string) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ smiles, mol_file: molFile }),
       });
-      if (res.ok) await refetch();
+      if (!res.ok) return;
+      const updated = (await res.json().catch(() => null)) as WorkingSolution | null;
+      if (updated && currentExerciseIdRef.current === exerciseId) {
+        setSolutionState(updated);
+      }
     },
-    [exerciseId, refetch],
+    [exerciseId],
   );
 
   const clearSolution = useCallback(async () => {

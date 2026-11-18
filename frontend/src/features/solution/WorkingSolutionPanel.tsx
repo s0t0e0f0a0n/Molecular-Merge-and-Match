@@ -401,11 +401,16 @@ useEffect(() => {
       setValidationResult(result.is_correct);
       setShouldIterateDifficulty(result.should_iterate_difficulty);
       if (result.is_correct) {
-        setSelectedExerciseStatistics(await fetchExerciseStatistics(exerciseId));
+        const statistics = await fetchExerciseStatistics(exerciseId);
+        setSelectedExerciseStatistics(statistics);
+        window.dispatchEvent(new CustomEvent('exercise-statistics-updated', {
+          detail: { exerciseId, statistics },
+        }));
+      } else {
+        window.dispatchEvent(new CustomEvent('exercise-statistics-updated', {
+          detail: { exerciseId },
+        }));
       }
-      window.dispatchEvent(new CustomEvent('exercise-statistics-updated', {
-        detail: { exerciseId },
-      }));
     } catch {
       setValidationError('Unable to validate the working solution.');
     } finally {

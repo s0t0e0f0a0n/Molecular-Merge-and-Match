@@ -1688,7 +1688,6 @@ function ResetTab({ exerciseSummaries: allExerciseSummaries, selectedExerciseId,
         : (await resetExercises(pendingReset.exerciseIds, pendingReset.level), pendingReset.exerciseIds);
       setPendingReset(null);
       window.dispatchEvent(new CustomEvent('exercise-reset', { detail: { ...pendingReset, exerciseIds } }));
-      window.dispatchEvent(new Event('exercise-statistics-updated'));
     } catch (error) {
       setResetError(error instanceof Error ? error.message : 'Reset failed.');
     } finally {

@@ -30,6 +30,7 @@ import {
   deleteExercise,
   type ApiC13Coupling,
   type ApiC13Peak,
+  type ExerciseStatistics,
   type ExerciseSummary,
 } from '../../api/exercises';
 import { useExerciseData } from '../../context/ExerciseDataContext';
@@ -515,21 +516,46 @@ export function MolecularBookkeepingPage() {
   }, []);
 
   {/*getting the exercise list from api*/}
-  const loadExerciseSummaries = useCallback(async () => {
-  setLoadingExerciseSummaries(true);
+  const loadExerciseSummaries = useCallback(async (options: { silent?: boolean } = {}) => {
+  if (!options.silent) setLoadingExerciseSummaries(true);
   setExerciseSummariesError(null);
 
   try {
     const data = await fetchExerciseSummaries();
     setExerciseSummaries(data);
+    return data;
   } catch (error) {
     setExerciseSummariesError(
       error instanceof Error ? error.message : 'Failed to load exercises.',
     );
+    return null;
   } finally {
-    setLoadingExerciseSummaries(false);
+    if (!options.silent) setLoadingExerciseSummaries(false);
   }
 }, []);
+
+  const patchExerciseSummaryStatistics = useCallback((
+    exerciseId: number,
+    statistics: ExerciseStatistics,
+  ) => {
+    setExerciseSummaries((current) => current.map((summary) => summary.id === exerciseId
+      ? {
+          ...summary,
+          difficulty: statistics.difficulty,
+          completed: statistics.completed_at !== null,
+          incorrect_count: statistics.incorrect_count,
+          timer_total: statistics.timer_total,
+          started_at: statistics.started_at,
+          completed_at: statistics.completed_at,
+          fragments_drawn: statistics.fragments_drawn,
+          merges_done: statistics.merges_done,
+          matches_done: statistics.matches_done,
+          SR_status: statistics.SR_status,
+          cheats_used: statistics.cheats_used,
+          has_statistics: true,
+        }
+      : summary));
+  }, []);
 
 useEffect(() => {
   if (!settingsLoaded || exercisesInitializedRef.current) return;
@@ -579,21 +605,24 @@ useEffect(() => {
   if (loadingSelectedExercise || stopTargetSummaryRefreshRef.current === selectedExerciseId) return;
 
   stopTargetSummaryRefreshRef.current = selectedExerciseId;
-  void loadExerciseSummaries();
+  void loadExerciseSummaries({ silent: true });
 }, [loadExerciseSummaries, loadingSelectedExercise, selectedExerciseId, stopTarget?.id]);
 
 useEffect(() => {
-  const handleExerciseSummariesRefresh = () => {
-    void loadExerciseSummaries();
+  const handleExerciseSummariesRefresh = (event: Event) => {
+    const detail = (event as CustomEvent<{ exerciseId?: number; statistics?: ExerciseStatistics }>).detail;
+    if (detail?.exerciseId !== undefined && detail.statistics) {
+      patchExerciseSummaryStatistics(detail.exerciseId, detail.statistics);
+      return;
+    }
+    void loadExerciseSummaries({ silent: true });
   };
 
-  window.addEventListener('exercise-completed', handleExerciseSummariesRefresh);
   window.addEventListener('exercise-statistics-updated', handleExerciseSummariesRefresh);
   return () => {
-    window.removeEventListener('exercise-completed', handleExerciseSummariesRefresh);
     window.removeEventListener('exercise-statistics-updated', handleExerciseSummariesRefresh);
   };
-}, [loadExerciseSummaries]);
+}, [loadExerciseSummaries, patchExerciseSummaryStatistics]);
 
 useEffect(() => {
   if (!statisticsPanelOpen) return;
@@ -643,16 +672,20 @@ useEffect(() => {
     const handleExerciseReset = (event: Event) => {
       const detail = (event as CustomEvent<{ exerciseIds?: number[]; level?: string }>).detail;
       if (detail.level === 'exercise') void loadSolventPreferences();
-      if (!selectedExerciseId || !detail.exerciseIds?.includes(selectedExerciseId) || !detail.level) return;
 
       void (async () => {
+        const updatedSummaries = await loadExerciseSummaries({ silent: true });
+        if (!updatedSummaries ||
+            !selectedExerciseId ||
+            !detail.exerciseIds?.includes(selectedExerciseId) ||
+            !detail.level) {
+          return;
+        }
         if (detail.level !== 'logbook') await refetchFragments();
         if (detail.level !== 'logbook' && detail.level !== 'workspace') await refetchSolution();
         if (detail.level === 'completion' || detail.level === 'progression') {
           await selectExerciseById(selectedExerciseId);
         } else if (detail.level === 'exercise') {
-          const updatedSummaries = await fetchExerciseSummaries();
-          setExerciseSummaries(updatedSummaries);
           const selectedIndex = exerciseSummaries.findIndex((exercise) => exercise.id === selectedExerciseId);
           const removedIds = new Set(detail.exerciseIds);
           const nextExercise = exerciseSummaries.slice(selectedIndex + 1).find((exercise) => !removedIds.has(exercise.id) && updatedSummaries.some((candidate) => candidate.id === exercise.id));
@@ -666,9 +699,13 @@ useEffect(() => {
 
     window.addEventListener('exercise-reset', handleExerciseReset);
     return () => window.removeEventListener('exercise-reset', handleExerciseReset);
-  }, [clearSelectedExercise, exerciseSummaries, loadSolventPreferences, refetchFragments, refetchSolution, selectExerciseById, selectedExerciseId]);
+  }, [clearSelectedExercise, exerciseSummaries, loadExerciseSummaries, loadSolventPreferences, refetchFragments, refetchSolution, selectExerciseById, selectedExerciseId]);
 
-  const handleExercisesMutated = useCallback(async () => {
+  const handleExercisesMutated = useCallback(async (options: { summariesOnly?: boolean } = {}) => {
+    if (options.summariesOnly) {
+      await loadExerciseSummaries();
+      return;
+    }
     await Promise.all([
       loadExerciseSummaries(),
       loadActiveTags(),
@@ -1833,11 +1870,16 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
           setValidatedCorrectExerciseId(selectedExerciseId);
         }
         if (result.is_correct) {
-          setSelectedExerciseStatistics(await fetchExerciseStatistics(selectedExerciseId));
+          const statistics = await fetchExerciseStatistics(selectedExerciseId);
+          setSelectedExerciseStatistics(statistics);
+          window.dispatchEvent(new CustomEvent('exercise-statistics-updated', {
+            detail: { exerciseId: selectedExerciseId, statistics },
+          }));
+        } else {
+          window.dispatchEvent(new CustomEvent('exercise-statistics-updated', {
+            detail: { exerciseId: selectedExerciseId },
+          }));
         }
-        window.dispatchEvent(new CustomEvent('exercise-statistics-updated', {
-          detail: { exerciseId: selectedExerciseId },
-        }));
       } catch {
         setCasAnswerIsCorrect(false);
       } finally {

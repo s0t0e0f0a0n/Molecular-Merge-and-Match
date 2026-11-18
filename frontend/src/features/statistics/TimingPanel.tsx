@@ -93,7 +93,7 @@ export function useExerciseTimingState({
       const statistics = await resumeExerciseTimer(selectedExerciseId);
       setSelectedExerciseStatistics(statistics);
       window.dispatchEvent(new CustomEvent('exercise-statistics-updated', {
-        detail: { exerciseId: selectedExerciseId },
+        detail: { exerciseId: selectedExerciseId, statistics },
       }));
       setExercisePaused(false);
     } catch (error) {

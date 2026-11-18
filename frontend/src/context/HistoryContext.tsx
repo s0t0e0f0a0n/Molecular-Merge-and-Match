@@ -115,7 +115,15 @@ type HistoryContextValue = {
 
 const HistoryContext = createContext<HistoryContextValue | undefined>(undefined);
 
-const SAVE_DEBOUNCE_MS = 70;
+const SAVE_DEBOUNCE_MS = 500;
+
+function serializeHistory(state: ExerciseHistory): string {
+  return JSON.stringify({
+    entries: state.entries,
+    cursor: state.cursor,
+    links: state.links,
+  });
+}
 
 function makeId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -136,6 +144,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
 
   const loadedRef = useRef<Set<string>>(new Set());
   const dirtyRef = useRef<Set<string>>(new Set());
+  const lastSavedRef = useRef<Map<string, string>>(new Map());
   const saveTimersRef = useRef<Map<string, number>>(new Map());
   const latestHistoriesRef = useRef(allHistories);
   latestHistoriesRef.current = allHistories;
@@ -149,6 +158,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
       for (const key of keys) {
         loadedRef.current.delete(key);
         dirtyRef.current.delete(key);
+        lastSavedRef.current.delete(key);
         const timer = saveTimersRef.current.get(key);
         if (timer !== undefined) {
           window.clearTimeout(timer);
@@ -210,6 +220,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         links: parseArray<Link>(remote.links_json),
       };
       loadedRef.current.add(exerciseKey);
+      lastSavedRef.current.set(exerciseKey, serializeHistory(next));
 
       // The entries that were typed during loading should be kept
       setAllHistories((prev) => prev[exerciseKey] !== undefined
@@ -219,42 +230,81 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [exerciseKey, resetVersion]);
 
-  // Persist only histories changed by an explicit logbook operation.
+  const currentHistory = allHistories[exerciseKey] ?? emptyHistory;
+
+  const persistDirtyHistory = useCallback((key: string) => {
+    const timer = saveTimersRef.current.get(key);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      saveTimersRef.current.delete(key);
+    }
+    if (!dirtyRef.current.has(key) || !loadedRef.current.has(key)) return;
+
+    const state = latestHistoriesRef.current[key];
+    if (!state) return;
+    const serialized = serializeHistory(state);
+    if (lastSavedRef.current.get(key) === serialized) {
+      dirtyRef.current.delete(key);
+      return;
+    }
+
+    saveLogbook(key, {
+      entries_json: JSON.stringify(state.entries),
+      cursor: state.cursor,
+      links_json: JSON.stringify(state.links),
+    }).then((savedState) => {
+      lastSavedRef.current.set(key, serialized);
+      dirtyRef.current.delete(key);
+      setSaveErrorExerciseKey((current) => current === key ? null : current);
+      const exerciseId = Number(key.replace(/^exercise-/, ''));
+      if (savedState.timer_checkpointed && exerciseId === selectedExerciseIdRef.current) {
+        fetchExerciseStatistics(exerciseId)
+          .then(setSelectedExerciseStatistics)
+          .catch((err) => console.error('logbook statistics refresh failed', err));
+      }
+    }, (err) => {
+      console.error('logbook save failed', err);
+      setSaveErrorExerciseKey(key);
+    });
+  }, [setSelectedExerciseStatistics]);
+
+  useEffect(() => {
+    const previousKey = exerciseKey;
+    return () => {
+      persistDirtyHistory(previousKey);
+    };
+  }, [exerciseKey, persistDirtyHistory]);
+
+  useEffect(() => {
+    const flushPending = () => {
+      for (const key of [...dirtyRef.current]) persistDirtyHistory(key);
+    };
+    window.addEventListener('beforeunload', flushPending);
+    window.addEventListener('pagehide', flushPending);
+    return () => {
+      window.removeEventListener('beforeunload', flushPending);
+      window.removeEventListener('pagehide', flushPending);
+    };
+  }, [persistDirtyHistory]);
+
+  // Persist only the current exercise after explicit changes.
   useEffect(() => {
     if (isJumping) return;
 
-    for (const key of dirtyRef.current) {
-      if (!loadedRef.current.has(key) || !latestHistoriesRef.current[key] || saveTimersRef.current.has(key)) {
-        continue;
-      }
-      const timer = window.setTimeout(() => {
-        saveTimersRef.current.delete(key);
-        if (!dirtyRef.current.delete(key)) return;
-        const state = latestHistoriesRef.current[key];
-        if (!state) return;
-
-        saveLogbook(key, {
-          entries_json: JSON.stringify(state.entries),
-          cursor: state.cursor,
-          links_json: JSON.stringify(state.links),
-        }).then((savedState) => {
-          setSaveErrorExerciseKey((current) => current === key ? null : current);
-          const exerciseId = Number(key.replace(/^exercise-/, ''));
-          if (savedState.timer_checkpointed && exerciseId === selectedExerciseIdRef.current) {
-            fetchExerciseStatistics(exerciseId)
-              .then(setSelectedExerciseStatistics)
-              .catch((err) => console.error('logbook statistics refresh failed', err));
-          }
-        }, (err) => {
-          console.error('logbook save failed', err);
-          setSaveErrorExerciseKey(key);
-        });
-      }, SAVE_DEBOUNCE_MS);
-      saveTimersRef.current.set(key, timer);
+    if (!dirtyRef.current.has(exerciseKey) ||
+        !loadedRef.current.has(exerciseKey) ||
+        !latestHistoriesRef.current[exerciseKey] ||
+        saveTimersRef.current.has(exerciseKey)) {
+      return;
     }
-  }, [allHistories, isJumping, setSelectedExerciseStatistics]);
+    const timer = window.setTimeout(() => {
+      saveTimersRef.current.delete(exerciseKey);
+      persistDirtyHistory(exerciseKey);
+    }, SAVE_DEBOUNCE_MS);
+    saveTimersRef.current.set(exerciseKey, timer);
+  }, [exerciseKey, currentHistory, isJumping, persistDirtyHistory]);
 
-  const current = allHistories[exerciseKey] ?? emptyHistory;
+  const current = currentHistory;
 
   const registerHandlers = useCallback((handlers: HistoryHandlers) => {
     handlersRef.current = handlers;

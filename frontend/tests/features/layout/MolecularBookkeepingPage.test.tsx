@@ -136,6 +136,25 @@ async function selectExerciseViaMenu(user: ReturnType<typeof userEvent.setup>, e
   await user.click(await screen.findByRole('button', { name: new RegExp(`^${exerciseName}\\b`) }));
 }
 
+it('reloads exercise summaries once after a reset without a duplicate statistics event', async () => {
+  renderPage();
+  await waitFor(() => expect(fetchExerciseDetail).toHaveBeenCalledWith(1));
+
+  vi.mocked(fetchExerciseSummaries).mockClear();
+  const statisticsListener = vi.fn();
+  window.addEventListener('exercise-statistics-updated', statisticsListener);
+
+  act(() => {
+    window.dispatchEvent(new CustomEvent('exercise-reset', {
+      detail: { exerciseIds: [1], level: 'logbook' },
+    }));
+  });
+
+  await waitFor(() => expect(fetchExerciseSummaries).toHaveBeenCalledTimes(1));
+  expect(statisticsListener).not.toHaveBeenCalled();
+  window.removeEventListener('exercise-statistics-updated', statisticsListener);
+});
+
 describe('stop exercise', () => {
   const statistics: ExerciseStatistics = {
     exercise_id: '1',
