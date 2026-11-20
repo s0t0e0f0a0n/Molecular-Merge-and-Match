@@ -7,7 +7,7 @@ import type { SolventPreference } from '../../api/solvents';
 import type { LinkInheritMode } from '../linking/LinkInheritOptionsPopup';
 import { formatChemistryText } from '../../utils/formatChemistryText';
 import '../../panelStyles.css';
-import { fetchTags, deleteTag, restoreTag, setTagHidden, setTagStatistics, Tag } from '../../api/tags';
+import { deleteTag, restoreTag, setTagHidden, setTagStatistics, Tag } from '../../api/tags';
 import type { ExerciseSummary } from '../../api/exercises';
 import type { StartAtMode } from '../../api/settings';
 
@@ -16,6 +16,7 @@ type SettingsTabId = 'settingstab' | 'solventstab' | 'tagstab' | 'cheatstab';
 type SettingsPanelProps = {
   isOpen: boolean;
   onClose: () => void;
+  activeTags?: Tag[];
   linkInheritMode: LinkInheritMode;
   onLinkInheritModeChange: (value: LinkInheritMode) => void;
   selectedTheme: string;
@@ -211,42 +212,24 @@ function SolventStructure({ smiles }: { smiles: string }) {
 }
 
 type TagsTabProps = {
+  activeTags: Tag[];
   onTagsUpdated?: () => void;
   onTagVisibilityUpdated?: (tag: Tag) => void;
   showCheatTags: boolean;
 };
 
-function TagsTab({ onTagsUpdated, onTagVisibilityUpdated, showCheatTags }: TagsTabProps) {
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [loading, setLoading] = useState(true);
+function TagsTab({ activeTags, onTagsUpdated, onTagVisibilityUpdated, showCheatTags }: TagsTabProps) {
+  const [tags, setTags] = useState<Tag[]>(activeTags);
   const [deleted, setDeleted] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
-    let mounted = true;
-    async function load() {
-      setLoading(true);
-      try {
-        const res = await fetchTags();
-        if (!mounted) return;
-        // sort alphabetically by tag_name
-        res.sort((a, b) => a.tag_name.localeCompare(b.tag_name, undefined, { sensitivity: 'base' }));
-        setTags(res);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-    load();
-    return () => { mounted = false; };
-  }, []);
+    setTags(activeTags);
+  }, [activeTags]);
 
   const displayedTags = useMemo(
     () => (showCheatTags ? tags : tags.filter((tag) => !tag.is_cheat)),
     [showCheatTags, tags],
   );
-
-  if (loading) {
-    return <p className="settings-placeholder-text">Loading tags...</p>;
-  }
 
   const sortedTags = [...displayedTags].sort((a, b) => 
     a.tag_name.localeCompare(b.tag_name, undefined, { sensitivity: 'base' })
@@ -346,6 +329,7 @@ function TagsTab({ onTagsUpdated, onTagVisibilityUpdated, showCheatTags }: TagsT
 export function SettingsPanel({
   isOpen,
   onClose,
+  activeTags = [],
   linkInheritMode,
   onLinkInheritModeChange,
   selectedTheme,
@@ -732,6 +716,7 @@ export function SettingsPanel({
                         Deleting tags can only be undone in the current active window: close this settings panel and deletion is irreversible.
                 </div>
               <TagsTab
+                activeTags={activeTags}
                 onTagsUpdated={onTagsUpdated}
                 onTagVisibilityUpdated={onTagVisibilityUpdated}
                 showCheatTags={showCheatTags}

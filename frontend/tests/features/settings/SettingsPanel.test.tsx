@@ -1,11 +1,9 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchTags } from '../../../src/api/tags';
 import { SettingsPanel } from '../../../src/features/settings/SettingsPanel';
 
 vi.mock('../../../src/api/tags', () => ({
-  fetchTags: vi.fn(),
   deleteTag: vi.fn(),
   restoreTag: vi.fn(),
   setTagHidden: vi.fn(),
@@ -21,11 +19,13 @@ function renderSettingsPanel(
   cheatBits: string,
   onStartAtModeChange = vi.fn(),
   onStartAtExerciseIdChange = vi.fn(),
+  activeTags: Array<{ id: number; tag_name: string; description: string | null; is_persistent: boolean; is_hideable: boolean; is_hidden: boolean; is_cheat: boolean; tag_count: number; user_tag: boolean; allowed_stats: boolean; progression_use: boolean }> = [],
 ) {
   render(
     <SettingsPanel
       isOpen
       onClose={vi.fn()}
+      activeTags={activeTags}
       linkInheritMode="none"
       onLinkInheritModeChange={vi.fn()}
       selectedTheme="Light"
@@ -106,8 +106,7 @@ describe('SettingsPanel cheat tags', () => {
   });
 
   it('keeps a non-hideable tag unchecked when its database record is hidden', async () => {
-    vi.mocked(fetchTags).mockResolvedValue([
-      {
+    const activeTags = [{
         id: 1,
         tag_name: 'cyclic',
         description: null,
@@ -119,10 +118,9 @@ describe('SettingsPanel cheat tags', () => {
         user_tag: false,
         allowed_stats: false,
         progression_use: false,
-      },
-    ]);
+      }];
 
-    renderSettingsPanel('100000001000');
+    renderSettingsPanel('100000001000', vi.fn(), vi.fn(), activeTags);
 
     await userEvent.setup().click(screen.getByRole('button', { name: /tags/i }));
 
@@ -130,8 +128,7 @@ describe('SettingsPanel cheat tags', () => {
   });
 
   it('hides cheat tags when cheats are disabled even if the cheat-tag bit remains set', async () => {
-    vi.mocked(fetchTags).mockResolvedValue([
-      {
+    const activeTags = [{
         id: 1,
         tag_name: 'cyclic',
         description: null,
@@ -143,10 +140,9 @@ describe('SettingsPanel cheat tags', () => {
         user_tag: false,
         allowed_stats: false,
         progression_use: false,
-      },
-    ]);
+      }];
 
-    renderSettingsPanel('000000001000');
+    renderSettingsPanel('000000001000', vi.fn(), vi.fn(), activeTags);
     await userEvent.setup().click(screen.getByRole('button', { name: /tags/i }));
 
     expect(await screen.findByText('Tag name')).toBeInTheDocument();

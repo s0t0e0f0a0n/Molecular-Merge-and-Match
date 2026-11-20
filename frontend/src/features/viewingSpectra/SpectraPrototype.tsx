@@ -477,10 +477,7 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
       })
       .then((text) => {
         if (controller.signal.aborted) return;
-        const processed = forceSvgFontFamily(
-          applySvgDisplaySettings(text, type, showSolventText, showExchangeText, showIntegralCurves),
-          {},
-        )
+        const processed = forceSvgFontFamily(text, {})
           .replace(/<title[\s\S]*?<\/title>/gi, '')
           .replace(/<desc[\s\S]*?<\/desc>/gi, '')
           .replace(/<metadata[\s\S]*?<\/metadata>/gi, '')
@@ -497,7 +494,7 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
       });
 
     return () => controller.abort();
-  }, [src, type, showSolventText, showExchangeText, showIntegralCurves])
+  }, [src])
 
   const highlightWidthPPM = useMemo(() => {
     if (type === 'H') return 0.21; // was 0.18 ppm
@@ -516,8 +513,19 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.2, 10))
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.2, 1))
  
+  const processedSvg = useMemo(
+    () => applySvgDisplaySettings(
+      svgContent,
+      type,
+      showSolventText,
+      showExchangeText,
+      showIntegralCurves,
+    ),
+    [svgContent, type, showSolventText, showExchangeText, showIntegralCurves],
+  )
+
   const displaySvg = useMemo(
-    () => svgContent.replace(
+    () => processedSvg.replace(
       /<svg([^>]*)>/,
       (match, attrs) => {
         const cleanAttrs = attrs
@@ -526,7 +534,7 @@ export function SpectrumViewer({ title, src, height = 200, type, peaks, axisRang
         return `<svg${cleanAttrs} preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:100%;">`
       }
     ),
-    [svgContent, showSolventText, showExchangeText, showIntegralCurves],
+    [processedSvg],
   )
   
   const renderContent = (isModal: boolean) => (

@@ -18,6 +18,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 
 from app.api.statistics import (
+    StatisticsOut,
     _ensure_statistics_row,
     _find_statistics_row,
     _record_spaced_repetition_review,
@@ -46,7 +47,6 @@ from app.core.tag_tokens import (
 from app.core.tag_tokens import (
     extract_tag_ids as extract_tag_ids,
 )
-from app.core.usage_counts import recount_exercise_usage
 from app.db.models import (
     Exercise,
     ExerciseAdditionalNuclei,
@@ -58,6 +58,7 @@ from app.db.models import (
     LogbookState,
     Statistics,
     StatisticsReviewEvent,
+    SolventsUsed,
     TagsUsed,
     WorkingSolution,
 )
@@ -320,6 +321,8 @@ class ExerciseOut(BaseModel):
     alt_nuclei: list[AdditionalNucleusOut]
 
     additional_spectra: list[AdditionalSpectrumOut]
+    statistics: StatisticsOut | None = None
+    saved_dbe: float | None = None
     model_config = {"from_attributes": True}
 
 class ExerciseSummaryOut(BaseModel):
@@ -767,6 +770,7 @@ def _to_response(
     row: Exercise,
     db,
     tags_by_id: dict[int, TagsUsed] | None = None,
+    include_detail: bool = False,
 ) -> ExerciseOut:
     tags = []
     parts: list[str] = []
@@ -782,6 +786,15 @@ def _to_response(
         if p not in seen:
             seen.add(p)
             tags.append(p)
+
+    statistics_row = _find_statistics_row(db, str(row.id)) if include_detail else None
+    working_solution = (
+        db.query(WorkingSolution)
+        .filter_by(exercise_id=f"exercise-{row.id}")
+        .first()
+        if include_detail
+        else None
+    )
 
     return ExerciseOut(
         id=row.id, name=row.name, molecular_formula=row.molecular_formula, dbe=row.dbe,
@@ -800,6 +813,12 @@ def _to_response(
             AdditionalSpectrumOut(id=s.id, file_path=s.file_path, label=s.label, priority=s.priority)
             for s in row.additional_spectra
         ],
+        statistics=(
+            StatisticsOut.model_validate(statistics_row)
+            if statistics_row is not None
+            else None
+        ),
+        saved_dbe=working_solution.dbe if working_solution is not None else None,
     )
 
 def _to_summary_response(
@@ -1039,8 +1058,9 @@ def update_exercise_from_import(body: ExerciseUpdateRequest) -> ExerciseOut:
                     h1_solvent = c13_solvent = solvent_override
                 old_solvent_ids = extract_solvent_ids(exercise.h1_solvent) | extract_solvent_ids(exercise.c13_solvent)
                 apply_solvent_count_delta(db, old_solvent_ids, -1)
-                exercise.h1_solvent, _ = encode_solvent_text(db, h1_solvent)
-                exercise.c13_solvent, _ = encode_solvent_text(db, c13_solvent)
+                solvents = db.query(SolventsUsed).all()
+                exercise.h1_solvent, _ = encode_solvent_text(db, h1_solvent, solvents)
+                exercise.c13_solvent, _ = encode_solvent_text(db, c13_solvent, solvents)
                 apply_solvent_count_delta(db, extract_solvent_ids(exercise.h1_solvent) | extract_solvent_ids(exercise.c13_solvent), +1)
 
             for spectrum_name, spectrum in (("h1", body.replace.h1), ("c13", body.replace.c13)):
@@ -1119,10 +1139,10 @@ def get_exercise(exercise_id: int, track: bool = True) -> ExerciseOut:
             raise HTTPException(status_code=404, detail="Exercise not found.")
         if track:
             mark_exercise_selected(db, row)
-            response = _to_response(row, db)
+            response = _to_response(row, db, include_detail=True)
             db.commit()
             return response
-        return _to_response(row, db)
+        return _to_response(row, db, include_detail=True)
 
 @router.get("/", response_model=list[ExerciseOut])
 def list_exercises() -> list[ExerciseOut]:
@@ -1312,9 +1332,12 @@ def delete_exercise(exercise_id: int) -> None:
             if spec.file_path:
                 file_paths.append(spec.file_path)
 
+        removed_tag_ids = extract_tag_ids(exercise.tags_csv)
+        removed_solvent_ids = extract_solvent_ids(exercise.h1_solvent) | extract_solvent_ids(exercise.c13_solvent)
         db.delete(exercise)
         db.flush()
-        recount_exercise_usage(db)
+        apply_tag_count_delta(db, removed_tag_ids, -1)
+        apply_solvent_count_delta(db, removed_solvent_ids, -1)
         db.commit()
         sqlite_root = Path(settings.sqlite_path).resolve().parent
         for path in file_paths:
@@ -1429,8 +1452,9 @@ def create_exercise(body: ExerciseCreate) -> ExerciseOut:
                 exercise.tags_csv = encoded_tags
                 apply_tag_count_delta(db, tag_ids, +1)
 
-            encoded_h1_solvent, _ = encode_solvent_text(db, h1_solvent)
-            encoded_c13_solvent, _ = encode_solvent_text(db, c13_solvent)
+            solvents = db.query(SolventsUsed).all()
+            encoded_h1_solvent, _ = encode_solvent_text(db, h1_solvent, solvents)
+            encoded_c13_solvent, _ = encode_solvent_text(db, c13_solvent, solvents)
             exercise.h1_solvent = encoded_h1_solvent
             exercise.c13_solvent = encoded_c13_solvent
 

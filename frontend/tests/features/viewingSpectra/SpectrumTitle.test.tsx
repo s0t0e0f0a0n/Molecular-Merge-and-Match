@@ -56,6 +56,49 @@ describe('SpectrumViewer title — italic solvent rerender', () => {
     );
 
     await waitFor(() => expect(container.querySelector('#integral')).not.toBeNull());
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refetch raw SVG text when display toggles change', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(
+            '<svg><text>solvent</text><text>exchanges with D2O</text><path id="integral" stroke="#ff0000" d="M0 0"/></svg>',
+          ),
+        } as Response),
+      ),
+    );
+
+    const { container, rerender } = render(
+      <SpectrumViewer {...commonProps({
+        src: '/toggle-spectrum.svg',
+        showSolventText: true,
+        showExchangeText: true,
+        showIntegralCurves: true,
+      })} />,
+    );
+
+    await waitFor(() => expect(container.querySelector('#integral')).not.toBeNull());
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <SpectrumViewer {...commonProps({
+        src: '/toggle-spectrum.svg',
+        showSolventText: false,
+        showExchangeText: false,
+        showIntegralCurves: false,
+      })} />,
+    );
+
+    await waitFor(() => {
+      expect(container.querySelector('#integral')).toBeNull();
+      expect(container).not.toHaveTextContent('solvent');
+      expect(container).not.toHaveTextContent('exchanges');
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it('always shows the APT marker and toggles its phase annotation independently', () => {

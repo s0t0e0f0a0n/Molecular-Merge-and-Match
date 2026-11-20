@@ -188,6 +188,7 @@ describe('stop exercise', () => {
       id,
       name: id === 9 ? 'Sucrose' : 'Exercise 1',
       completed: id === 9 ? false : options.completed ?? false,
+      statistics: stats,
     }));
     mockFetch.mockImplementation((url) => Promise.resolve({
       ok: true,

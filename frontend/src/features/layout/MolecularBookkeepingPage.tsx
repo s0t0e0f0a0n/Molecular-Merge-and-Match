@@ -25,7 +25,6 @@ import {
   fetchExerciseSummaries,
   resetExercise,
   validateExerciseCasAnswer,
-  fetchExerciseDbe,
   saveExerciseDbe,
   deleteExercise,
   type ApiC13Coupling,
@@ -566,36 +565,27 @@ useEffect(() => {
     setLoadingExerciseSummaries(true);
     setExerciseSummariesError(null);
 
-    try {
-      const data = await fetchExerciseSummaries();
-      setExerciseSummaries(data);
-
-      if (data.length > 0) {
-        if (srMode) {
-          const queue = getSpacedRepetitionQueue(data);
-          if (queue.length > 0) {
-            await selectExerciseById(queue[0].id);
-          } else {
-            await clearSelectedExercise();
-          }
+    const data = exerciseSummaries;
+    if (data.length > 0) {
+      if (srMode) {
+        const queue = getSpacedRepetitionQueue(data);
+        if (queue.length > 0) {
+          await selectExerciseById(queue[0].id);
         } else {
-          const initialId = initialUrlId === null
-            ? getStartAtExerciseId(data, startAtMode, startAtExerciseId)
-            : data.find((exercise) => exercise.id === initialUrlId)?.id ?? data[0].id;
-          if (initialId !== null) await selectExerciseById(initialId);
+          await clearSelectedExercise();
         }
+      } else {
+        const initialId = initialUrlId === null
+          ? getStartAtExerciseId(data, startAtMode, startAtExerciseId)
+          : data.find((exercise) => exercise.id === initialUrlId)?.id ?? data[0].id;
+        if (initialId !== null) await selectExerciseById(initialId);
       }
-    } catch (error) {
-      setExerciseSummariesError(
-        error instanceof Error ? error.message : 'Failed to load exercises.',
-      );
-    } finally {
-      setLoadingExerciseSummaries(false);
     }
+    setLoadingExerciseSummaries(false);
   }
 
   void initExercises();
-}, [clearSelectedExercise, loadActiveTags, initialUrlId, selectExerciseById, settingsLoaded, srMode, startAtExerciseId, startAtMode]);
+}, [clearSelectedExercise, exerciseSummaries, loadActiveTags, initialUrlId, selectExerciseById, settingsLoaded, srMode, startAtExerciseId, startAtMode]);
 
 useEffect(() => {
   if (selectedExerciseId !== stopTarget?.id) {
@@ -980,11 +970,20 @@ useEffect(() => {
   );
 
   useEffect(() => {
-    fetchUserSettings()
-      .then((settings) => {
-        applyIncomingSettings(settings);
-      })
-      .catch((err) => {
+    let cancelled = false;
+    setLoadingExerciseSummaries(true);
+    setExerciseSummariesError(null);
+
+    Promise.allSettled([
+      fetchUserSettings(),
+      fetchExerciseSummaries(),
+    ]).then(([settingsResult, summariesResult]) => {
+      if (cancelled) return;
+
+      if (settingsResult.status === 'fulfilled') {
+        applyIncomingSettings(settingsResult.value);
+      } else {
+        const err = settingsResult.reason;
         console.error('failed to load settings', err);
         setCheatBits(DEFAULT_CHEATS);
         setShowCASValidation(true);
@@ -998,11 +997,23 @@ useEffect(() => {
         setShowCreation(true);
         setSelectedTheme('Light');
         setSelectedPreset('User');
-      })
-      .finally(() => {
-        setLoadingLinkSettings(false);
-        setSettingsLoaded(true);
-      });
+      }
+
+      if (summariesResult.status === 'fulfilled') {
+        setExerciseSummaries(summariesResult.value);
+      } else {
+        const err = summariesResult.reason;
+        setExerciseSummariesError(
+          err instanceof Error ? err.message : 'Failed to load exercises.',
+        );
+      }
+
+      setLoadingLinkSettings(false);
+      setSettingsLoaded(true);
+      setLoadingExerciseSummaries(false);
+    });
+
+    return () => { cancelled = true; };
   }, [applyIncomingSettings]);
 
   const handleSolventPreferenceChange = useCallback(
@@ -1302,27 +1313,10 @@ const cAxisRange: [number, number] | null =
         return;
       }
 
-      setFormulaDbeDraft('');
-      setSavedFormulaDbe(null);
-
-      let cancelled = false;
-      fetchExerciseDbe(selectedExerciseId)
-        .then((dbe) => {
-          if (!cancelled) {
-            setSavedFormulaDbe(dbe);
-            setFormulaDbeDraft(dbe !== null ? String(dbe) : '');
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to load DBE:', err);
-          if (!cancelled) {
-            setFormulaDbeDraft('');
-            setSavedFormulaDbe(null);
-          }
-        });
-        
-      return () => { cancelled = true; };
-    }, [selectedExerciseId]);
+      const savedDbe = selectedExercise?.saved_dbe ?? null;
+      setSavedFormulaDbe(savedDbe);
+      setFormulaDbeDraft(savedDbe !== null ? String(savedDbe) : '');
+    }, [selectedExercise, selectedExerciseId]);
 
     const parsedFormulaDbeDraft = useMemo(() => {
     const value = formulaDbeDraft.trim();
@@ -2687,6 +2681,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
       <SettingsPanel
         isOpen={settingsPanelOpen}
         onClose={() => setSettingsPanelOpen(false)}
+        activeTags={activeTags}
         linkInheritMode={linkInheritMode}
         onLinkInheritModeChange={handleChangeLinkInheritMode}
         selectedTheme={selectedTheme}
@@ -2739,6 +2734,7 @@ function molBlockWithoutMapNumbers(graph: MolGraph): string {
         isOpen={statisticsPanelOpen}
         onClose={() => setStatisticsPanelOpen(false)}
         exerciseSummaries={exerciseSummaries}
+        activeTags={activeTags}
         selectedExerciseId={selectedExerciseId}
         enableDelete={enableDelete}
         deleteProgression={cheating.isEnabled(10)}

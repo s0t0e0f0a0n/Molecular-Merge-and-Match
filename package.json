@@ -78,11 +78,7 @@
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb",
-        "rpm",
-        "pacman",
-        "flatpak"
+        "AppImage"
       ],
       "executableName": "molecularmergeandmatch",
       "artifactName": "${name}-Setup-${version}-${arch}.${ext}",

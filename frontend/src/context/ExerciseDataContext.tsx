@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  fetchExerciseStatistics,
   fetchExerciseDetail,
   stopExerciseTimer,
   type ExerciseStatistics,
@@ -97,13 +96,7 @@ export function ExerciseDataProvider({
 
     try {
       const detail = await fetchExerciseDetail(exerciseId); 
-      let statistics: ExerciseStatistics | null = null;
-
-      try {
-        statistics = await fetchExerciseStatistics(exerciseId);
-      } catch {
-        statistics = null;
-      }
+      const statistics = detail.statistics ?? null;
 
       if (requestId !== selectRequestIdRef.current) {
         return;
@@ -140,8 +133,8 @@ export function ExerciseDataProvider({
     ) {
       return;
     }
-
     setSelectedExercise(detail);
+    setSelectedExerciseStatistics(detail.statistics ?? null);
   }, [selectedExerciseId]);
 
   const clearSelectedExercise = useCallback(async () => {

@@ -113,7 +113,11 @@ def _token_for(solvent_id: int) -> str:
     return f"%solv{{{solvent_id}}}"
 
 
-def encode_solvent_text(db: Session, raw_solvent_text: str | None) -> tuple[str | None, int | None]:
+def encode_solvent_text(
+    db: Session,
+    raw_solvent_text: str | None,
+    solvents: list["SolventsUsed"] | None = None,
+) -> tuple[str | None, int | None]:
     """Replace a known solvent match inside text with a solvent-id token.
 
     Returns the encoded text and the solvent id that was referenced.
@@ -125,7 +129,7 @@ def encode_solvent_text(db: Session, raw_solvent_text: str | None) -> tuple[str 
     if not solvent_text:
         return None, None
 
-    rows = db.query(SolventsUsed).all()
+    rows = list(solvents) if solvents is not None else db.query(SolventsUsed).all()
     rows.sort(key=lambda row: (-len(row.match or ""), row.id))
 
     for row in rows:
@@ -145,4 +149,6 @@ def encode_solvent_text(db: Session, raw_solvent_text: str | None) -> tuple[str 
     )
     db.add(created)
     db.flush()
+    if solvents is not None:
+        solvents.append(created)
     return _token_for(created.id), created.id

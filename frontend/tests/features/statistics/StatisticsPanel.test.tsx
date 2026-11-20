@@ -36,6 +36,11 @@ function renderResetPanel() {
       isOpen
       onClose={() => undefined}
       exerciseSummaries={summaries.map((exercise) => ({ ...exercise, has_statistics: true }))}
+      activeTags={[
+        { id: 1, tag_name: 'important', description: null, is_persistent: false, is_hideable: true, is_hidden: false, is_cheat: false, tag_count: 3, user_tag: false, allowed_stats: true, progression_use: true },
+        { id: 2, tag_name: 'review', description: null, is_persistent: false, is_hideable: true, is_hidden: false, is_cheat: false, tag_count: 1, user_tag: false, allowed_stats: true, progression_use: true },
+        { id: 3, tag_name: 'hidden-tag', description: null, is_persistent: false, is_hideable: true, is_hidden: false, is_cheat: false, tag_count: 1, user_tag: false, allowed_stats: true, progression_use: true },
+      ]}
       selectedExerciseId={2}
       enableDelete
       deleteProgression
@@ -236,6 +241,11 @@ describe('Statistics tag progression', () => {
         exerciseSummaries={[
           ...summaries,
           { id: 6, name: 'Six', exercise_set: 'set-c', tags: [], statistics_tags: ['hidden-tag'], completed_at: '2026-09-08T01:00:00' },
+        ]}
+        activeTags={[
+          { id: 1, tag_name: 'important', description: null, is_persistent: false, is_hideable: true, is_hidden: false, is_cheat: false, tag_count: 3, user_tag: false, allowed_stats: true, progression_use: true },
+          { id: 2, tag_name: 'review', description: null, is_persistent: false, is_hideable: true, is_hidden: false, is_cheat: false, tag_count: 1, user_tag: false, allowed_stats: true, progression_use: true },
+          { id: 3, tag_name: 'hidden-tag', description: null, is_persistent: false, is_hideable: true, is_hidden: true, is_cheat: false, tag_count: 1, user_tag: false, allowed_stats: true, progression_use: true },
         ]}
         selectedExerciseId={2}
       />,

@@ -6,8 +6,9 @@ from typing import Literal
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
+from app.core.solvent_tokens import apply_solvent_count_delta, extract_solvent_ids
 from app.core.statistics_keys import statistics_exercise_id_keys
-from app.core.usage_counts import recount_exercise_usage
+from app.core.tag_tokens import apply_tag_count_delta, extract_tag_ids
 from app.db.models import (
     Exercise,
     ExerciseAdditionalNuclei,
@@ -149,6 +150,17 @@ def _reset_exercises_data(db, exercise_ids: set[int], level: str) -> None:
             Statistics.exercise_id.in_(eligible_keys)
         ).delete(synchronize_session=False)
     if level == "exercise":
+        removed_exercises = db.query(Exercise).filter(
+            Exercise.id.in_(eligible_ids)
+        ).all()
+        for removed_exercise in removed_exercises:
+            apply_tag_count_delta(db, extract_tag_ids(removed_exercise.tags_csv), -1)
+            apply_solvent_count_delta(
+                db,
+                extract_solvent_ids(removed_exercise.h1_solvent)
+                | extract_solvent_ids(removed_exercise.c13_solvent),
+                -1,
+            )
         db.query(ExerciseAdditionalNuclei).filter(
             ExerciseAdditionalNuclei.exercise_id.in_(eligible_ids)
         ).delete(synchronize_session=False)
@@ -173,9 +185,6 @@ def _reset_exercises_data(db, exercise_ids: set[int], level: str) -> None:
 def reset_exercises(body: ResetExercisesRequest) -> None:
     with get_db() as db:
         _reset_exercises_data(db, set(body.exercise_ids), body.level)
-        if body.level == "exercise":
-            db.flush()
-            recount_exercise_usage(db)
         db.commit()
 
 

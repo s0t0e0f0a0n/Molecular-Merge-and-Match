@@ -167,6 +167,10 @@ def test_get_exercise_tracks_selection_by_default(client):
     response = client.get(f"/api/v1/exercises/{exercise_id}")
 
     assert response.status_code == 200
+    payload = response.json()
+    assert payload["statistics"] is not None
+    assert payload["statistics"]["exercise_id"] == str(exercise_id)
+    assert payload["saved_dbe"] is None
     db = SessionLocal()
     try:
         statistics = db.query(Statistics).filter_by(exercise_id=str(exercise_id)).one()
@@ -423,23 +427,93 @@ def test_dbe_input_counter_increments_for_each_value_submission(client):
         db.close()
 
 
+def test_usage_counts_stay_correct_after_create_update_and_delete(client):
+    db = SessionLocal()
+    try:
+        db.query(TagsUsed).filter(TagsUsed.tag_name.in_(["usage-old-tag", "usage-new-tag"])).delete(synchronize_session=False)
+        db.query(SolventsUsed).filter(
+            SolventsUsed.match.in_(["usage-old-solvent", "usage-new-solvent"])
+        ).delete(synchronize_session=False)
+        db.commit()
+    finally:
+        db.close()
+
+    payload = _exercise_payload(solution_inchi=INCHI_HASH_CCO)
+    payload["tags"] = ["usage-old-tag"]
+    payload["h1_solvent"] = "usage-old-solvent"
+    payload["c13_solvent"] = "usage-old-solvent"
+    created = client.post("/api/v1/exercises/", json=payload)
+    assert created.status_code == 201
+    exercise_id = created.json()["id"]
+
+    db = SessionLocal()
+    try:
+        exercise = db.query(Exercise).filter(Exercise.id == exercise_id).one()
+        old_tag = db.query(TagsUsed).filter(TagsUsed.tag_name == "usage-old-tag").one()
+        old_solvent = db.query(SolventsUsed).filter(SolventsUsed.match == "usage-old-solvent").one()
+        old_tag_id = old_tag.id
+        old_solvent_id = old_solvent.id
+        assert f"%tag{{{old_tag_id}}}" in (exercise.tags_csv or "")
+        assert f"%solv{{{old_solvent_id}}}" in (exercise.h1_solvent or "")
+        assert db.query(TagsUsed).filter(TagsUsed.id == old_tag_id).one().tag_count == 1
+        assert db.query(SolventsUsed).filter(SolventsUsed.id == old_solvent_id).one().count == 1
+    finally:
+        db.close()
+
+    updated = client.post(
+        "/api/v1/exercises/import-update",
+        json={
+            "match": {"inchi_hash": INCHI_HASH_CCO},
+            "update": {
+                "tags": ["usage-new-tag"],
+                "h1_solvent": "usage-new-solvent",
+                "c13_solvent": "usage-new-solvent",
+            },
+        },
+    )
+    assert updated.status_code == 200
+
+    db = SessionLocal()
+    try:
+        new_tag = db.query(TagsUsed).filter(TagsUsed.tag_name == "usage-new-tag").one()
+        new_solvent = db.query(SolventsUsed).filter(SolventsUsed.match == "usage-new-solvent").one()
+        assert db.query(TagsUsed).filter(TagsUsed.id == old_tag_id).one().tag_count == 0
+        assert db.query(SolventsUsed).filter(SolventsUsed.id == old_solvent_id).one().count == 0
+        assert new_tag.tag_count == 1
+        assert new_solvent.count == 1
+        new_tag_id = new_tag.id
+        new_solvent_id = new_solvent.id
+    finally:
+        db.close()
+
+    deleted = client.delete(f"/api/v1/exercises/{exercise_id}")
+    assert deleted.status_code == 204
+
+    db = SessionLocal()
+    try:
+        assert db.query(TagsUsed).filter(TagsUsed.id == new_tag_id).one().tag_count == 0
+        assert db.query(SolventsUsed).filter(SolventsUsed.id == new_solvent_id).one().count == 0
+    finally:
+        db.close()
+
+
 @pytest.mark.parametrize("deletion_api", ["single", "batch"])
 def test_exercise_deletion_recounts_usage(client, deletion_api):
     db = SessionLocal()
     try:
-        tag_a = TagsUsed(tag_name="usage-recount-a", tag_count=50)
-        tag_b = TagsUsed(tag_name="usage-recount-b", tag_count=50)
+        tag_a = TagsUsed(tag_name="usage-recount-a", tag_count=2)
+        tag_b = TagsUsed(tag_name="usage-recount-b", tag_count=2)
         solvent_a = SolventsUsed(
             names="usage-recount-solvent-a",
             match="usage-recount-solvent-a",
             display="Usage recount solvent A",
-            count=50,
+            count=2,
         )
         solvent_b = SolventsUsed(
             names="usage-recount-solvent-b",
             match="usage-recount-solvent-b",
             display="Usage recount solvent B",
-            count=50,
+            count=2,
         )
         db.add_all([tag_a, tag_b, solvent_a, solvent_b])
         db.flush()

@@ -22,6 +22,11 @@ following sections as applicable: Added, Changed, Removed, Fixed, and Security.
 - After switching to the stop-target exercise, the stop button becomes a play button that resumes the latest unfinished exercise.
 
 ### Changed
+- The statistics panel is modularized into tab components, chart modules, reset controls, and tested pure data builders.
+- Exercise deletions and exercise-level reset batches now update tag and solvent usage counts incrementally instead of recounting all exercises.
+- Spectrum SVG text is now downloaded only when the spectrum source changes; solvent, exchange-text, and integral display toggles reuse the cached raw SVG locally.
+- Statistics panels now share one logbook-history request and receive cached page tags instead of fetching them separately across panel tabs.
+- Startup settings and exercise summaries now load concurrently, and exercise details include statistics and saved DBE state to avoid separate startup and exercise-open requests.
 - **Deliberation metric redesign**: Three-component model measuring planning quality (execution efficiency, pace consistency, thinking pause quality) instead of pause frequency. See README for technical details.
 - Fragment and working-solution mutations now update local state from mutation responses instead of refetching the full lists, reducing network requests during editing and history jumps.
 - Logbook saves are now debounced for 500 ms, skip unchanged loaded data, and flush pending exercise changes during exercise switches and page unload.

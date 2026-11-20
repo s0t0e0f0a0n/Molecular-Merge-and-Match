@@ -108,6 +108,7 @@ export type ExerciseDetail = {
 
   additional_spectra: ApiAdditionalSpectrum[];
   statistics?: ExerciseStatistics | null;
+  saved_dbe?: number | null;
 };
 
 export type CasAnswerValidationResponse = {
@@ -266,15 +267,6 @@ export async function validateExerciseSolutionHash(
   }
 
   return payload as SolutionValidationResponse;
-}
-
-export async function fetchExerciseDbe(
-  exerciseId: number
-): Promise<number | null> {
-  const r = await fetch(`/api/v1/exercises/${exerciseId}/dbe`);
-  if (!r.ok) throw new Error('Failed to fetch DBE');
-  const data = await r.json();
-  return data.dbe;
 }
 
 export async function saveExerciseDbe(
