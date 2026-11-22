@@ -78,7 +78,10 @@
     },
     "linux": {
       "target": [
-        "AppImage"
+        "AppImage",
+        "deb",
+        "rpm",
+        "pacman"
       ],
       "executableName": "molecularmergeandmatch",
       "artifactName": "${name}-Setup-${version}-${arch}.${ext}",
