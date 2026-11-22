@@ -230,6 +230,12 @@ function setupApiProxy() {
             headers.delete('host');
             headers.delete('origin');
             headers.delete('referer');
+            if (
+                (originalUrl.pathname === '/api/v1' || originalUrl.pathname.startsWith('/api/v1/'))
+                && request.method !== 'GET'
+            ) {
+                headers.set('X-Requested-With', 'MMM');
+            }
 
             const fetchOptions = {
                 method: request.method,
