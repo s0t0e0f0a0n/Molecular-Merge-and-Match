@@ -56,9 +56,9 @@ from app.db.models import (
     ExerciseH1Peak,
     Fragment,
     LogbookState,
+    SolventsUsed,
     Statistics,
     StatisticsReviewEvent,
-    SolventsUsed,
     TagsUsed,
     WorkingSolution,
 )
