@@ -283,6 +283,9 @@ function protectWindowNavigation(win) {
 }
 
 function createWindow() {
+    mainWindowCloseAuthorized = false;
+    mainWindowCloseInProgress = false;
+
     let iconAsset;
     // Linux doesn't scale the .png or .icns very well, unless using nativeImage or selecting a dedicated size.
     if (process.platform === 'linux') {
@@ -445,7 +448,6 @@ async function flushActiveExerciseTimerBeforeClose(win) {
     mainWindowCloseInProgress = false;
 }
 
-
 app.whenReady().then(async () => {
     try {
         backendPort = await getFreePort();
@@ -462,7 +464,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+    app.quit();
 });
 
 app.on('before-quit', (event) => {
