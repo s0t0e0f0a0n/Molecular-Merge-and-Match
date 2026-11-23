@@ -3,6 +3,12 @@ uvicorn[standard]==0.54.0
 pydantic-settings==2.16.1
 python-multipart==0.0.32
 SQLAlchemy==2.0.36
-rdkit==2025.9.6
 psutil==7.2.2
 defusedxml==0.7.1
+
+# Intel macOS (last supported RDKit wheel + safe NumPy cap)
+rdkit==2025.9.3; sys_platform == "darwin" and platform_machine == "x86_64"
+numpy<2.4; sys_platform == "darwin" and platform_machine == "x86_64"
+
+# Windows, Linux, and Apple Silicon macOS
+rdkit==2025.9.6; sys_platform != "darwin" or platform_machine != "x86_64"

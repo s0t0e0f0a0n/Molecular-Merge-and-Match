@@ -19,14 +19,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [windows-latest, windows-11-arm, macos-15-intel, macos-latest, ubuntu-latest, ubuntu-24.04-arm]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
       - name: Create GitHub Release Pre-emptively
-        if: runner.os == 'Linux' && startsWith(github.ref, 'refs/tags/')
+        if: matrix.os == 'ubuntu-latest' && startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.VERIFY_ACTIONS_RELEASE }}
@@ -35,18 +35,18 @@ jobs:
           draft: true  
           prerelease: false
 
-
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+          architecture: ${{ runner.os == 'Windows' && 'x64' || '' }}
 
       - name: Build Python Backend (Sidecar)
         shell: bash
         run: |
           cd backend
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller==6.22.3
           pyinstaller --noconsole --collect-all rdkit --collect-all fastapi --collect-all uvicorn --name molecular-backend main_electron.py
 
       - name: Move Backend Binary to Resources
@@ -94,5 +94,10 @@ jobs:
           GH_TOKEN: ${{ secrets.VERIFY_ACTIONS_RELEASE }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
         shell: bash
-        run: npm run dist -- -p always
+        run: |
+          if [ "${{ matrix.os }}" == "windows-11-arm" ]; then
+            npm run dist -- --win --arm64 -p always
+          else
+            npm run dist -- -p always
+          fi
 
